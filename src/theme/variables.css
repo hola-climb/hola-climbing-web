@@ -1,0 +1,115 @@
+/* ============================================================
+   Hola Design System — Ionic variable overrides
+   Maps Hola tokens → Ionic CSS custom properties
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
+
+:root {
+  /* ── Hola base tokens ─────────────────────────── */
+  --bg:            #F7F7F5;
+  --surface:       #FFFFFF;
+  --surface-soft:  #F0F1F4;
+  --fg:            #151515;
+  --fg-muted:      #8D96A8;
+  --border:        #E7EAF0;
+
+  /* ── Hold accents ─────────────────────────────── */
+  --hold-pink:   #FF4D94;
+  --hold-lime:   #C8FF00;
+  --hold-orange: #FF9800;
+  --hold-cyan:   #22D3EE;
+  --hold-dark:   #151515;
+
+  /* ── Hold tints ───────────────────────────────── */
+  --tint-pink:   #FFE3EF;
+  --tint-lime:   #EEFFB8;
+  --tint-orange: #FFE7C2;
+  --tint-cyan:   #CFF6FB;
+  --tint-dark:   #E7EAF0;
+
+  /* ── Semantic ─────────────────────────────────── */
+  --success: var(--hold-lime);
+  --info:    var(--hold-cyan);
+  --warning: var(--hold-orange);
+  --danger:  var(--hold-pink);
+
+  /* ── Typography ───────────────────────────────── */
+  --font-sans: 'Outfit', 'Noto Sans KR', system-ui, -apple-system, sans-serif;
+  --font-kr:   'Noto Sans KR', 'Outfit', system-ui, sans-serif;
+
+  --w-medium:    500;
+  --w-semibold:  600;
+  --w-bold:      700;
+  --w-extrabold: 800;
+
+  --fs-display: 48px;
+  --fs-h1:      28px;
+  --fs-h2:      22px;
+  --fs-h3:      17px;
+  --fs-body:    15px;
+  --fs-caption: 13px;
+  --fs-micro:   11px;
+
+  /* ── Spacing ──────────────────────────────────── */
+  --s-1:  4px;
+  --s-2:  8px;
+  --s-3:  12px;
+  --s-4:  16px;
+  --s-6:  24px;
+  --s-8:  32px;
+  --s-12: 48px;
+
+  /* ── Radii ────────────────────────────────────── */
+  --r-card:   24px;
+  --r-button: 16px;
+  --r-input:  16px;
+  --r-chip:   999px;
+  --r-sheet:  28px;
+
+  /* ── Shadows ──────────────────────────────────── */
+  --shadow-card:    0 1px 2px rgba(20,22,28,0.04), 0 8px 24px rgba(20,22,28,0.06);
+  --shadow-float:   0 2px 6px rgba(20,22,28,0.05), 0 20px 48px rgba(20,22,28,0.10);
+  --shadow-pressed: inset 0 1px 0 rgba(20,22,28,0.06);
+
+  /* ── Motion ───────────────────────────────────── */
+  --ease-soft:  cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-state: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast:   150ms;
+  --dur-base:   220ms;
+  --dur-slow:   320ms;
+
+  /* ── Ionic overrides ──────────────────────────── */
+  --ion-background-color:       var(--bg);
+  --ion-text-color:             var(--fg);
+  --ion-font-family:            var(--font-sans);
+
+  --ion-color-primary:          var(--hold-dark);
+  --ion-color-primary-rgb:      21, 21, 21;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-shade:    #0d0d0d;
+  --ion-color-primary-tint:     #2b2b2b;
+
+  --ion-color-secondary:        var(--hold-lime);
+  --ion-color-secondary-rgb:    200, 255, 0;
+  --ion-color-secondary-contrast: var(--fg);
+  --ion-color-secondary-shade:  #b0e000;
+  --ion-color-secondary-tint:   #d0ff33;
+
+  --ion-color-tertiary:         var(--hold-cyan);
+  --ion-color-danger:           var(--hold-pink);
+  --ion-color-warning:          var(--hold-orange);
+  --ion-color-success:          var(--hold-lime);
+
+  --ion-color-medium:           var(--fg-muted);
+  --ion-color-light:            var(--surface-soft);
+
+  --ion-toolbar-background:     var(--bg);
+  --ion-toolbar-color:          var(--fg);
+  --ion-tab-bar-background:     transparent;
+  --ion-tab-bar-color:          var(--fg-muted);
+  --ion-tab-bar-color-selected: var(--fg);
+
+  --ion-safe-area-top:    env(safe-area-inset-top);
+  --ion-safe-area-bottom: env(safe-area-inset-bottom);
+}

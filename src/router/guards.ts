@@ -1,0 +1,39 @@
+import type { NavigationGuardNext, RouteLocationNormalized } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+
+export async function authGuard(
+  to: RouteLocationNormalized,
+  _from: RouteLocationNormalized,
+  next: NavigationGuardNext,
+) {
+  const authStore = useAuthStore()
+
+  // Wait for session restoration (page refresh) before evaluating auth state,
+  // otherwise a logged-in user is bounced to /auth/login on the first navigation.
+  await authStore.initFromStorage()
+
+  // Auth pages (login/register/password-reset) — accessible only when logged out
+  const authPaths = ['/auth/login', '/auth/register', '/auth/password-reset']
+  const isAuthPath = authPaths.some(path => to.path.startsWith(path))
+
+  // Public content paths — accessible without authentication (per spec)
+  const publicPaths = ['/feed', '/explore']
+  const isPublicPath = publicPaths.some(path => to.path.startsWith(path))
+
+  // Already authenticated → keep auth pages out of reach, send to feed
+  if (isAuthPath && authStore.isAuthenticated) {
+    return next('/feed')
+  }
+
+  // Admin-only routes require ADMIN role
+  if (to.meta.requiresAdmin && authStore.user?.role !== 'ADMIN') {
+    return next(authStore.isAuthenticated ? '/feed' : '/auth/login')
+  }
+
+  // Private routes require authentication; preserve intended destination
+  if (!isAuthPath && !isPublicPath && !authStore.isAuthenticated) {
+    return next({ path: '/auth/login', query: { redirect: to.fullPath } })
+  }
+
+  next()
+}

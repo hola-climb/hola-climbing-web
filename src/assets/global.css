@@ -1,0 +1,90 @@
+/* Global utility classes — do not add component-specific styles here */
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--fg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Type utilities ─────────────────────────────── */
+.text-display { font-size: var(--fs-display); font-weight: var(--w-extrabold); letter-spacing: -0.02em; line-height: 1.0; }
+.text-h1      { font-size: var(--fs-h1);      font-weight: var(--w-extrabold); letter-spacing: -0.015em; line-height: 1.1; }
+.text-h2      { font-size: var(--fs-h2);      font-weight: var(--w-semibold);  letter-spacing: -0.01em; }
+.text-h3      { font-size: var(--fs-h3);      font-weight: var(--w-semibold); }
+.text-body    { font-size: var(--fs-body);    font-weight: var(--w-medium);    line-height: 1.45; }
+.text-caption { font-size: var(--fs-caption); font-weight: var(--w-medium);    color: var(--fg-muted); }
+.text-micro   { font-size: var(--fs-micro);   font-weight: var(--w-semibold);  text-transform: uppercase; letter-spacing: 0.08em; color: var(--fg-muted); }
+
+.text-muted   { color: var(--fg-muted); }
+
+/* ── Layout utilities ───────────────────────────── */
+.page-padding   { padding: 0 20px; }
+.page-content   { padding-bottom: 100px; }
+
+/* ── Hola card ──────────────────────────────────── */
+.hola-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── Chips ──────────────────────────────────────── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: var(--r-chip);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.chip-pink   { background: var(--tint-pink);   color: #C7286A; }
+.chip-lime   { background: var(--tint-lime);   color: #4a6a00; }
+.chip-orange { background: var(--tint-orange); color: #8a4a00; }
+.chip-cyan   { background: var(--tint-cyan);   color: #066a78; }
+.chip-dark   { background: var(--tint-dark);   color: var(--fg); }
+
+/* ── AI breathing dot ───────────────────────────── */
+@keyframes breathe {
+  0%, 100% { opacity: 0.3; transform: scale(0.9); }
+  50%       { opacity: 1;   transform: scale(1.1); }
+}
+.ai-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--hold-cyan);
+  animation: breathe 1400ms ease-in-out infinite;
+}
+
+/* ── Scroll resets ──────────────────────────────── */
+ion-content {
+  --background: var(--bg);
+}
+ion-toolbar {
+  --background: var(--bg);
+  --border-color: transparent;
+}
+ion-tab-bar {
+  --background: rgba(247,247,245,0.78);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border-top: 1px solid rgba(231,234,240,0.6);
+  height: 60px;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+ion-tab-button {
+  --color: var(--fg-muted);
+  --color-selected: var(--fg);
+}
