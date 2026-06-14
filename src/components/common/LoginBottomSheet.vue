@@ -27,7 +27,7 @@ function goRegister() {
     @did-dismiss="emit('close')"
   >
     <div class="sheet-content">
-      <button class="close-btn" @click="emit('close')" aria-label="닫기">
+      <button class="sheet-close close-btn" @click="emit('close')" aria-label="닫기">
         <IonIcon :icon="closeOutline" />
       </button>
 
@@ -53,19 +53,11 @@ function goRegister() {
   position: relative;
 }
 
+/* positioning only — visual styling comes from global .sheet-close */
 .close-btn {
   position: absolute;
   top: 16px;
   right: 16px;
-  background: var(--surface-soft);
-  border: none;
-  border-radius: 50%;
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  color: var(--fg-muted);
 }
 
 .title {

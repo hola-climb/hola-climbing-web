@@ -30,6 +30,9 @@ npm-debug.log*
 /dist
 /node_modules
 /platforms
+
+# ffmpeg.wasm core — generated from node_modules by predev/prebuild (copy:ffmpeg)
+/public/ffmpeg
 /plugins
 /www
 .claude

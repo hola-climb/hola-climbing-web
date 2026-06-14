@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // imports → state → computed → methods → lifecycle
 import { ref, computed, onMounted } from "vue";
-import { IonPage, IonHeader, IonToolbar, IonContent, IonAlert, IonSpinner } from "@ionic/vue";
+import { IonPage, IonHeader, IonToolbar, IonContent, IonSpinner } from "@ionic/vue";
+import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useUIStore } from "@/stores/ui";
@@ -17,6 +18,7 @@ const showLogoutAlert = ref(false);
 const isLoading = ref(true);
 const stats = ref<UserStats | null>(null);
 const techniqueStats = ref<TechniqueStats | null>(null);
+const hasScrolled = ref(false);
 
 const avatarInitial = computed(() => authStore.user?.nickname?.charAt(0).toUpperCase() ?? "J");
 
@@ -30,13 +32,47 @@ const profileSub = computed(() => {
   return "클라이머";
 });
 
-function formatLastClimbed(iso: string | null): string {
-  if (!iso) return "—";
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const days = Math.floor(diffMs / 86_400_000);
-  if (days <= 0) return "오늘";
-  if (days === 1) return "어제";
-  return `${days}일 전`;
+// ── Inline profile edit ────────────────────────────
+const isEditing = ref(false);
+const editNickname = ref("");
+const editBio = ref("");
+const isSavingProfile = ref(false);
+
+function startEdit() {
+  editNickname.value = authStore.user?.nickname ?? "";
+  editBio.value = authStore.user?.bio ?? "";
+  isEditing.value = true;
+}
+function cancelEdit() {
+  isEditing.value = false;
+}
+async function saveProfile() {
+  if (!editNickname.value.trim()) {
+    uiStore.showToast("닉네임을 입력해주세요.", "warning");
+    return;
+  }
+  isSavingProfile.value = true;
+  try {
+    await authStore.updateProfile({ nickname: editNickname.value.trim(), bio: editBio.value.trim() || null });
+    isEditing.value = false;
+    uiStore.showToast("프로필이 저장됐어요.");
+  } catch (err: unknown) {
+    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+    uiStore.showToast(msg ?? "저장에 실패했어요.", "danger");
+  } finally {
+    isSavingProfile.value = false;
+  }
+}
+
+function goFollows(tab: "followers" | "following") {
+  const id = authStore.user?.id;
+  if (id) router.push(`/users/${id}/follows?tab=${tab}`);
+}
+
+function handleScroll(event: CustomEvent<{ scrollTop: number }>) {
+  const scrolled = event.detail.scrollTop > 12;
+  hasScrolled.value = scrolled;
+  window.dispatchEvent(new CustomEvent("hola:tab-bar-scroll", { detail: { scrolled } }));
 }
 
 // Headline stats — derived from real /stats/me
@@ -45,10 +81,11 @@ const headlineStats = computed(() => {
   const moves = s ? Object.values(s.techniqueCounts).reduce((a, b) => a + b, 0) : 0;
   const hours = s ? (s.totalClimbingSeconds / 3600).toFixed(1) : "0";
   return [
+    { value: s?.isDynamic ? "다이나믹" : "스태틱", label: "STYLE" },
     { value: String(s?.totalVideos ?? 0), label: "VIDEOS" },
     { value: `${hours}h`, label: "CLIMB" },
     { value: String(moves), label: "MOVES" },
-    { value: formatLastClimbed(s?.lastClimbedAt ?? null), label: "LAST" },
+    // { value: formatLastClimbed(s?.lastClimbedAt ?? null), label: "LAST" },
   ];
 });
 
@@ -69,12 +106,6 @@ const techniques = computed(() => {
     color: key === mostUsed ? "var(--hold-lime)" : "var(--hold-pink)",
   }));
 });
-
-// Settings list (app preferences — navigation only)
-const settings = [
-  { label: "알림 설정", value: null, toggle: false, action: () => router.push("/my/notifications") },
-  { label: "올라 소개", value: null, toggle: false, action: undefined },
-];
 
 async function load() {
   isLoading.value = true;
@@ -102,8 +133,8 @@ onMounted(load);
 
 <template>
   <IonPage>
-    <IonHeader class="ion-no-border">
-      <IonToolbar>
+    <IonHeader class="ion-no-border transparent-header" :class="{ 'is-scrolled': hasScrolled }">
+      <IonToolbar class="transparent-toolbar">
         <div class="toolbar-inner">
           <span class="brand-label">MY PAGE</span>
           <button class="icon-btn" @click="router.push('/my/settings')" aria-label="설정">
@@ -118,19 +149,65 @@ onMounted(load);
       </IonToolbar>
     </IonHeader>
 
-    <IonContent>
+    <IonContent fullscreen class="my-page-content" :scroll-events="true" @ion-scroll="handleScroll">
       <div class="my-content page-padding">
-        <!-- Profile header with glows -->
-        <div class="profile-section">
+        <!-- Profile hero card -->
+        <div class="profile-hero">
           <div class="glow glow-pink" aria-hidden="true" />
           <div class="glow glow-lime" aria-hidden="true" />
-          <div class="profile-row">
-            <div class="avatar-dark" :aria-label="`${authStore.user?.nickname ?? ''} 아바타`">
-              {{ avatarInitial }}
+
+          <!-- View mode -->
+          <template v-if="!isEditing">
+            <div class="hero-top">
+              <div class="avatar-dark" :aria-label="`${authStore.user?.nickname ?? ''} 아바타`">
+                <img v-if="authStore.user?.profileImageUrl" :src="authStore.user.profileImageUrl" :alt="`${authStore.user?.nickname ?? ''} 프로필`" class="avatar-img" />
+                <template v-else>{{ avatarInitial }}</template>
+              </div>
+              <div class="profile-info">
+                <div class="profile-name">{{ authStore.user?.nickname ?? "—" }}</div>
+                <div class="profile-sub">{{ profileSub }}</div>
+                <p v-if="authStore.user?.bio" class="profile-bio">{{ authStore.user.bio }}</p>
+              </div>
+              <button class="edit-btn" aria-label="프로필 편집" @click="startEdit">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                </svg>
+              </button>
             </div>
-            <div class="profile-info">
-              <div class="profile-name">{{ authStore.user?.nickname ?? "—" }}</div>
-              <div class="profile-sub">{{ profileSub }}</div>
+
+            <!-- Social / activity stats -->
+            <div class="hero-stats">
+              <button class="hero-stat" @click="goFollows('followers')">
+                <span class="hs-val">{{ authStore.user?.followerCount ?? 0 }}</span>
+                <span class="hs-lbl">팔로워</span>
+              </button>
+              <button class="hero-stat" @click="goFollows('following')">
+                <span class="hs-val">{{ authStore.user?.followingCount ?? 0 }}</span>
+                <span class="hs-lbl">팔로잉</span>
+              </button>
+              <button class="hero-stat" @click="router.push('/my/videos')">
+                <span class="hs-val">{{ authStore.user?.videoCount ?? 0 }}</span>
+                <span class="hs-lbl">영상</span>
+              </button>
+            </div>
+          </template>
+
+          <!-- Edit mode -->
+          <div v-else class="profile-edit">
+            <div class="edit-field">
+              <label class="edit-label" for="edit-nickname">닉네임</label>
+              <input id="edit-nickname" v-model="editNickname" class="edit-input" type="text" maxlength="20" placeholder="닉네임" aria-label="닉네임" />
+            </div>
+            <div class="edit-field">
+              <label class="edit-label" for="edit-bio">소개</label>
+              <textarea id="edit-bio" v-model="editBio" class="edit-input edit-textarea" rows="3" maxlength="200" placeholder="클라이머 소개 (선택)" aria-label="소개" />
+            </div>
+            <div class="edit-actions">
+              <button class="edit-cancel" :disabled="isSavingProfile" @click="cancelEdit">취소</button>
+              <button class="edit-save" :disabled="isSavingProfile" @click="saveProfile">
+                <IonSpinner v-if="isSavingProfile" name="crescent" class="btn-spinner save-spinner" />
+                <span v-else>저장</span>
+              </button>
             </div>
           </div>
         </div>
@@ -171,19 +248,6 @@ onMounted(load);
           </div>
         </div>
 
-        <!-- Settings list -->
-        <div class="settings-card hola-card">
-          <div v-for="(item, i) in settings" :key="item.label" class="settings-row" :class="{ 'border-top': i > 0 }" role="button" tabindex="0" :aria-label="item.label" @click="item.action?.()">
-            <div class="settings-label">{{ item.label }}</div>
-            <div class="settings-right">
-              <span v-if="item.value" class="settings-value">{{ item.value }}</span>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="m9 5 7 7-7 7" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
         <!-- Logout -->
         <button class="logout-btn" @click="showLogoutAlert = true" aria-label="로그아웃">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -193,22 +257,7 @@ onMounted(load);
         </button>
       </div>
 
-      <IonAlert
-        :is-open="showLogoutAlert"
-        header="로그아웃"
-        message="정말 로그아웃하시겠어요?"
-        :buttons="[
-          {
-            text: '취소',
-            role: 'cancel',
-            handler: () => {
-              showLogoutAlert = false;
-            },
-          },
-          { text: '로그아웃', role: 'confirm', handler: handleLogout },
-        ]"
-        @did-dismiss="showLogoutAlert = false"
-      />
+      <ConfirmDialog :open="showLogoutAlert" title="로그아웃" message="정말 로그아웃하시겠어요?" confirm-text="로그아웃" @confirm="handleLogout" @cancel="showLogoutAlert = false" />
     </IonContent>
   </IonPage>
 </template>
@@ -221,6 +270,39 @@ onMounted(load);
   justify-content: space-between;
   padding: 0 20px;
   height: 52px;
+}
+.transparent-header {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 10;
+  background: transparent;
+  box-shadow: none;
+  transition:
+    background var(--dur-base) var(--ease-state),
+    box-shadow var(--dur-base) var(--ease-state);
+}
+.transparent-header::after {
+  display: none;
+}
+.transparent-header.is-scrolled {
+  background: rgba(247, 247, 245, 0.82);
+  box-shadow: 0 1px 0 rgba(231, 234, 240, 0.72);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+}
+.transparent-toolbar {
+  --background: transparent;
+  --border-color: transparent;
+  --box-shadow: none;
+  --min-height: 52px;
+  background: transparent;
+}
+.my-page-content {
+  --background:
+    radial-gradient(circle at 82% -34px, rgba(255, 77, 148, 0.18) 0, rgba(255, 77, 148, 0.09) 32%, rgba(255, 77, 148, 0) 60%),
+    radial-gradient(circle at -18% 90px, rgba(200, 255, 0, 0.2) 0, rgba(200, 255, 0, 0.1) 30%, rgba(200, 255, 0, 0) 58%), var(--bg);
 }
 .brand-label {
   font-size: 11px;
@@ -242,21 +324,28 @@ onMounted(load);
 
 /* ── Content ────────────────────────────────────── */
 .my-content {
-  padding-top: 8px;
+  padding-top: calc(var(--ion-safe-area-top) + 68px);
   padding-bottom: 40px;
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
 @media (min-width: 1024px) {
-  .my-content { max-width: 720px; margin: 0 auto; }
+  .my-content {
+    max-width: 720px;
+    margin: 0 auto;
+  }
 }
 
-/* ── Profile section ────────────────────────────── */
-.profile-section {
+/* ── Profile hero card (transparent, outlined) ──── */
+.profile-hero {
   position: relative;
-  padding: 0 0 4px;
+  padding: 20px;
+  border: 1.5px solid var(--fg);
+  border-radius: var(--r-card);
+  background: transparent;
 }
+
 .glow {
   position: absolute;
   width: 280px;
@@ -274,30 +363,37 @@ onMounted(load);
 }
 .glow-lime {
   background: var(--hold-lime);
-  top: 80px;
-  left: -120px;
+  bottom: -80px;
+  left: -100px;
 }
 
-.profile-row {
+.hero-top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 14px;
   position: relative;
+  z-index: 1;
 }
 .avatar-dark {
-  width: 72px;
-  height: 72px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
   background: var(--hold-dark);
   color: #fff;
   display: grid;
   place-items: center;
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 800;
   flex-shrink: 0;
+  overflow: hidden;
+}
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .profile-name {
-  font-size: 22px;
+  font-size: var(--fs-h2);
   font-weight: 800;
   letter-spacing: -0.015em;
 }
@@ -305,6 +401,141 @@ onMounted(load);
   font-size: 13px;
   color: var(--fg-muted);
   margin-top: 2px;
+}
+.profile-info {
+  flex: 1;
+  min-width: 0;
+  padding-top: 2px;
+}
+.edit-btn {
+  background: var(--surface-soft);
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  color: var(--fg);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.profile-bio {
+  font-size: var(--fs-body);
+  line-height: 1.5;
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Hero stat row (followers / following / videos) */
+.hero-stats {
+  display: flex;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  position: relative;
+  z-index: 1;
+}
+.hero-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 0;
+}
+.hero-stat--static {
+  cursor: default;
+}
+.hero-stat:not(.hero-stat--static):active {
+  opacity: 0.6;
+}
+.hs-val {
+  font-size: var(--fs-h3);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+}
+.hs-lbl {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+}
+
+/* Inline edit */
+.profile-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: relative;
+  z-index: 1;
+}
+.edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.edit-label {
+  font-size: var(--fs-micro);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-muted);
+}
+.edit-input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--r-input);
+  background: var(--surface);
+  padding: 12px 14px;
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  color: var(--fg);
+  outline: none;
+}
+.edit-input:focus {
+  border-color: var(--fg);
+}
+.edit-textarea {
+  resize: none;
+  line-height: 1.45;
+}
+.edit-actions {
+  display: flex;
+  gap: 8px;
+}
+.edit-cancel,
+.edit-save {
+  flex: 1;
+  height: 46px;
+  border: none;
+  border-radius: var(--r-button);
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  font-weight: 700;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.edit-cancel {
+  background: var(--surface-soft);
+  color: var(--fg);
+}
+.edit-save {
+  background: var(--hold-dark);
+  color: #fff;
+}
+.edit-cancel:disabled,
+.edit-save:disabled {
+  opacity: 0.5;
+}
+.save-spinner {
+  --color: #fff;
 }
 
 /* ── Headline stats ─────────────────────────────── */
@@ -324,17 +555,22 @@ onMounted(load);
 }
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px 12px;
   position: relative;
 }
 .big-stat {
   text-align: left;
+  min-width: 0;
 }
 .big-val {
   font-size: 24px;
   font-weight: 800;
   letter-spacing: -0.015em;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .big-lbl {
   font-size: 11px;
@@ -352,14 +588,8 @@ onMounted(load);
   justify-content: space-between;
   padding: 0 4px 12px;
 }
-.section-title {
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-}
+/* .section-title — canonical style in global.css */
 
-.pyramid-card {
-}
 .pyramid-rows {
   display: flex;
   flex-direction: column;
@@ -395,7 +625,7 @@ onMounted(load);
   text-align: center;
 }
 .state-title {
-  font-size: 14px;
+  font-size: var(--fs-body);
   font-weight: 700;
   margin: 0;
 }
@@ -422,67 +652,6 @@ onMounted(load);
   font-size: 12px;
   font-weight: 600;
   color: var(--fg-muted);
-}
-
-/* ── Settings list ──────────────────────────────── */
-.settings-card {
-  padding: 0;
-}
-.settings-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 16px 18px;
-  cursor: pointer;
-  transition: opacity var(--dur-fast) var(--ease-state);
-}
-.settings-row:active {
-  opacity: 0.7;
-}
-.settings-row.border-top {
-  border-top: 1px solid var(--border);
-}
-.settings-label {
-  font-size: 14px;
-  font-weight: 500;
-}
-.settings-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--fg-muted);
-}
-.settings-value {
-  font-size: 13px;
-  color: var(--fg-muted);
-}
-
-.toggle {
-  width: 44px;
-  height: 26px;
-  background: var(--surface-soft);
-  border-radius: 999px;
-  position: relative;
-  transition: background var(--dur-base) var(--ease-state);
-  flex-shrink: 0;
-}
-.toggle.on {
-  background: var(--hold-lime);
-}
-.toggle-thumb {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
-  transition: left var(--dur-base) var(--ease-state);
-}
-.toggle.on .toggle-thumb {
-  left: 21px;
 }
 
 /* ── Logout ─────────────────────────────────────── */

@@ -1,78 +1,64 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { IonModal, IonButton, IonIcon } from '@ionic/vue'
-import { closeOutline, checkmarkOutline, closeCircleOutline } from 'ionicons/icons'
-import type { TechniqueTag } from '@/types/api'
-import { getTagLabel } from '@/utils/tagLabels'
-import { useVideoStore } from '@/stores/video'
-import { useUIStore } from '@/stores/ui'
+import { ref } from "vue";
+import { IonModal, IonButton, IonIcon } from "@ionic/vue";
+import { closeOutline, checkmarkOutline, closeCircleOutline } from "ionicons/icons";
+import type { TechniqueTag } from "@/types/api";
+import { getTagLabel } from "@/utils/tagLabels";
+import { useVideoStore } from "@/stores/video";
+import { useUIStore } from "@/stores/ui";
 
 const props = defineProps<{
-  isOpen: boolean
-  videoId: string
-  techniques: TechniqueTag[]
-}>()
-const emit = defineEmits<{ (e: 'close'): void }>()
+  isOpen: boolean;
+  videoId: string;
+  techniques: TechniqueTag[];
+}>();
+const emit = defineEmits<{ (e: "close"): void }>();
 
-const videoStore = useVideoStore()
-const uiStore = useUIStore()
-const submitting = ref<string | null>(null)
+const videoStore = useVideoStore();
+const uiStore = useUIStore();
+const submitting = ref<string | null>(null);
 
-async function submitFeedback(tag: TechniqueTag, feedback: 'correct' | 'incorrect') {
-  if (submitting.value) return
-  submitting.value = tag.key
+async function submitFeedback(tag: TechniqueTag, feedback: "correct" | "incorrect") {
+  if (submitting.value) return;
+  submitting.value = tag.key;
   try {
-    await videoStore.submitFeedback(props.videoId, tag.key, feedback === 'correct')
-    uiStore.showToast('피드백 감사해요!', 'success')
+    await videoStore.submitFeedback(props.videoId, tag.key, feedback === "correct");
+    uiStore.showToast("피드백 감사해요!", "success");
   } catch {
-    uiStore.showToast('피드백 처리에 실패했어요.', 'danger')
+    uiStore.showToast("피드백 처리에 실패했어요.", "danger");
   } finally {
-    submitting.value = null
+    submitting.value = null;
   }
 }
 </script>
 
 <template>
-  <IonModal
-    :is-open="isOpen"
-    :initial-breakpoint="0.75"
-    :breakpoints="[0, 0.75, 1]"
-    @did-dismiss="emit('close')"
-  >
+  <IonModal :is-open="isOpen" :initial-breakpoint="0.75" :breakpoints="[0, 0.75, 1]" @did-dismiss="emit('close')">
     <div class="modal-content">
       <div class="modal-header">
         <span class="modal-title">AI 분석 피드백</span>
-        <button class="close-btn" @click="emit('close')" aria-label="닫기">
+        <button class="sheet-close" @click="emit('close')" aria-label="닫기">
           <IonIcon :icon="closeOutline" />
         </button>
       </div>
 
       <p class="modal-desc">
-        AI가 인식한 기술이 맞는지 알려주세요.<br/>
+        AI가 인식한 기술이 맞는지 알려주세요.
+        <br />
         피드백은 AI 개선에 사용됩니다.
       </p>
 
       <div class="tag-list">
         <div v-for="tag in techniques" :key="tag.key" class="tag-row">
-          <span class="tag-label">{{ getTagLabel(tag.key) }}</span>
-          <span class="confidence">{{ Math.round(tag.confidence * 100) }}%</span>
+          <span class="tag-label">{{ getTagLabel(tag) }}</span>
+          <!-- <span class="confidence">{{ Math.round(tag.confidence * 100) }}%</span> -->
 
           <div class="feedback-btns">
-            <button
-              class="fb-btn"
-              :class="{ active: tag.userFeedback === 'correct', loading: submitting === tag.key }"
-              @click="submitFeedback(tag, 'correct')"
-              aria-label="맞아요"
-            >
+            <button class="fb-btn" :class="{ active: tag.userFeedback === 'correct', loading: submitting === tag.key }" @click="submitFeedback(tag, 'correct')" aria-label="맞아요">
               <IonIcon :icon="checkmarkOutline" />
               맞아요
             </button>
-            <button
-              class="fb-btn wrong"
-              :class="{ active: tag.userFeedback === 'incorrect', loading: submitting === tag.key }"
-              @click="submitFeedback(tag, 'incorrect')"
-              aria-label="틀렸어요"
-            >
+            <button class="fb-btn wrong" :class="{ active: tag.userFeedback === 'incorrect', loading: submitting === tag.key }" @click="submitFeedback(tag, 'incorrect')" aria-label="틀렸어요">
               <IonIcon :icon="closeCircleOutline" />
               틀렸어요
             </button>
@@ -86,7 +72,9 @@ async function submitFeedback(tag: TechniqueTag, feedback: 'correct' | 'incorrec
 </template>
 
 <style scoped>
-.modal-content { padding: 20px 20px 40px; }
+.modal-content {
+  padding: 20px 20px 40px;
+}
 
 .modal-header {
   display: flex;
@@ -98,18 +86,6 @@ async function submitFeedback(tag: TechniqueTag, feedback: 'correct' | 'incorrec
   font-size: var(--fs-h3);
   font-weight: var(--w-extrabold);
 }
-.close-btn {
-  background: var(--surface-soft);
-  border: none;
-  border-radius: 50%;
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  color: var(--fg-muted);
-}
-
 .modal-desc {
   font-size: var(--fs-caption);
   color: var(--fg-muted);
@@ -117,7 +93,11 @@ async function submitFeedback(tag: TechniqueTag, feedback: 'correct' | 'incorrec
   margin-bottom: 20px;
 }
 
-.tag-list { display: flex; flex-direction: column; gap: 12px; }
+.tag-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 
 .tag-row {
   display: flex;
@@ -141,7 +121,10 @@ async function submitFeedback(tag: TechniqueTag, feedback: 'correct' | 'incorrec
   text-align: right;
 }
 
-.feedback-btns { display: flex; gap: 6px; }
+.feedback-btns {
+  display: flex;
+  gap: 6px;
+}
 
 .fb-btn {
   display: flex;
@@ -157,9 +140,25 @@ async function submitFeedback(tag: TechniqueTag, feedback: 'correct' | 'incorrec
   transition: all var(--dur-fast) var(--ease-state);
   color: var(--fg-muted);
 }
-.fb-btn.active { background: var(--tint-lime); border-color: var(--hold-lime); color: #4a6a00; }
-.fb-btn.wrong.active { background: var(--tint-pink); border-color: var(--hold-pink); color: #C7286A; }
-.fb-btn.loading { opacity: 0.6; pointer-events: none; }
+.fb-btn.active {
+  background: var(--tint-lime);
+  border-color: var(--hold-lime);
+  color: var(--on-tint-lime);
+}
+.fb-btn.wrong.active {
+  background: var(--tint-pink);
+  border-color: var(--hold-pink);
+  color: var(--on-tint-pink);
+}
+.fb-btn.loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
 
-.empty { text-align: center; color: var(--fg-muted); font-size: var(--fs-caption); padding: 20px 0; }
+.empty {
+  text-align: center;
+  color: var(--fg-muted);
+  font-size: var(--fs-caption);
+  padding: 20px 0;
+}
 </style>

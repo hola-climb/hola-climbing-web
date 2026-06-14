@@ -112,6 +112,7 @@ export interface RawRecommendedVideo {
   commentCount: number;
   source: string;
   createdAt: string;
+  recordedDate?: string | null; // YYYY-MM-DD (GET /api/videos 응답)
 }
 
 /** UI feed card — derived from RawRecommendedVideo */
@@ -131,6 +132,7 @@ export interface FeedVideo {
   commentCount: number;
   source: string;
   createdAt: string;
+  recordedDate?: string | null; // YYYY-MM-DD (촬영일, GET /api/videos 응답)
 }
 
 export interface TechniqueTag {
@@ -244,7 +246,10 @@ export interface UserStats {
   totalVideos: number;
   totalClimbingSeconds: number;
   techniqueCounts: Record<string, number>;
-  lastClimbedAt: string | null;
+  // lastClimbedAt: string | null;
+  dynamicCount: number;
+  staticCount: number;
+  isDynamic: boolean;
 }
 
 /** Public stats for another user — GET /api/stats/users/{userId} */
@@ -253,7 +258,10 @@ export interface PublicUserStats {
   totalVideos: number;
   totalClimbingSeconds: number;
   techniqueCounts: Record<string, number>;
-  lastClimbedAt: string | null;
+  // lastClimbedAt: string | null;
+  dynamicCount: number;
+  staticCount: number;
+  isDynamic: boolean;
 }
 
 /**
@@ -293,11 +301,23 @@ export interface CalendarDay {
   gymName: string | null;
 }
 
-/** Raw API response item from GET /api/stats/me/calendar — backend CalendarDayResponse */
+/** GET /api/stats/me/calendar 의 days[] 항목 — backend CalendarDayResponse */
 export interface CalendarMonthItem {
   date: string;
   logCount: number;
   totalProblems: number;
+  videoCount: number;
+}
+
+/** GET /api/stats/me/calendar 응답 — backend CalendarMonthResponse (집계 + days) */
+export interface CalendarMonth {
+  year: number;
+  month: number;
+  totalVideos: number;
+  totalProblems: number;
+  totalVideoDurationSeconds: number;
+  totalGymVisits: number;
+  days: CalendarMonthItem[];
 }
 
 /** Raw API response item from GET /api/stats/me/calendar/{date} — backend ClimbingLogResponse */
@@ -311,6 +331,27 @@ export interface CalendarDayRecord {
   memo: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** 클라이밍 기록 — POST/GET/PATCH /api/climbing-logs — backend ClimbingLogResponse */
+export interface ClimbingLog {
+  id: number;
+  userId: number;
+  gymId: number;
+  climbedOn: string; // YYYY-MM-DD (KST 로컬 날짜)
+  gradeCounts: Record<string, number>; // 난이도 라벨 → 푼 문제 수
+  totalProblems: number;
+  memo: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** POST/PATCH /api/climbing-logs 요청 바디 — backend Create/UpdateClimbingLogRequest */
+export interface ClimbingLogPayload {
+  gymId: number;
+  climbedOn: string;
+  gradeCounts: Record<string, number>;
+  memo?: string | null;
 }
 
 // ── Gym ───────────────────────────────────────────────────────────────────────

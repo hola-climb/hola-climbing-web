@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { IonIcon } from '@ionic/vue'
 import { heartOutline, heart, chatbubbleOutline } from 'ionicons/icons'
 import type { Video } from '@/types/api'
@@ -8,6 +7,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 import { useRouter } from 'vue-router'
 import { gradeColor, gradeTextColor } from '@/utils/gradeColor'
+import VideoThumbnail from './VideoThumbnail.vue'
 
 const props = defineProps<{ video: Video }>()
 
@@ -15,15 +15,6 @@ const videoStore = useVideoStore()
 const authStore = useAuthStore()
 const uiStore = useUIStore()
 const router = useRouter()
-
-const statusLabel = computed(() => {
-  const map: Record<string, string> = {
-    pending: '업로드 중',
-    analyzing: 'AI 분석 중',
-    failed: '분석 실패',
-  }
-  return map[props.video.status] ?? ''
-})
 
 async function handleLike() {
   if (!authStore.isAuthenticated) { uiStore.openLoginSheet(); return }
@@ -37,38 +28,35 @@ async function handleLike() {
 function openDetail() {
   router.push(`/videos/${props.video.id}`)
 }
+
+function openProfile() {
+  if (props.video.user?.id) router.push(`/users/${props.video.user.id}`)
+}
 </script>
 
 <template>
   <div class="video-card" @click="openDetail">
     <!-- Thumbnail -->
     <div class="thumbnail-wrap">
-      <img
-        v-if="video.thumbnailUrl"
-        :src="video.thumbnailUrl"
+      <VideoThumbnail
+        :thumbnail-url="video.thumbnailUrl"
+        :grade="video.grade"
         :alt="`${video.user.nickname}의 클라이밍 영상`"
-        class="thumbnail"
-        loading="lazy"
-      />
-      <div v-else class="thumbnail-placeholder" aria-hidden="true" />
-
-      <!-- Status badge (only shown for non-done states) -->
-      <div v-if="video.status !== 'done'" class="status-badge" :class="`status-${video.status}`">
-        <span v-if="video.status === 'analyzing'" class="ai-dot" />
-        <span>{{ statusLabel }}</span>
-      </div>
-    </div>
+        :status="video.status"
+      /></div>
 
     <!-- Meta -->
     <div class="meta">
       <div class="author-row">
-        <div class="avatar" :aria-label="video.user.nickname">
-          {{ video.user.nickname.charAt(0).toUpperCase() }}
-        </div>
-        <div class="author-info">
-          <span class="author-name">{{ video.user.nickname }}</span>
-          <span class="gym-name" v-if="video.gym">· {{ video.gym.name }}</span>
-        </div>
+        <button class="author-link" @click.stop="openProfile" :aria-label="`${video.user.nickname} 프로필 보기`">
+          <div class="avatar" :aria-hidden="true">
+            {{ video.user.nickname.charAt(0).toUpperCase() }}
+          </div>
+          <div class="author-info">
+            <span class="author-name">{{ video.user.nickname }}</span>
+            <span class="gym-name" v-if="video.gym">· {{ video.gym.name }}</span>
+          </div>
+        </button>
         <span v-if="video.grade" class="chip" :style="{ background: gradeColor(video.grade), color: gradeTextColor(gradeColor(video.grade)) }">{{ video.grade }}</span>
       </div>
 
@@ -102,38 +90,31 @@ function openDetail() {
 .thumbnail-wrap {
   position: relative;
   aspect-ratio: 9/16;
-  background: var(--surface-soft);
   overflow: hidden;
 }
-.thumbnail { width: 100%; height: 100%; object-fit: cover; }
-.thumbnail-placeholder { width: 100%; height: 100%; background: var(--surface-soft); }
-
-.status-badge {
-  position: absolute;
-  bottom: 10px;
-  left: 10px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: var(--r-chip);
-  font-size: 11px;
-  font-weight: 600;
-  backdrop-filter: blur(8px);
-  background: rgba(247,247,245,0.85);
-  color: var(--fg);
-}
-.status-failed { color: var(--hold-pink); }
 
 .meta { padding: 12px 14px; }
 
 .author-row { display: flex; align-items: center; gap: 8px; }
+.author-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+.author-link:active { opacity: 0.6; }
 .avatar {
   width: 32px;
   height: 32px;
   border-radius: 50%;
   background: var(--tint-cyan);
-  color: #066a78;
+  color: var(--on-tint-cyan);
   display: grid;
   place-items: center;
   font-size: 13px;

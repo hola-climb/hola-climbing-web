@@ -20,9 +20,23 @@ body {
 
 .text-muted   { color: var(--fg-muted); }
 
+/* Canonical top-level section heading (e.g. "주변 암장", "기술 사용 빈도") */
+.section-title {
+  font-size: var(--fs-h2);
+  font-weight: var(--w-extrabold);
+  letter-spacing: -0.01em;
+}
+
 /* ── Layout utilities ───────────────────────────── */
 .page-padding   { padding: 0 20px; }
 .page-content   { padding-bottom: 100px; }
+
+/* ── Spacing utilities (margin-top, on the 4/8/12/16/24 scale) ── */
+.mt-1 { margin-top: var(--s-1); }
+.mt-2 { margin-top: var(--s-2); }
+.mt-3 { margin-top: var(--s-3); }
+.mt-4 { margin-top: var(--s-4); }
+.mt-6 { margin-top: var(--s-6); }
 
 /* ── Hola card ──────────────────────────────────── */
 .hola-card {
@@ -48,11 +62,14 @@ body {
   letter-spacing: 0.07em;
   text-transform: uppercase;
 }
-.chip-pink   { background: var(--tint-pink);   color: #C7286A; }
-.chip-lime   { background: var(--tint-lime);   color: #4a6a00; }
-.chip-orange { background: var(--tint-orange); color: #8a4a00; }
-.chip-cyan   { background: var(--tint-cyan);   color: #066a78; }
-.chip-dark   { background: var(--tint-dark);   color: var(--fg); }
+.chip-pink   { background: var(--tint-pink);   color: var(--on-tint-pink); }
+.chip-lime   { background: var(--tint-lime);   color: var(--on-tint-lime); }
+.chip-orange { background: var(--tint-orange); color: var(--on-tint-orange); }
+.chip-cyan   { background: var(--tint-cyan);   color: var(--on-tint-cyan); }
+.chip-dark   { background: var(--tint-dark);   color: var(--on-tint-dark); }
+
+/* ── Inline button spinner ──────────────────────── */
+.btn-spinner { width: 16px; height: 16px; }
 
 /* ── AI breathing dot ───────────────────────────── */
 @keyframes breathe {
@@ -66,6 +83,30 @@ body {
   border-radius: 50%;
   background: var(--hold-cyan);
   animation: breathe 1400ms ease-in-out infinite;
+}
+
+/* ── Modals & sheets ────────────────────────────── */
+/* Consistent sheet radius, surface and backdrop across all ion-modal usages.
+   Bottom-sheet modals (breakpoints) round their top corners; the centered
+   .confirm-dialog overrides --border-radius for all four corners. */
+ion-modal {
+  --background: var(--surface);
+  --border-radius: var(--r-sheet);
+  --backdrop-opacity: 0.45;
+}
+
+/* Shared circular close button for modal/sheet headers */
+.sheet-close {
+  background: var(--surface-soft);
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: var(--fg-muted);
+  font-size: 18px;
 }
 
 /* ── Scroll resets ──────────────────────────────── */

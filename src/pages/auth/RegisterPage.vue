@@ -17,6 +17,42 @@ const email = ref("");
 const password = ref("");
 const isLoading = ref(false);
 
+// 이메일 중복 확인 상태 — GET /api/auth/email-check
+type EmailStatus = "idle" | "checking" | "available" | "taken" | "invalid";
+const emailStatus = ref<EmailStatus>("idle");
+const emailMessages: Record<Exclude<EmailStatus, "idle">, string> = {
+  checking: "확인 중...",
+  available: "사용 가능한 이메일이에요.",
+  taken: "이미 가입된 이메일이에요.",
+  invalid: "이메일 형식을 확인해주세요.",
+};
+
+function onEmailInput() {
+  // 입력이 바뀌면 이전 확인 결과를 초기화
+  if (emailStatus.value !== "idle") emailStatus.value = "idle";
+}
+
+async function checkEmailAvailability() {
+  const value = email.value.trim();
+  if (!value) {
+    emailStatus.value = "idle";
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+    emailStatus.value = "invalid";
+    return;
+  }
+  emailStatus.value = "checking";
+  try {
+    const { data } = await authService.checkEmail(value);
+    emailStatus.value = data.available ? "available" : "taken";
+  } catch (err: unknown) {
+    if (import.meta.env.DEV) console.error(err);
+    // 확인 실패 시 가입 흐름을 막지 않도록 idle로 되돌린다.
+    emailStatus.value = "idle";
+  }
+}
+
 // Active terms loaded from API. agreed map keyed by termId.
 const terms = ref<Term[]>([]);
 const agreed = ref<Record<number, boolean>>({});
@@ -62,6 +98,10 @@ async function handleRegister() {
     uiStore.showToast("필수 약관에 동의해주세요.", "warning");
     return;
   }
+  if (emailStatus.value === "taken") {
+    uiStore.showToast("이미 가입된 이메일이에요.", "warning");
+    return;
+  }
 
   isLoading.value = true;
   try {
@@ -103,7 +143,15 @@ onMounted(loadTerms);
 
           <div class="field">
             <label class="field-label" for="reg-email">이메일</label>
-            <IonInput id="reg-email" v-model="email" type="email" placeholder="hello@climbing.kr" class="hola-input" autocomplete="email" />
+            <IonInput id="reg-email" v-model="email" type="email" placeholder="hello@climbing.kr" class="hola-input" autocomplete="email" @ion-input="onEmailInput" @ion-blur="checkEmailAvailability" />
+            <p
+              v-if="emailStatus !== 'idle'"
+              class="field-hint"
+              :class="{ ok: emailStatus === 'available', err: emailStatus === 'taken' || emailStatus === 'invalid' }"
+              aria-live="polite"
+            >
+              {{ emailMessages[emailStatus] }}
+            </p>
           </div>
 
           <div class="field">
@@ -122,7 +170,7 @@ onMounted(loadTerms);
           </div>
 
           <IonButton expand="block" :disabled="isLoading || !nickname || !email || !password" @click="handleRegister" class="submit-btn">
-            <IonSpinner v-if="isLoading" name="dots" slot="start" />
+            <IonSpinner v-if="isLoading" name="crescent" slot="start" />
             {{ isLoading ? "처리 중..." : "계정 만들기" }}
           </IonButton>
         </div>
@@ -205,6 +253,17 @@ onMounted(loadTerms);
 }
 .pw-errors li {
   font-size: var(--fs-caption);
+  color: var(--hold-pink);
+}
+.field-hint {
+  margin: 0;
+  font-size: var(--fs-caption);
+  color: var(--fg-muted);
+}
+.field-hint.ok {
+  color: var(--hold-lime);
+}
+.field-hint.err {
   color: var(--hold-pink);
 }
 

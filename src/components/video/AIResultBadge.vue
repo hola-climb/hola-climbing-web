@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import type { TechniqueTag } from '@/types/api'
-import { getTagLabel } from '@/utils/tagLabels'
+import type { TechniqueTag } from "@/types/api";
+import { getTagLabel } from "@/utils/tagLabels";
 
 defineProps<{
-  techniques: TechniqueTag[]
-  problemType: 'DYNAMIC' | 'STATIC' | null
-}>()
+  techniques: TechniqueTag[];
+  problemType: "DYNAMIC" | "STATIC" | null;
+}>();
 </script>
 
 <template>
@@ -14,18 +14,13 @@ defineProps<{
 
     <div v-if="problemType" class="problem-type">
       <span class="chip" :class="problemType === 'DYNAMIC' ? 'chip-cyan' : 'chip-dark'">
-        {{ problemType === 'DYNAMIC' ? '다이나믹' : '스태틱' }}
+        {{ problemType === "DYNAMIC" ? "다이나믹" : "스태틱" }}
       </span>
     </div>
 
     <div class="techniques">
-      <span
-        v-for="tag in techniques"
-        :key="tag.key"
-        class="technique-chip"
-        :class="`feedback-${tag.userFeedback ?? 'none'}`"
-      >
-        {{ getTagLabel(tag.key) }}
+      <span v-for="tag in techniques" :key="tag" class="technique-chip" :class="`feedback-${tag.userFeedback ?? 'none'}`">
+        {{ getTagLabel(tag) }}
         <span v-if="tag.userFeedback === 'correct'" class="feedback-icon" aria-label="정확">✓</span>
         <span v-else-if="tag.userFeedback === 'incorrect'" class="feedback-icon feedback-wrong" aria-label="오류">✗</span>
       </span>
@@ -47,7 +42,10 @@ defineProps<{
   letter-spacing: 0.08em;
   color: var(--fg-muted);
 }
-.problem-type { display: flex; gap: 6px; }
+.problem-type {
+  display: flex;
+  gap: 6px;
+}
 .techniques {
   display: flex;
   flex-wrap: wrap;
@@ -61,19 +59,26 @@ defineProps<{
   padding: 0 12px;
   border-radius: var(--r-chip);
   background: var(--tint-cyan);
-  color: #066a78;
+  color: var(--on-tint-cyan);
   font-size: 12px;
   font-weight: 600;
 }
 .feedback-correct {
   background: var(--tint-lime);
-  color: #4a6a00;
+  color: var(--on-tint-lime);
 }
 .feedback-incorrect {
   background: var(--tint-pink);
-  color: #C7286A;
+  color: var(--on-tint-pink);
 }
-.feedback-icon { font-size: 11px; }
-.feedback-wrong { color: var(--hold-pink); }
-.empty-text { font-size: var(--fs-caption); color: var(--fg-muted); }
+.feedback-icon {
+  font-size: 11px;
+}
+.feedback-wrong {
+  color: var(--hold-pink);
+}
+.empty-text {
+  font-size: var(--fs-caption);
+  color: var(--fg-muted);
+}
 </style>

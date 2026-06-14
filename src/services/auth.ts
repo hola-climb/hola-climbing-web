@@ -36,6 +36,20 @@ export const authService = {
   checkNickname: (nickname: string) =>
     api.get<{ available: boolean }>('/auth/nickname-check', { params: { nickname } }),
 
+  /** 이메일 중복 확인 — GET /api/auth/email-check?email= (공개) */
+  checkEmail: (email: string) =>
+    api.get<{ available: boolean }>('/auth/email-check', { params: { email } }),
+
+  /** 인증메일 재발송 — POST /api/auth/resend-verification (공개)
+   *  보안상 미가입 이메일이어도 동일하게 200을 반환한다. */
+  resendVerification: (email: string) =>
+    api.post('/auth/resend-verification', { email }),
+
+  /** 약관 동의 기록 — POST /api/terms/agree (인증 필요, NF-10)
+   *  약관 갱신 시 로그인 사용자의 재동의를 기록한다. */
+  agreeTerms: (agreements: Array<{ termId: number; agreed: boolean }>) =>
+    api.post('/terms/agree', { agreements }),
+
   // ── My profile ────────────────────────────────────────────────────────────
 
   getMe: () =>

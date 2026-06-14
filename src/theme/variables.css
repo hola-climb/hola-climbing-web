@@ -28,6 +28,13 @@
   --tint-cyan:   #CFF6FB;
   --tint-dark:   #E7EAF0;
 
+  /* ── On-tint text (text/icon color placed over a tint chip) ── */
+  --on-tint-pink:   #C7286A;
+  --on-tint-lime:   #4A6A00;
+  --on-tint-orange: #8A4A00;
+  --on-tint-cyan:   #066A78;
+  --on-tint-dark:   var(--fg);
+
   /* ── Semantic ─────────────────────────────────── */
   --success: var(--hold-lime);
   --info:    var(--hold-cyan);

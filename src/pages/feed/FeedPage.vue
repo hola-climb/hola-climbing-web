@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // imports → state → computed → methods → lifecycle
-import { onMounted, reactive, computed, watch } from "vue";
+import { onMounted, reactive, computed, ref, watch } from "vue";
 import { IonPage, IonHeader, IonToolbar, IonContent, IonRefresher, IonRefresherContent, IonInfiniteScroll, IonInfiniteScrollContent, IonSpinner } from "@ionic/vue";
 import type { InfiniteScrollCustomEvent } from "@ionic/vue";
 import { useRouter } from "vue-router";
@@ -8,6 +8,7 @@ import { useVideoStore } from "@/stores/video";
 import { useAuthStore } from "@/stores/auth";
 import { useUIStore } from "@/stores/ui";
 import { gradeColor } from "@/utils/gradeColor";
+import VideoThumbnail from "@/components/video/VideoThumbnail.vue";
 
 const router = useRouter();
 const videoStore = useVideoStore();
@@ -15,6 +16,7 @@ const authStore = useAuthStore();
 const uiStore = useUIStore();
 
 const brokenThumbs = reactive<Set<string>>(new Set());
+const hasScrolled = ref(false);
 
 const greetingHour = new Date().getHours();
 const greeting = greetingHour < 12 ? "좋은 아침이에요" : greetingHour < 18 ? "오늘도 높이 올라요" : "오늘 하루도 수고했어요";
@@ -36,6 +38,12 @@ function onThumbError(id: string) {
 
 function openVideo(id: string) {
   router.push(`/videos/${id}`);
+}
+
+function handleScroll(event: CustomEvent<{ scrollTop: number }>) {
+  const scrolled = event.detail.scrollTop > 12;
+  hasScrolled.value = scrolled;
+  window.dispatchEvent(new CustomEvent("hola:tab-bar-scroll", { detail: { scrolled } }));
 }
 
 async function handleRefresh(event: CustomEvent) {
@@ -64,8 +72,8 @@ watch(
 
 <template>
   <IonPage>
-    <IonHeader class="ion-no-border">
-      <IonToolbar>
+    <IonHeader class="ion-no-border transparent-header" :class="{ 'is-scrolled': hasScrolled }">
+      <IonToolbar class="transparent-toolbar">
         <div class="toolbar-inner">
           <span class="brand">HOLA</span>
           <button class="icon-btn" @click="router.push('/my/notifications')" aria-label="알림">
@@ -78,7 +86,7 @@ watch(
       </IonToolbar>
     </IonHeader>
 
-    <IonContent>
+    <IonContent fullscreen class="feed-content" :scroll-events="true" @ion-scroll="handleScroll">
       <IonRefresher slot="fixed" @ion-refresh="handleRefresh">
         <IonRefresherContent />
       </IonRefresher>
@@ -118,8 +126,8 @@ watch(
               loading="lazy"
               @error="onThumbError(video.id)"
             />
-            <div v-else class="thumb-placeholder" :style="{ height: placeholderHeights[i % placeholderHeights.length] + 'px', background: gradeColor(video.grade) }">
-              <span class="placeholder-grade">{{ video.grade ?? "HOLA" }}</span>
+            <div v-else class="thumb-placeholder" :style="{ height: placeholderHeights[i % placeholderHeights.length] + 'px', background: `var(--hold-lime)` }">
+              <span class="placeholder-grade">{{ "HOLA" }}</span>
             </div>
 
             <!-- Grade chip -->
@@ -161,6 +169,39 @@ watch(
   padding: 0 16px;
   height: 52px;
 }
+.transparent-header {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 10;
+  background: transparent;
+  box-shadow: none;
+  transition:
+    background var(--dur-base) var(--ease-state),
+    box-shadow var(--dur-base) var(--ease-state);
+}
+.transparent-header::after {
+  display: none;
+}
+.transparent-header.is-scrolled {
+  background: rgba(247, 247, 245, 0.82);
+  box-shadow: 0 1px 0 rgba(231, 234, 240, 0.72);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+}
+.transparent-toolbar {
+  --background: transparent;
+  --border-color: transparent;
+  --box-shadow: none;
+  --min-height: 52px;
+  background: transparent;
+}
+.feed-content {
+  --background:
+    radial-gradient(circle at 86% -28px, rgba(200, 255, 0, 0.24) 0, rgba(200, 255, 0, 0.12) 30%, rgba(200, 255, 0, 0) 58%),
+    radial-gradient(circle at -18% 78px, rgba(255, 77, 148, 0.14) 0, rgba(255, 77, 148, 0.08) 34%, rgba(255, 77, 148, 0) 62%), var(--bg);
+}
 .brand {
   font-size: 18px;
   font-weight: 800;
@@ -194,7 +235,7 @@ watch(
 
 /* ── Greeting ───────────────────────────────────── */
 .hero {
-  padding: 24px 20px 18px;
+  padding: calc(var(--ion-safe-area-top) + 68px) 20px 18px;
   position: relative;
   overflow: hidden;
 }
@@ -264,13 +305,22 @@ watch(
   padding: 8px 16px 120px;
 }
 @media (min-width: 768px) {
-  .masonry { column-count: 3; }
+  .masonry {
+    column-count: 3;
+  }
 }
 @media (min-width: 1024px) {
-  .masonry { column-count: 4; column-gap: 16px; }
+  .masonry {
+    column-count: 4;
+    column-gap: 16px;
+  }
 }
 @media (min-width: 1440px) {
-  .masonry { column-count: 5; max-width: 1600px; margin: 0 auto; }
+  .masonry {
+    column-count: 5;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
 }
 .masonry-card {
   display: block;
@@ -311,7 +361,6 @@ watch(
   color: rgba(0, 0, 0, 0.55);
   letter-spacing: -0.02em;
 }
-
 .grade-chip {
   position: absolute;
   top: 8px;
@@ -322,12 +371,15 @@ watch(
   max-width: calc(100% - 16px);
   font-size: 11px;
   font-weight: 700;
-  color: rgba(21, 21, 21, 0.82);
+  color: rgba(255, 255, 255, 0.9);
+  border-radius: 5px;
   line-height: 1;
   padding: 5px 8px;
-  border: 1px solid rgba(231, 234, 240, 0.9);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.88);
+  /* color: rgba(21, 21, 21, 0.82); */
+  /* border: 1px solid rgba(231, 234, 240, 0.9); */
+  /* border-radius: 999px; */
+  /* background: rgba(255, 255, 255, 0.88); */
+  background: rgba(0, 0, 0, 0.6);
   box-shadow: 0 1px 3px rgba(20, 22, 28, 0.1);
   backdrop-filter: saturate(140%) blur(6px);
   -webkit-backdrop-filter: saturate(140%) blur(6px);

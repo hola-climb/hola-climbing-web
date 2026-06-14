@@ -2,14 +2,15 @@
 // imports → state → computed → methods → lifecycle
 import { ref, computed, onMounted } from 'vue'
 import {
-  IonPage, IonHeader, IonToolbar, IonContent, IonIcon, IonSpinner,
+  IonPage, IonContent, IonIcon, IonSpinner,
   IonInfiniteScroll, IonInfiniteScrollContent, IonRefresher, IonRefresherContent,
 } from '@ionic/vue'
 import type { InfiniteScrollCustomEvent } from '@ionic/vue'
 import {
-  chevronBackOutline, chatbubbleOutline, heartOutline,
+  chatbubbleOutline, heartOutline,
   personAddOutline, megaphoneOutline, returnDownForwardOutline,
 } from 'ionicons/icons'
+import AppHeader from '@/components/common/AppHeader.vue'
 import { useRouter } from 'vue-router'
 import { useUIStore } from '@/stores/ui'
 import { notificationService } from '@/services/notification'
@@ -108,18 +109,11 @@ onMounted(() => load(true))
 
 <template>
   <IonPage>
-    <IonHeader class="ion-no-border">
-      <IonToolbar>
-        <div class="toolbar-inner">
-          <button class="back-btn" @click="router.back()" aria-label="뒤로">
-            <IonIcon :icon="chevronBackOutline" />
-          </button>
-          <span class="toolbar-title">알림</span>
-          <button v-if="hasUnread" class="read-all" @click="markAllRead">모두 읽음</button>
-          <span v-else class="read-all-spacer" />
-        </div>
-      </IonToolbar>
-    </IonHeader>
+    <AppHeader title="알림">
+      <template v-if="hasUnread" #action>
+        <button class="read-all" @click="markAllRead">모두 읽음</button>
+      </template>
+    </AppHeader>
 
     <IonContent>
       <IonRefresher slot="fixed" @ion-refresh="handleRefresh">
@@ -165,24 +159,11 @@ onMounted(() => load(true))
 </template>
 
 <style scoped>
-.toolbar-inner {
-  display: grid;
-  grid-template-columns: 44px 1fr auto;
-  align-items: center;
-  gap: 8px;
-  padding: 0 12px;
-  height: 52px;
-}
-.back-btn {
-  background: none; border: none; cursor: pointer; color: var(--fg);
-  font-size: 22px; display: grid; place-items: center; padding: 6px;
-}
-.toolbar-title { font-size: 15px; font-weight: 700; }
 .read-all {
   background: none; border: none; color: var(--hold-cyan);
-  font-size: 13px; font-weight: 700; cursor: pointer; padding: 6px 8px;
+  font-size: var(--fs-caption); font-weight: 700; cursor: pointer; padding: 6px 8px;
+  white-space: nowrap;
 }
-.read-all-spacer { width: 44px; }
 
 .state-center {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -205,12 +186,12 @@ onMounted(() => load(true))
   display: grid; place-items: center; font-size: 18px;
   background: var(--surface-soft); color: var(--fg);
 }
-.noti-icon.like { background: var(--tint-pink, #ffe0ec); color: #c7286a; }
-.noti-icon.follow { background: var(--tint-cyan, #d6f6fb); color: #066a78; }
-.noti-icon.comment, .noti-icon.reply { background: var(--tint-lime, #eefcc6); color: #4a6a00; }
+.noti-icon.like { background: var(--tint-pink, #ffe0ec); color: var(--on-tint-pink); }
+.noti-icon.follow { background: var(--tint-cyan, #d6f6fb); color: var(--on-tint-cyan); }
+.noti-icon.comment, .noti-icon.reply { background: var(--tint-lime, #eefcc6); color: var(--on-tint-lime); }
 
 .noti-body { flex: 1; min-width: 0; }
-.noti-title { font-size: 14px; font-weight: 700; }
+.noti-title { font-size: var(--fs-body); font-weight: 700; }
 .noti-msg {
   font-size: 13px; color: var(--fg-muted); line-height: 1.4; margin-top: 2px;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;

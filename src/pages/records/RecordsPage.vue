@@ -2,40 +2,51 @@
 // imports → state → computed → methods → lifecycle
 import { ref, computed, onMounted } from "vue";
 import { IonPage, IonHeader, IonToolbar, IonContent, IonRefresher, IonRefresherContent, IonSpinner } from "@ionic/vue";
+import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
+import VideoThumbnail from "@/components/video/VideoThumbnail.vue";
 import { useRouter } from "vue-router";
 import { statsService } from "@/services/stats";
 import { gymService } from "@/services/gym";
 import { videoService } from "@/services/video";
+import { climbingLogService } from "@/services/climbingLog";
 import { useAuthStore } from "@/stores/auth";
 import { useUIStore } from "@/stores/ui";
 import { useMediaQuery } from "@/composables/useMediaQuery";
 import { gradeColor, gradeTextColor, gradeDifficulty } from "@/utils/gradeColor";
-import type { UserStats, FeedVideo } from "@/types/api";
+import type { FeedVideo, GymGrade } from "@/types/api";
 
 // ── Types ──────────────────────────────────────────
-interface RouteRow {
+interface GradeRow {
   grade: string;
+  color: string;
   count: number;
-  difficulty: number;
+  difficultyOrder: number;
 }
 
 interface Session {
   key: string;
+  logId: string | null; // 클라이밍 기록 id (없으면 영상 전용 그룹)
   dateLabel: string;
   venue: string;
   totalProblems: number;
   memo: string | null;
-  routes: RouteRow[];
+  gradeRows: GradeRow[];
   videos: FeedVideo[];
 }
 
 interface CalendarCell {
   date: string; // YYYY-MM-DD
   day: number; // 1-31
-  hasRecord: boolean;
-  totalProblems: number;
+  hasRecord: boolean; // videoCount > 0 || logCount > 0
+  videoCount: number; // 날짜 아래 표시 숫자
   isToday: boolean;
   isCurrentMonth: boolean;
+}
+
+/** 달력 한 날짜의 원본 카운트 */
+interface DayCount {
+  videoCount: number;
+  logCount: number;
 }
 
 // ── Store / router ─────────────────────────────────
@@ -51,10 +62,16 @@ const month = ref(now.getMonth() + 1); // 1-indexed
 
 const isLoading = ref(true);
 const isDetailLoading = ref(false);
-const stats = ref<UserStats | null>(null);
 
-/** dates that have records: date → totalProblems */
-const recordMap = ref<Map<string, number>>(new Map());
+/** 이번 달 집계 (달력 응답의 월 단위 합계) */
+const monthSummary = ref<{ totalVideos: number; totalProblems: number; totalGymVisits: number }>({
+  totalVideos: 0,
+  totalProblems: 0,
+  totalGymVisits: 0,
+});
+
+/** 기록이 있는 날짜: date → { videoCount, logCount } */
+const recordMap = ref<Map<string, DayCount>>(new Map());
 
 /** selected date for detail view (null = calendar view) */
 const selectedDate = ref<string | null>(null);
@@ -66,16 +83,6 @@ const gymNameCache = new Map<number, string>();
 const monthLabel = computed(() => {
   const d = new Date(year.value, month.value - 1, 1);
   return d.toLocaleDateString("ko-KR", { year: "numeric", month: "long" });
-});
-
-const techniqueCount = computed(() => {
-  const tc = stats.value?.techniqueCounts;
-  return tc ? Object.keys(tc).length : 0;
-});
-
-const climbingHours = computed(() => {
-  const sec = stats.value?.totalClimbingSeconds ?? 0;
-  return sec >= 3600 ? `${(sec / 3600).toFixed(1)}h` : sec > 0 ? `${Math.floor(sec / 60)}m` : "0";
 });
 
 /** Calendar grid: starts on Monday */
@@ -98,7 +105,7 @@ const calendarCells = computed<CalendarCell[]>(() => {
       date: toDateStr(d),
       day: d.getDate(),
       hasRecord: false,
-      totalProblems: 0,
+      videoCount: 0,
       isToday: false,
       isCurrentMonth: false,
     });
@@ -108,12 +115,12 @@ const calendarCells = computed<CalendarCell[]>(() => {
   for (let day = 1; day <= lastDay.getDate(); day++) {
     const d = new Date(year.value, month.value - 1, day);
     const dateStr = toDateStr(d);
-    const problems = recordMap.value.get(dateStr) ?? 0;
+    const entry = recordMap.value.get(dateStr);
     cells.push({
       date: dateStr,
       day,
-      hasRecord: problems > 0,
-      totalProblems: problems,
+      hasRecord: !!entry, // recordMap 에는 videoCount>0 || logCount>0 인 날만 담긴다
+      videoCount: entry?.videoCount ?? 0,
       isToday: dateStr === todayStr,
       isCurrentMonth: true,
     });
@@ -129,7 +136,7 @@ const calendarCells = computed<CalendarCell[]>(() => {
         date: toDateStr(d),
         day: d.getDate(),
         hasRecord: false,
-        totalProblems: 0,
+        videoCount: 0,
         isToday: false,
         isCurrentMonth: false,
       });
@@ -162,41 +169,119 @@ async function resolveGymName(gymId: number): Promise<string> {
   }
 }
 
-function buildSessions(logs: Awaited<ReturnType<typeof statsService.getCalendarDay>>["data"], dayVideos: FeedVideo[]): Promise<Session[]> {
-  return Promise.all(
-    logs.map(async (log) => {
-      const venue = await resolveGymName(log.gymId);
-      const routes: RouteRow[] = Object.entries(log.gradeCounts ?? {})
-        .map(([grade, count]) => ({ grade, count, difficulty: gradeDifficulty(grade) }))
-        .sort((a, b) => b.difficulty - a.difficulty);
-      const climbedDate = log.climbedOn.slice(0, 10);
-      const videos = dayVideos.filter((v) => v.gymId === String(log.gymId) && v.createdAt.slice(0, 10) === climbedDate);
-      return {
-        key: String(log.id),
-        dateLabel: selectedDateLabel.value,
-        venue,
-        totalProblems: log.totalProblems,
-        memo: log.memo,
-        routes,
-        videos,
-      };
-    }),
-  );
+const gymGradeCache = new Map<number, GymGrade[]>();
+
+async function resolveGymGrades(gymId: number): Promise<GymGrade[]> {
+  if (gymGradeCache.has(gymId)) return gymGradeCache.get(gymId)!;
+  try {
+    const { data } = await gymService.getGrades(String(gymId));
+    gymGradeCache.set(gymId, data);
+    return data;
+  } catch {
+    return [];
+  }
+}
+
+type DayLog = Awaited<ReturnType<typeof statsService.getCalendarDay>>["data"][number];
+
+/** 클라이밍 기록(log) 기준 세션 빌드 (난이도 바 포함) */
+async function buildLogSession(log: DayLog, dayVideos: FeedVideo[]): Promise<Session> {
+  const [venue, gymGrades] = await Promise.all([resolveGymName(log.gymId), resolveGymGrades(log.gymId)]);
+  const countMap = log.gradeCounts ?? {};
+
+  // All gym grades sorted by difficultyOrder descending (hardest first)
+  const gradeRows: GradeRow[] = gymGrades
+    .slice()
+    .sort((a, b) => b.difficultyOrder - a.difficultyOrder)
+    .map((g) => ({
+      grade: g.label,
+      color: gradeColor(g.label),
+      count: (countMap as Record<string, number>)[g.label] ?? 0,
+      difficultyOrder: g.difficultyOrder,
+    }));
+
+  // Fallback: if no gym grades from API, build from climbed grades only
+  if (gradeRows.length === 0) {
+    Object.entries(countMap).forEach(([grade, count]) => {
+      gradeRows.push({ grade, color: gradeColor(grade), count: count as number, difficultyOrder: gradeDifficulty(grade) });
+    });
+    gradeRows.sort((a, b) => b.difficultyOrder - a.difficultyOrder);
+  }
+
+  // recordedDate 기반으로 이미 날짜 필터됨 → gymId로만 매칭
+  const videos = dayVideos.filter((v) => v.gymId === String(log.gymId));
+  return {
+    key: String(log.id),
+    logId: String(log.id),
+    dateLabel: selectedDateLabel.value,
+    venue,
+    totalProblems: log.totalProblems,
+    memo: log.memo,
+    gradeRows,
+    videos,
+  };
+}
+
+/** 영상만 있는 암장 그룹 빌드 (기록 없음 → 썸네일만) */
+async function buildVideoOnlySession(gymId: string, videos: FeedVideo[]): Promise<Session> {
+  // 영상 응답의 gymName 우선 사용, 없으면 암장 API 폴백
+  const venue = videos.find((v) => v.gymName)?.gymName ?? (await resolveGymName(Number(gymId)));
+  return {
+    key: `gym-${gymId}`,
+    logId: null,
+    dateLabel: selectedDateLabel.value,
+    venue,
+    totalProblems: 0,
+    memo: null,
+    gradeRows: [],
+    videos,
+  };
+}
+
+/** logs ∪ videos 를 gymId 기준으로 합쳐 세션 목록 생성 (기록 보유 그룹 먼저) */
+async function buildSessions(logs: DayLog[], dayVideos: FeedVideo[]): Promise<Session[]> {
+  const loggedGymIds = new Set(logs.map((l) => String(l.gymId)));
+
+  // 1) 클라이밍 기록 보유 세션
+  const logSessions = await Promise.all(logs.map((log) => buildLogSession(log, dayVideos)));
+
+  // 2) 기록 없는 암장의 영상 전용 세션 (gymId별 그룹)
+  const videoOnlyByGym = new Map<string, FeedVideo[]>();
+  for (const v of dayVideos) {
+    if (!v.gymId || loggedGymIds.has(v.gymId)) continue;
+    const list = videoOnlyByGym.get(v.gymId) ?? [];
+    list.push(v);
+    videoOnlyByGym.set(v.gymId, list);
+  }
+  const videoOnlySessions = await Promise.all([...videoOnlyByGym.entries()].map(([gymId, videos]) => buildVideoOnlySession(gymId, videos)));
+
+  return [...logSessions, ...videoOnlySessions];
 }
 
 // ── Actions ────────────────────────────────────────
+/** 달력 카운트 맵 + 월 집계 갱신 (selectedDate 유지) */
+async function refreshCalendarMap() {
+  const { data } = await statsService.getCalendarRaw(year.value, month.value);
+  const map = new Map<string, DayCount>();
+  for (const item of data.days ?? []) {
+    // 영상 또는 기록이 있는 날만 표시 대상
+    if (item.videoCount > 0 || item.logCount > 0) {
+      map.set(item.date, { videoCount: item.videoCount, logCount: item.logCount });
+    }
+  }
+  recordMap.value = map;
+  monthSummary.value = {
+    totalVideos: data.totalVideos ?? 0,
+    totalProblems: data.totalProblems ?? 0,
+    totalGymVisits: data.totalGymVisits ?? 0,
+  };
+}
+
 async function load() {
   isLoading.value = true;
   selectedDate.value = null;
   try {
-    const [statsRes, calRes] = await Promise.all([statsService.getStats(), statsService.getCalendarRaw(year.value, month.value)]);
-    stats.value = statsRes.data;
-
-    const map = new Map<string, number>();
-    for (const item of calRes.data) {
-      if (item.logCount > 0) map.set(item.date, item.totalProblems);
-    }
-    recordMap.value = map;
+    await refreshCalendarMap();
   } catch (err: unknown) {
     if (import.meta.env.DEV) console.error(err);
     uiStore.showToast("기록을 불러오지 못했어요.", "danger");
@@ -214,10 +299,11 @@ async function selectDate(cell: CalendarCell) {
     const userId = authStore.user?.id ?? "";
     const [dayRes, videosRes] = await Promise.allSettled([
       statsService.getCalendarDay(cell.date),
-      userId ? videoService.getUserVideos(userId, { page: 0, size: 50 }) : Promise.resolve({ data: { content: [] } }),
+      // recordedDate 필터로 해당 날짜 영상만 정확히 조회
+      userId ? videoService.getVideosByDate(userId, cell.date) : Promise.resolve([]),
     ]);
     if (dayRes.status === "rejected") throw dayRes.reason;
-    const dayVideos: FeedVideo[] = videosRes.status === "fulfilled" ? (videosRes.value.data.content as FeedVideo[]) : [];
+    const dayVideos: FeedVideo[] = videosRes.status === "fulfilled" ? videosRes.value : [];
     selectedSessions.value = await buildSessions(dayRes.value.data, dayVideos);
   } catch (err: unknown) {
     if (import.meta.env.DEV) console.error(err);
@@ -230,6 +316,39 @@ async function selectDate(cell: CalendarCell) {
 function goBackToCalendar() {
   selectedDate.value = null;
   selectedSessions.value = [];
+}
+
+// ── 기록 수정/삭제 ─────────────────────────────────
+function editSession(session: Session) {
+  // session.key === 클라이밍 기록 id
+  router.push(`/climbing-log/${session.key}`);
+}
+
+const deleteTargetKey = ref<string | null>(null);
+const isDeleteAlertOpen = ref(false);
+
+function askDeleteSession(session: Session) {
+  deleteTargetKey.value = session.key;
+  isDeleteAlertOpen.value = true;
+}
+
+async function confirmDeleteSession() {
+  const key = deleteTargetKey.value;
+  isDeleteAlertOpen.value = false;
+  deleteTargetKey.value = null;
+  if (!key) return;
+  try {
+    await climbingLogService.remove(key);
+    uiStore.showToast("기록을 삭제했어요.");
+    // 해당 날짜에서 제거 후, 남은 기록이 없으면 달력으로 복귀
+    selectedSessions.value = selectedSessions.value.filter((s) => s.key !== key);
+    if (selectedSessions.value.length === 0) goBackToCalendar();
+    // 달력 카운트만 갱신 (상세 화면 유지)
+    await refreshCalendarMap();
+  } catch (err: unknown) {
+    if (import.meta.env.DEV) console.error(err);
+    uiStore.showToast("삭제에 실패했어요.", "danger");
+  }
 }
 
 function prevMonth() {
@@ -253,6 +372,10 @@ async function handleRefresh(event: CustomEvent) {
   (event.target as HTMLIonRefresherElement).complete();
 }
 
+function handleScroll(event: CustomEvent<{ scrollTop: number }>) {
+  window.dispatchEvent(new CustomEvent("hola:tab-bar-scroll", { detail: { scrolled: event.detail.scrollTop > 12 } }));
+}
+
 onMounted(load);
 </script>
 
@@ -273,155 +396,176 @@ onMounted(load);
       </IonToolbar>
     </IonHeader>
 
-    <IonContent>
+    <IonContent :scroll-events="true" @ion-scroll="handleScroll">
       <IonRefresher slot="fixed" @ion-refresh="handleRefresh">
         <IonRefresherContent />
       </IonRefresher>
 
       <div class="records-layout">
-      <!-- ── CALENDAR VIEW ───────────────────────── -->
-      <div v-if="!selectedDate || isDesktop" class="calendar-pane">
-        <!-- Hero -->
-        <div class="hero page-padding">
-          <h1 class="hero-title">이번 달 기록</h1>
-        </div>
-
-        <!-- Stats strip -->
-        <div class="stats-strip page-padding">
-          <div class="mini-stat hola-card">
-            <div class="mini-lbl">VIDEOS</div>
-            <div class="mini-val">{{ stats?.totalVideos ?? 0 }}</div>
-          </div>
-          <div class="mini-stat hola-card">
-            <div class="mini-lbl">CLIMB</div>
-            <div class="mini-val">{{ climbingHours }}</div>
-          </div>
-          <div class="mini-stat hola-card">
-            <div class="mini-lbl">MOVES</div>
-            <div class="mini-val">{{ techniqueCount }}</div>
-          </div>
-        </div>
-
-        <!-- Calendar section -->
-        <div class="calendar-section page-padding">
-          <!-- Month nav -->
-          <div class="month-nav">
-            <button class="nav-btn" aria-label="이전 달" @click="prevMonth">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M15 18l-6-6 6-6" />
-              </svg>
-            </button>
-            <span class="month-label">{{ monthLabel }}</span>
-            <button class="nav-btn" aria-label="다음 달" @click="nextMonth">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M9 18l6-6-6-6" />
-              </svg>
-            </button>
+        <!-- ── CALENDAR VIEW ───────────────────────── -->
+        <div v-if="!selectedDate || isDesktop" class="calendar-pane">
+          <!-- Hero -->
+          <div class="hero page-padding">
+            <h1 class="hero-title">이번 달 기록</h1>
           </div>
 
-          <!-- Day-of-week headers -->
-          <div class="cal-grid">
-            <div v-for="d in ['M', 'T', 'W', 'T', 'F', 'S', 'S']" :key="d" class="dow-cell">{{ d }}</div>
+          <!-- Stats strip (이번 달 집계) -->
+          <div class="stats-strip page-padding">
+            <div class="mini-stat hola-card">
+              <div class="mini-lbl">VIDEOS</div>
+              <div class="mini-val">{{ monthSummary.totalVideos }}</div>
+            </div>
+            <div class="mini-stat hola-card">
+              <div class="mini-lbl">PROBLEMS</div>
+              <div class="mini-val">{{ monthSummary.totalProblems }}</div>
+            </div>
+            <div class="mini-stat hola-card">
+              <div class="mini-lbl">GYM VISITS</div>
+              <div class="mini-val">{{ monthSummary.totalGymVisits }}</div>
+            </div>
           </div>
 
-          <!-- Loading skeleton -->
-          <div v-if="isLoading" class="cal-grid">
-            <div v-for="i in 35" :key="i" class="day-cell skeleton" />
-          </div>
-
-          <!-- Calendar cells -->
-          <div v-else class="cal-grid">
-            <button
-              v-for="cell in calendarCells"
-              :key="cell.date"
-              class="day-cell"
-              :class="{
-                'has-record': cell.hasRecord && cell.isCurrentMonth,
-                'is-today': cell.isToday,
-                'other-month': !cell.isCurrentMonth,
-                clickable: cell.hasRecord && cell.isCurrentMonth,
-              }"
-              :aria-label="cell.hasRecord ? `${cell.day}일, 기록 있음` : `${cell.day}일`"
-              :disabled="!cell.hasRecord || !cell.isCurrentMonth"
-              @click="selectDate(cell)"
-            >
-              <span class="day-num">{{ cell.day }}</span>
-              <span v-if="cell.hasRecord && cell.isCurrentMonth" class="record-count" aria-hidden="true">{{ cell.totalProblems }}</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── DETAIL VIEW ─────────────────────────── -->
-      <div v-if="selectedDate || isDesktop" class="detail-pane">
-        <!-- Desktop placeholder (no date selected) -->
-        <div v-if="!selectedDate" class="state-center empty">
-          <p class="empty-title">날짜를 선택하세요</p>
-          <p class="empty-sub">달력에서 기록이 있는 날짜를 누르면 상세를 볼 수 있어요.</p>
-        </div>
-
-        <!-- Loading -->
-        <div v-else-if="isDetailLoading" class="state-center">
-          <IonSpinner name="crescent" />
-        </div>
-
-        <!-- Empty -->
-        <div v-else-if="selectedSessions.length === 0" class="state-center empty">
-          <p class="empty-title">기록이 없어요</p>
-          <p class="empty-sub">해당 날짜에 저장된 기록이 없습니다.</p>
-        </div>
-
-        <!-- Desktop detail header (date label) -->
-        <template v-else>
-        <div v-if="isDesktop" class="detail-date-head page-padding">{{ selectedDateLabel }}</div>
-        <div class="sessions page-padding">
-          <div v-for="session in selectedSessions" :key="session.key" class="session-group">
-            <!-- Session header -->
-            <div class="session-header">
-              <div class="session-venue">{{ session.venue }}</div>
-              <div class="session-duration">{{ session.totalProblems }} sends</div>
+          <!-- Calendar section -->
+          <div class="calendar-section page-padding">
+            <!-- Month nav -->
+            <div class="month-nav">
+              <button class="nav-btn" aria-label="이전 달" @click="prevMonth">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </button>
+              <span class="month-label">{{ monthLabel }}</span>
+              <button class="nav-btn" aria-label="다음 달" @click="nextMonth">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </button>
             </div>
 
-            <!-- Grade pills card -->
-            <div class="grades-card hola-card">
-              <div class="grade-pills">
-                <div v-for="route in session.routes" :key="route.grade" class="grade-pill">
-                  <span class="grade-dot" :style="{ background: gradeColor(route.grade) }" aria-hidden="true" />
-                  <span class="grade-label">{{ route.grade }}</span>
-                  <span class="grade-count" :style="{ color: 'var(--hold-orange)' }">{{ route.count }}</span>
-                </div>
-              </div>
-
-              <!-- Memo -->
-              <div v-if="session.memo" class="memo memo-border">
-                {{ session.memo }}
-              </div>
+            <!-- Day-of-week headers -->
+            <div class="cal-grid">
+              <div v-for="d in ['M', 'T', 'W', 'T', 'F', 'S', 'S']" :key="d" class="dow-cell">{{ d }}</div>
             </div>
 
-            <!-- Video thumbnails -->
-            <div v-if="session.videos.length" class="video-row">
-              <button v-for="v in session.videos" :key="v.id" class="video-thumb" :aria-label="v.title ?? '클라이밍 영상'" @click="router.push(`/videos/${v.id}`)">
-                <img v-if="v.thumbnailUrl" :src="v.thumbnailUrl" :alt="v.title ?? ''" loading="lazy" />
-                <div v-else class="video-ph" :style="{ background: gradeColor(v.grade) }">
-                  <span :style="{ color: gradeTextColor(gradeColor(v.grade)) }">{{ v.grade ?? "HOLA" }}</span>
-                </div>
-                <span
-                  v-if="v.grade"
-                  class="v-grade-badge"
-                  :style="{
-                    background: gradeColor(v.grade),
-                    color: gradeTextColor(gradeColor(v.grade)),
-                  }"
-                >
-                  {{ v.grade }}
-                </span>
+            <!-- Loading skeleton -->
+            <div v-if="isLoading" class="cal-grid">
+              <div v-for="i in 35" :key="i" class="day-cell skeleton" />
+            </div>
+
+            <!-- Calendar cells -->
+            <div v-else class="cal-grid">
+              <button
+                v-for="cell in calendarCells"
+                :key="cell.date"
+                class="day-cell"
+                :class="{
+                  'has-record': cell.hasRecord && cell.isCurrentMonth,
+                  'is-today': cell.isToday,
+                  'other-month': !cell.isCurrentMonth,
+                  clickable: cell.hasRecord && cell.isCurrentMonth,
+                }"
+                :aria-label="cell.hasRecord ? `${cell.day}일, 기록 있음` : `${cell.day}일`"
+                :disabled="!cell.hasRecord || !cell.isCurrentMonth"
+                @click="selectDate(cell)"
+              >
+                <span class="day-num">{{ cell.day }}</span>
+                <span v-if="cell.videoCount > 0 && cell.isCurrentMonth" class="record-count" aria-hidden="true">{{ cell.videoCount }}</span>
               </button>
             </div>
           </div>
         </div>
-        </template>
+
+        <!-- ── DETAIL VIEW ─────────────────────────── -->
+        <div v-if="selectedDate || isDesktop" class="detail-pane">
+          <!-- Desktop placeholder (no date selected) -->
+          <div v-if="!selectedDate" class="state-center empty">
+            <p class="empty-title">날짜를 선택하세요</p>
+            <p class="empty-sub">달력에서 기록이 있는 날짜를 누르면 상세를 볼 수 있어요.</p>
+          </div>
+
+          <!-- Loading -->
+          <div v-else-if="isDetailLoading" class="state-center">
+            <IonSpinner name="crescent" />
+          </div>
+
+          <!-- Empty -->
+          <div v-else-if="selectedSessions.length === 0" class="state-center empty">
+            <p class="empty-title">기록이 없어요</p>
+            <p class="empty-sub">해당 날짜에 저장된 기록이 없습니다.</p>
+          </div>
+
+          <!-- Desktop detail header (date label) -->
+          <template v-else>
+            <div v-if="isDesktop" class="detail-date-head page-padding">{{ selectedDateLabel }}</div>
+            <div class="sessions page-padding">
+              <div v-for="session in selectedSessions" :key="session.key" class="session-group">
+                <!-- Session header -->
+                <div class="session-header">
+                  <div class="session-venue">{{ session.venue }}</div>
+                  <div class="session-head-right">
+                    <span class="session-duration">{{ session.logId ? `${session.totalProblems} sends` : `영상 ${session.videos.length}개` }}</span>
+                    <template v-if="session.logId">
+                      <button class="icon-btn" aria-label="기록 수정" @click="editSession(session)">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                        </svg>
+                      </button>
+                      <button class="icon-btn danger" aria-label="기록 삭제" @click="askDeleteSession(session)">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                        </svg>
+                      </button>
+                    </template>
+                  </div>
+                </div>
+
+                <!-- Grade completion bar card (클라이밍 기록 있을 때만) -->
+                <div v-if="session.gradeRows.length" class="grades-card hola-card">
+                  <div class="grade-bars">
+                    <div v-for="row in session.gradeRows" :key="row.grade" class="grade-row" :class="{ 'grade-row--empty': row.count === 0 }">
+                      <span class="grade-dot" :style="{ background: row.color }" aria-hidden="true" />
+                      <span class="grade-name">{{ row.grade }}</span>
+                      <div class="bar-track" aria-hidden="true">
+                        <div
+                          class="bar-fill"
+                          :style="{
+                            width: session.totalProblems > 0 ? `${(row.count / Math.max(...session.gradeRows.map((r) => r.count))) * 100}%` : '0%',
+                            background: row.color,
+                          }"
+                        />
+                      </div>
+                      <span class="grade-count">{{ row.count > 0 ? row.count : "—" }}</span>
+                    </div>
+                  </div>
+
+                  <!-- Memo -->
+                  <div v-if="session.memo" class="memo memo-border">
+                    {{ session.memo }}
+                  </div>
+                </div>
+
+                <!-- Video thumbnails -->
+                <div v-if="session.videos.length" class="video-row">
+                  <button v-for="v in session.videos" :key="v.id" class="video-thumb" :aria-label="v.title ?? '클라이밍 영상'" @click="router.push(`/my/videos/${v.id}`)">
+                    <VideoThumbnail :thumbnail-url="v.thumbnailUrl" :grade="v.grade" :alt="v.title ?? ''" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
       </div>
-      </div>
+
+      <!-- 기록 삭제 확인 -->
+      <ConfirmDialog
+        :open="isDeleteAlertOpen"
+        title="기록 삭제"
+        message="이 클라이밍 기록을 삭제할까요? 되돌릴 수 없어요."
+        confirm-text="삭제"
+        danger
+        @confirm="confirmDeleteSession"
+        @cancel="isDeleteAlertOpen = false"
+      />
     </IonContent>
   </IonPage>
 </template>
@@ -596,7 +740,7 @@ onMounted(load);
 }
 
 .day-num {
-  font-size: 14px;
+  font-size: var(--fs-body);
   font-weight: 600;
   line-height: 1;
   color: var(--fg);
@@ -700,44 +844,85 @@ onMounted(load);
   font-size: 15px;
   font-weight: 700;
 }
+.session-head-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .session-duration {
   font-size: 12px;
   color: var(--fg-muted);
 }
+.icon-btn {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--fg-muted);
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  transition: background var(--dur-fast) var(--ease-state);
+}
+.icon-btn:active {
+  background: var(--surface-soft);
+}
+.icon-btn.danger {
+  color: var(--hold-pink);
+}
 
-/* ── Grade pills ────────────────────────────────── */
+/* ── Grade completion bars ──────────────────────── */
 .grades-card {
   padding: 0;
 }
-.grade-pills {
+.grade-bars {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 16px 18px;
+  flex-direction: column;
+  gap: 0;
+  padding: 8px 0;
 }
-.grade-pill {
-  display: flex;
+.grade-row {
+  display: grid;
+  grid-template-columns: 12px 52px 1fr 24px;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: var(--surface-soft);
-  border: 1px solid var(--border);
+  gap: 10px;
+  padding: 7px 18px;
+  transition: opacity var(--dur-fast) var(--ease-state);
+}
+.grade-row--empty {
+  opacity: 0.35;
 }
 .grade-dot {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   flex-shrink: 0;
 }
-.grade-label {
+.grade-name {
   font-size: 13px;
   font-weight: 600;
   color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bar-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  overflow: hidden;
+}
+.bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.4s var(--ease-state);
+  min-width: 0;
 }
 .grade-count {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
+  color: var(--fg-muted);
+  text-align: right;
 }
 
 .memo {
@@ -756,15 +941,15 @@ onMounted(load);
   gap: 10px;
   overflow-x: auto;
   scrollbar-width: none;
-  padding-bottom: 4px;
+  padding-top: 10px;
 }
 .video-row::-webkit-scrollbar {
   display: none;
 }
 .video-thumb {
   flex: 0 0 auto;
-  width: 88px;
-  height: 120px;
+  width: 100px;
+  height: 100px;
   border-radius: 12px;
   overflow: hidden;
   position: relative;
@@ -772,30 +957,5 @@ onMounted(load);
   padding: 0;
   cursor: pointer;
   background: var(--surface-soft);
-}
-.video-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.video-ph {
-  width: 100%;
-  height: 100%;
-  display: grid;
-  place-items: center;
-}
-.video-ph span {
-  font-size: 14px;
-  font-weight: 800;
-}
-.v-grade-badge {
-  position: absolute;
-  bottom: 6px;
-  left: 6px;
-  font-size: 10px;
-  font-weight: 800;
-  padding: 2px 6px;
-  border-radius: 999px;
 }
 </style>

@@ -1,0 +1,295 @@
+<script setup lang="ts">
+import { ref, onMounted } from "vue";
+import { IonPage, IonHeader, IonToolbar, IonContent, IonSpinner, IonButtons, IonBackButton, IonInfiniteScroll, IonInfiniteScrollContent } from "@ionic/vue";
+import { useRouter } from "vue-router";
+import { useAuthStore } from "@/stores/auth";
+import { useUIStore } from "@/stores/ui";
+import { videoService } from "@/services/video";
+import VideoThumbnail from "@/components/video/VideoThumbnail.vue";
+import type { FeedVideo } from "@/types/api";
+
+const router = useRouter();
+const authStore = useAuthStore();
+const uiStore = useUIStore();
+
+const videos = ref<FeedVideo[]>([]);
+const isLoading = ref(true);
+const nextCursor = ref<string | null>(null);
+const hasNext = ref(false);
+const hasScrolled = ref(false);
+
+function handleScroll(event: CustomEvent<{ scrollTop: number }>) {
+  hasScrolled.value = event.detail.scrollTop > 12;
+}
+
+function goDetail(video: FeedVideo) {
+  router.push(`/my/videos/${video.id}`);
+}
+
+function formatDate(iso: string) {
+  const d = new Date(iso);
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+}
+
+async function load(cursor?: string | null) {
+  const userId = authStore.user?.id;
+  if (!userId) return;
+  try {
+    const result = await videoService.getMyVideos(userId, cursor);
+    if (cursor) {
+      videos.value.push(...result.content);
+    } else {
+      videos.value = result.content;
+    }
+    nextCursor.value = result.nextCursor;
+    hasNext.value = result.hasNext;
+  } catch (err: unknown) {
+    if (import.meta.env.DEV) console.error(err);
+    uiStore.showToast("영상 목록을 불러오지 못했어요.", "danger");
+  }
+}
+
+async function onInfiniteScroll(event: CustomEvent) {
+  if (!hasNext.value || !nextCursor.value) {
+    (event.target as HTMLIonInfiniteScrollElement).complete();
+    return;
+  }
+  await load(nextCursor.value);
+  (event.target as HTMLIonInfiniteScrollElement).complete();
+}
+
+onMounted(async () => {
+  isLoading.value = true;
+  if (!authStore.user) await authStore.fetchMe();
+  await load();
+  isLoading.value = false;
+});
+</script>
+
+<template>
+  <IonPage>
+    <IonHeader class="ion-no-border transparent-header" :class="{ 'is-scrolled': hasScrolled }">
+      <IonToolbar class="transparent-toolbar">
+        <IonButtons slot="start">
+          <IonBackButton default-href="/my" text="" class="back-btn" aria-label="뒤로" />
+        </IonButtons>
+        <div class="toolbar-title">내 영상</div>
+        <div class="toolbar-count" slot="end">
+          <span v-if="!isLoading">{{ videos.length }}{{ hasNext ? "+" : "" }}개</span>
+        </div>
+      </IonToolbar>
+    </IonHeader>
+
+    <IonContent fullscreen class="videos-page-content" :scroll-events="true" @ion-scroll="handleScroll">
+      <div class="page-inner page-padding">
+        <!-- Loading -->
+        <div v-if="isLoading" class="state-center">
+          <IonSpinner name="crescent" />
+        </div>
+
+        <!-- Empty -->
+        <div v-else-if="videos.length === 0" class="state-center">
+          <div class="empty-icon" aria-hidden="true">🧗</div>
+          <p class="state-title">아직 업로드한 영상이 없어요</p>
+          <p class="state-sub">첫 번째 클라이밍 영상을 올려보세요!</p>
+        </div>
+
+        <!-- Grid -->
+        <div v-else class="video-grid">
+          <button v-for="video in videos" :key="video.id" class="video-item" :aria-label="`${video.title ?? '제목 없음'} 영상 보기`" @click="goDetail(video)">
+            <div class="thumb-wrap">
+              <VideoThumbnail :thumbnail-url="video.thumbnailUrl" :grade="video.grade" :alt="`${video.title ?? '클라이밍 영상'} 썸네일`" />
+            </div>
+            <div class="item-info">
+              <p class="item-title">{{ video.title ?? "제목 없음" }}</p>
+              <div class="item-meta">
+                <span class="meta-stat" aria-label="조회수">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M1 12S5 4 12 4s11 8 11 8-4 8-11 8S1 12 1 12Z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                  {{ video.viewCount }}
+                </span>
+                <span class="meta-stat" aria-label="좋아요수">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78Z" />
+                  </svg>
+                  {{ video.likeCount }}
+                </span>
+                <span class="meta-date">{{ formatDate(video.createdAt) }}</span>
+              </div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <IonInfiniteScroll :disabled="!hasNext" @ion-infinite="onInfiniteScroll">
+        <IonInfiniteScrollContent loading-spinner="crescent" />
+      </IonInfiniteScroll>
+    </IonContent>
+  </IonPage>
+</template>
+
+<style scoped>
+/* ── Header ─────────────────────────────────────── */
+.transparent-header {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 10;
+  background: transparent;
+  box-shadow: none;
+  transition:
+    background var(--dur-base) var(--ease-state),
+    box-shadow var(--dur-base) var(--ease-state);
+}
+.transparent-header::after {
+  display: none;
+}
+.transparent-header.is-scrolled {
+  background: rgba(247, 247, 245, 0.82);
+  box-shadow: 0 1px 0 rgba(231, 234, 240, 0.72);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+}
+.transparent-toolbar {
+  --background: transparent;
+  --border-color: transparent;
+  --box-shadow: none;
+  --min-height: 52px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+}
+.back-btn {
+  --color: var(--fg);
+  --icon-font-size: 22px;
+}
+.toolbar-title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: var(--fs-body);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+  pointer-events: none;
+}
+.toolbar-count {
+  padding-right: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+
+/* ── Content ─────────────────────────────────────── */
+.videos-page-content {
+  --background: var(--bg);
+}
+
+.page-inner {
+  padding-top: calc(var(--ion-safe-area-top) + 64px);
+  padding-bottom: 40px;
+}
+
+/* ── State ───────────────────────────────────────── */
+.state-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 80px 24px;
+  text-align: center;
+}
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 4px;
+}
+.state-title {
+  font-size: var(--fs-body);
+  font-weight: 700;
+  margin: 0;
+  color: var(--fg);
+}
+.state-sub {
+  font-size: 13px;
+  color: var(--fg-muted);
+  margin: 0;
+}
+
+/* ── Grid ────────────────────────────────────────── */
+.video-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+@media (min-width: 600px) {
+  .video-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.video-item {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform var(--dur-fast) var(--ease-state);
+}
+.video-item:active {
+  transform: scale(0.97);
+}
+
+.thumb-wrap {
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--r-card);
+  background: var(--surface-soft);
+}
+
+.item-info {
+  padding: 8px 2px 4px;
+}
+
+.item-title {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--fg);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.meta-stat {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+
+.meta-date {
+  font-size: 11px;
+  color: var(--fg-muted);
+  margin-left: auto;
+}
+</style>

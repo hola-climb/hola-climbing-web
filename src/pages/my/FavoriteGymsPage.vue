@@ -1,0 +1,105 @@
+<script setup lang="ts">
+// imports → state → methods → lifecycle
+import { ref } from "vue";
+import { IonPage, IonContent, IonSpinner, IonInfiniteScroll, IonInfiniteScrollContent, onIonViewWillEnter } from "@ionic/vue";
+import type { InfiniteScrollCustomEvent } from "@ionic/vue";
+import AppHeader from "@/components/common/AppHeader.vue";
+import GymCard from "@/components/gym/GymCard.vue";
+import { gymService } from "@/services/gym";
+import { useUIStore } from "@/stores/ui";
+import type { Gym } from "@/types/api";
+
+const uiStore = useUIStore();
+
+const items = ref<Gym[]>([]);
+const page = ref(0);
+const hasNext = ref(true);
+const isLoading = ref(false);
+const initialLoading = ref(true);
+
+async function load(reset = false) {
+  if (isLoading.value) return;
+  if (reset) {
+    page.value = 0;
+    hasNext.value = true;
+    items.value = [];
+    initialLoading.value = true;
+  }
+  if (!hasNext.value) return;
+  isLoading.value = true;
+  try {
+    const { data } = await gymService.getFavorites({ page: page.value, size: 20 });
+    items.value.push(...data.content);
+    hasNext.value = data.hasNext;
+    page.value++;
+  } catch (err: unknown) {
+    if (import.meta.env.DEV) console.error(err);
+    uiStore.showToast("즐겨찾기를 불러오지 못했어요.", "danger");
+  } finally {
+    isLoading.value = false;
+    initialLoading.value = false;
+  }
+}
+
+async function loadMore(event: InfiniteScrollCustomEvent) {
+  await load();
+  event.target.complete();
+}
+
+// Refresh each time the page is shown so unfavorited gyms drop off.
+onIonViewWillEnter(() => load(true));
+</script>
+
+<template>
+  <IonPage>
+    <AppHeader title="즐겨찾기 암장" />
+
+    <IonContent>
+      <div v-if="initialLoading" class="state-center">
+        <IonSpinner name="crescent" />
+      </div>
+
+      <div v-else-if="items.length === 0" class="state-center empty">
+        <p class="empty-title">즐겨찾기한 암장이 없어요</p>
+        <p class="empty-sub">탐색에서 마음에 드는 암장을 저장해보세요.</p>
+      </div>
+
+      <div v-else class="gym-list">
+        <GymCard v-for="gym in items" :key="gym.id" :gym="gym" />
+      </div>
+
+      <IonInfiniteScroll :disabled="!hasNext || items.length === 0" @ion-infinite="loadMore">
+        <IonInfiniteScrollContent loading-spinner="crescent" />
+      </IonInfiniteScroll>
+    </IonContent>
+  </IonPage>
+</template>
+
+<style scoped>
+.state-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 64px 24px;
+  text-align: center;
+}
+.empty-title {
+  font-size: var(--fs-body);
+  font-weight: 700;
+  margin: 0;
+}
+.empty-sub {
+  font-size: var(--fs-caption);
+  color: var(--fg-muted);
+  margin: 0;
+}
+
+.gym-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px 40px;
+}
+</style>

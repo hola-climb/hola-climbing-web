@@ -1,84 +1,93 @@
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import type { User } from '@/types/api'
-import { authService } from '@/services/auth'
+import { defineStore } from "pinia";
+import { ref, computed } from "vue";
+import type { User } from "@/types/api";
+import { authService } from "@/services/auth";
 
-export const useAuthStore = defineStore('auth', () => {
+export const useAuthStore = defineStore("auth", () => {
   // state
-  const user = ref<User | null>(null)
-  const isLoading = ref(false)
+  const user = ref<User | null>(null);
+  const isLoading = ref(false);
   // Memoized session-restore promise so the router guard can await it once.
-  let initPromise: Promise<void> | null = null
+  let initPromise: Promise<void> | null = null;
 
   // computed
-  const isAuthenticated = computed(() => !!user.value)
+  const isAuthenticated = computed(() => !!user.value);
 
   // actions
   async function login(email: string, password: string) {
-    isLoading.value = true
+    isLoading.value = true;
     try {
       // Login response only carries tokens; profile comes from /users/me
-      const { data } = await authService.login({ email, password })
-      _applyTokens(data.accessToken, data.refreshToken)
-      await fetchMe()
+      const { data } = await authService.login({ email, password });
+      _applyTokens(data.accessToken, data.refreshToken);
+      await fetchMe();
     } finally {
-      isLoading.value = false
+      isLoading.value = false;
     }
   }
 
   async function register(email: string, password: string, nickname: string, termsAgreed: Array<{ termId: number; agreed: boolean }>) {
-    isLoading.value = true
+    isLoading.value = true;
     try {
       // Signup sends a verification email; user must verify before logging in.
       // (No auto-login — backend rejects login until email is verified.)
-      await authService.register({ email, password, nickname, termsAgreed })
+      await authService.register({ email, password, nickname, termsAgreed });
     } finally {
-      isLoading.value = false
+      isLoading.value = false;
     }
   }
 
-  async function socialLogin(provider: 'google' | 'kakao' | 'naver', code: string, redirectUri: string) {
-    isLoading.value = true
+  /** 약관 재동의 기록 (NF-10) — 약관 갱신 시 로그인 사용자가 다시 동의할 때 사용 */
+  async function agreeTerms(agreements: Array<{ termId: number; agreed: boolean }>) {
+    await authService.agreeTerms(agreements);
+  }
+
+  async function socialLogin(provider: "google" | "kakao" | "naver", code: string, redirectUri: string) {
+    isLoading.value = true;
     try {
-      const { data } = await authService.socialLogin(provider, code, redirectUri)
-      _applyTokens(data.accessToken, data.refreshToken)
-      await fetchMe()
+      const { data } = await authService.socialLogin(provider, code, redirectUri);
+      _applyTokens(data.accessToken, data.refreshToken);
+      await fetchMe();
     } finally {
-      isLoading.value = false
+      isLoading.value = false;
     }
   }
 
   async function logout() {
-    const refreshToken = localStorage.getItem('refresh_token')
+    const refreshToken = localStorage.getItem("refresh_token");
     if (refreshToken) {
-      try { await authService.logout(refreshToken) } catch { /* best-effort */ }
+      try {
+        await authService.logout(refreshToken);
+      } catch {
+        /* best-effort */
+      }
     }
-    _clearTokens()
-    user.value = null
-    initPromise = null   // allow re-init on next login
+    _clearTokens();
+    user.value = null;
+    initPromise = null; // allow re-init on next login
   }
 
   async function fetchMe() {
     try {
-      const { data } = await authService.getMe()
+      const { data } = await authService.getMe();
       // Backend MyProfileResponse uses userId/profileImage; map to client User
       const raw = data as unknown as {
-        userId?: string | number
-        id?: string
-        email: string
-        nickname: string
-        profileImage?: string | null
-        profileImageUrl?: string | null
-        bio?: string | null
-        emailVerified?: boolean
-        followerCount?: number
-        followingCount?: number
-        videoCount?: number
-        createdAt: string
-        role?: 'USER' | 'ADMIN'
-      }
+        userId?: string | number;
+        id?: string;
+        email: string;
+        nickname: string;
+        profileImage?: string | null;
+        profileImageUrl?: string | null;
+        bio?: string | null;
+        emailVerified?: boolean;
+        followerCount?: number;
+        followingCount?: number;
+        videoCount?: number;
+        createdAt: string;
+        role?: "USER" | "ADMIN";
+      };
       user.value = {
-        id: String(raw.id ?? raw.userId ?? ''),
+        id: String(raw.id ?? raw.userId ?? ""),
         email: raw.email,
         nickname: raw.nickname,
         profileImageUrl: raw.profileImageUrl ?? raw.profileImage ?? null,
@@ -89,48 +98,48 @@ export const useAuthStore = defineStore('auth', () => {
         videoCount: raw.videoCount ?? 0,
         createdAt: raw.createdAt,
         role: raw.role,
-      }
+      };
     } catch {
       // Only clear auth state if there's no existing user (standalone refresh)
       if (!user.value) {
-        _clearTokens()
+        _clearTokens();
       }
     }
   }
 
-  async function updateProfile(payload: Partial<Pick<User, 'nickname' | 'profileImageUrl' | 'bio'>>) {
-    const { data } = await authService.updateProfile(payload)
-    user.value = data
+  async function updateProfile(payload: Partial<Pick<User, "nickname" | "profileImageUrl" | "bio">>) {
+    const { data } = await authService.updateProfile(payload);
+    user.value = data;
   }
 
   function saveClimbingInfo(climbingExperienceMonths: number) {
-    if (user.value) user.value.climbingExperienceMonths = climbingExperienceMonths
+    if (user.value) user.value.climbingExperienceMonths = climbingExperienceMonths;
   }
 
   async function deleteAccount(password: string) {
-    await authService.deleteAccount(password)
-    _clearTokens()
-    user.value = null
+    await authService.deleteAccount(password);
+    _clearTokens();
+    user.value = null;
   }
 
   /** Restore session from localStorage. Idempotent — returns the same promise
    *  so the router guard and app bootstrap can both await a single fetchMe. */
   function initFromStorage(): Promise<void> {
     if (!initPromise) {
-      const token = localStorage.getItem('access_token')
-      initPromise = token ? fetchMe() : Promise.resolve()
+      const token = localStorage.getItem("access_token");
+      initPromise = token ? fetchMe() : Promise.resolve();
     }
-    return initPromise
+    return initPromise;
   }
 
   function _applyTokens(accessToken: string, refreshToken: string) {
-    localStorage.setItem('access_token', accessToken)
-    localStorage.setItem('refresh_token', refreshToken)
+    localStorage.setItem("access_token", accessToken);
+    localStorage.setItem("refresh_token", refreshToken);
   }
 
   function _clearTokens() {
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
   }
 
   return {
@@ -139,6 +148,7 @@ export const useAuthStore = defineStore('auth', () => {
     isAuthenticated,
     login,
     register,
+    agreeTerms,
     socialLogin,
     logout,
     fetchMe,
@@ -146,5 +156,5 @@ export const useAuthStore = defineStore('auth', () => {
     saveClimbingInfo,
     deleteAccount,
     initFromStorage,
-  }
-})
+  };
+});

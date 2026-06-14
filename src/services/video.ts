@@ -34,6 +34,7 @@ function toFeedVideo(raw: RawRecommendedVideo): FeedVideo {
     commentCount: raw.commentCount,
     source: raw.source,
     createdAt: raw.createdAt,
+    recordedDate: raw.recordedDate ?? null,
   };
 }
 
@@ -164,6 +165,38 @@ export const videoService = {
 
   getVideoStatus: (id: string) => api.get<VideoStatus>(`/videos/${id}/status`),
 
+  /** 내 영상 전체 목록 — GET /api/videos?userId={id}&cursor={cursor}&size=20
+   *  커서 기반 페이지네이션. cursor 없으면 첫 페이지. */
+  getMyVideos: async (
+    userId: string,
+    cursor?: string | null,
+    size = 20,
+  ): Promise<{ content: FeedVideo[]; nextCursor: string | null; hasNext: boolean }> => {
+    const params: Record<string, unknown> = { userId, size };
+    if (cursor) params.cursor = cursor;
+    const { data } = await api.get<{
+      content: RawRecommendedVideo[];
+      nextCursor: string | null;
+      hasNext: boolean;
+    }>("/videos", { params });
+    return {
+      content: data.content.map((raw) => toFeedVideo({ ...raw, source: "my" })),
+      nextCursor: data.nextCursor,
+      hasNext: data.hasNext,
+    };
+  },
+
+  /** 날짜별 내 영상 목록 — GET /api/videos?userId={id}&recordedDate={date}
+   *  커서 기반. 단일 날짜 필터로 해당 촬영일의 영상만 반환. */
+  getVideosByDate: async (userId: string, recordedDate: string): Promise<FeedVideo[]> => {
+    const { data } = await api.get<{
+      content: RawRecommendedVideo[];
+      nextCursor: string | null;
+      hasNext: boolean;
+    }>("/videos", { params: { userId, recordedDate, size: 50 } });
+    return data.content.map((raw) => toFeedVideo({ ...raw, source: "my" }));
+  },
+
   /** 사용자 공개 영상 목록 — GET /api/users/{userId}/videos (offset).
    *  VideoSummaryResponse → Video (작성자 해석, 표시용 기본값 채움). */
   getUserVideos: async (userId: string, params?: { page?: number; size?: number }): Promise<{ data: PageResponse<Video> }> => {
@@ -177,6 +210,7 @@ export const videoService = {
           user,
           title: raw.title,
           gymGrade: raw.gymGrade ?? null,
+          gymName: raw.gymName ?? null,
           grade: raw.gymGrade?.label ?? raw.grade ?? null,
           description: null,
           gym: null,

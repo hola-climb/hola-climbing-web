@@ -57,7 +57,7 @@ async function handleSend() {
           </div>
 
           <IonButton expand="block" :disabled="isLoading || !email" @click="handleSend" class="submit-btn">
-            <IonSpinner v-if="isLoading" name="dots" slot="start" />
+            <IonSpinner v-if="isLoading" name="crescent" slot="start" />
             {{ isLoading ? '발송 중...' : '인증 코드 받기' }}
           </IonButton>
         </div>

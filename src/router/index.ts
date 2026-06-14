@@ -38,6 +38,18 @@ const routes: Array<RouteRecordRaw> = [
     component: () => import('@/pages/upload/UploadPage.vue'),
   },
 
+  // ── Climbing log (작성/수정) ───────────────────────────────────────────
+  {
+    path: '/climbing-log',
+    component: () => import('@/pages/records/ClimbingLogPage.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/climbing-log/:id',
+    component: () => import('@/pages/records/ClimbingLogPage.vue'),
+    meta: { requiresAuth: true },
+  },
+
   // ── Video detail ──────────────────────────────────────────────────────
   {
     path: '/videos/:id',
@@ -70,6 +82,20 @@ const routes: Array<RouteRecordRaw> = [
     ],
   },
 
+  // ── My video list ─────────────────────────────────────────────────────
+  {
+    path: '/my/videos',
+    component: () => import('@/pages/my/MyVideosPage.vue'),
+    meta: { requiresAuth: true },
+  },
+
+  // ── My video detail (내 영상 + AI 분석) ──────────────────────────────────
+  {
+    path: '/my/videos/:id',
+    component: () => import('@/pages/my/MyVideoDetailPage.vue'),
+    meta: { requiresAuth: true },
+  },
+
   // ── Notifications ─────────────────────────────────────────────────────
   {
     path: '/my/notifications',
@@ -80,6 +106,26 @@ const routes: Array<RouteRecordRaw> = [
   {
     path: '/my/settings',
     component: () => import('@/pages/my/SettingsPage.vue'),
+  },
+
+  // ── Favorite gyms ─────────────────────────────────────────────────────
+  {
+    path: '/my/favorites',
+    component: () => import('@/pages/my/FavoriteGymsPage.vue'),
+    meta: { requiresAuth: true },
+  },
+
+  // ── Block management (users) ──────────────────────────────────────────
+  {
+    path: '/my/blocks',
+    component: () => import('@/pages/my/BlockListPage.vue'),
+    meta: { requiresAuth: true },
+  },
+
+  // ── Follow list (followers / following) ───────────────────────────────
+  {
+    path: '/users/:id/follows',
+    component: () => import('@/pages/my/FollowListPage.vue'),
   },
 
   // ── Profile (other user) ──────────────────────────────────────────────

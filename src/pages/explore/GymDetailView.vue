@@ -2,9 +2,10 @@
 // imports → state → computed → methods → lifecycle
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import {
-  IonHeader, IonToolbar, IonContent, IonIcon,
+  IonContent, IonIcon,
   IonSpinner, IonModal, IonButton,
 } from '@ionic/vue'
+import AppHeader from '@/components/common/AppHeader.vue'
 import {
   bookmarkOutline, bookmark, locationOutline,
   timeOutline, closeOutline, sendOutline, star, starOutline,
@@ -17,6 +18,7 @@ import { gymService } from '@/services/gym'
 import { chatService } from '@/services/chat'
 import { useGymChat } from '@/composables/useGymChat'
 import { gradeColor, gradeTextColor } from '@/utils/gradeColor'
+import VideoThumbnail from '@/components/video/VideoThumbnail.vue'
 import type { GymPhoto, GymReview, FeedVideo, ChatMessage } from '@/types/api'
 
 const props = defineProps<{ gymId: string }>()
@@ -198,7 +200,7 @@ function openVideo(id: string) {
 <template>
   <div class="gym-detail-view">
       <div v-if="isLoading" class="loading-center">
-        <IonSpinner name="dots" />
+        <IonSpinner name="crescent" />
       </div>
 
       <div v-else-if="gym" class="gym-detail page-padding">
@@ -257,11 +259,7 @@ function openVideo(id: string) {
               @click="openVideo(v.id)"
               :aria-label="v.title ?? '클라이밍 영상'"
             >
-              <img v-if="v.thumbnailUrl" :src="v.thumbnailUrl" :alt="v.title ?? ''" loading="lazy" />
-              <div v-else class="video-ph" :style="{ background: gradeColor(v.grade) }">
-                <span>{{ v.grade ?? 'HOLA' }}</span>
-              </div>
-              <span v-if="v.grade" class="v-grade" :style="{ background: gradeColor(v.grade), color: gradeTextColor(gradeColor(v.grade)) }">{{ v.grade }}</span>
+              <VideoThumbnail :thumbnail-url="v.thumbnailUrl" :grade="v.grade" :alt="v.title ?? ''" />
             </button>
           </div>
         </div>
@@ -321,7 +319,7 @@ function openVideo(id: string) {
           <div class="section-head">
             <div class="section-title">실시간 채팅</div>
             <button class="see-all" @click="enterChat">
-              <IonSpinner v-if="isJoining" name="crescent" style="width:14px;height:14px" />
+              <IonSpinner v-if="isJoining" name="crescent" class="btn-spinner" />
               <span v-else>입장</span>
             </button>
           </div>
@@ -332,7 +330,7 @@ function openVideo(id: string) {
                 <span class="cp-text">{{ m.content }}</span>
               </div>
             </template>
-            <p v-else class="no-info" style="margin:0">아직 대화가 없어요. 입장해 첫 메시지를 남겨보세요.</p>
+            <p v-else class="no-info">아직 대화가 없어요. 입장해 첫 메시지를 남겨보세요.</p>
           </div>
         </div>
       </div>
@@ -384,17 +382,13 @@ function openVideo(id: string) {
 
     <!-- Live chat modal -->
     <IonModal :is-open="showChat" @did-dismiss="leaveChat">
-      <IonHeader class="ion-no-border">
-        <IonToolbar>
-          <div class="toolbar-inner">
-            <button class="back-btn" @click="leaveChat" aria-label="닫기"><IonIcon :icon="closeOutline" /></button>
-            <span class="toolbar-title">{{ gym?.name ?? '채팅' }}</span>
-            <span class="chat-status" :class="chat.status.value">
-              {{ chat.status.value === 'connected' ? '● 실시간' : chat.status.value === 'connecting' ? '연결 중' : '오프라인' }}
-            </span>
-          </div>
-        </IonToolbar>
-      </IonHeader>
+      <AppHeader :title="gym?.name ?? '채팅'" back-icon="close" @back="leaveChat">
+        <template #action>
+          <span class="chat-status" :class="chat.status.value">
+            {{ chat.status.value === 'connected' ? '● 실시간' : chat.status.value === 'connecting' ? '연결 중' : '오프라인' }}
+          </span>
+        </template>
+      </AppHeader>
       <IonContent>
         <div class="chat-log page-padding">
           <div
@@ -432,14 +426,7 @@ function openVideo(id: string) {
 </template>
 
 <style scoped>
-.toolbar-inner {
-  display: grid;
-  grid-template-columns: 44px 1fr 44px;
-  align-items: center;
-  padding: 0 12px;
-  height: 52px;
-}
-.back-btn, .fav-btn {
+.fav-btn {
   background: none;
   border: none;
   cursor: pointer;
@@ -448,15 +435,8 @@ function openVideo(id: string) {
   display: grid;
   place-items: center;
   padding: 6px;
-}
-.fav-btn { flex-shrink: 0; align-self: flex-start; }
-.toolbar-title {
-  text-align: center;
-  font-size: var(--fs-caption);
-  font-weight: var(--w-semibold);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex-shrink: 0;
+  align-self: flex-start;
 }
 .fav-btn ion-icon.favorited { color: var(--fg); }
 
@@ -537,14 +517,6 @@ function openVideo(id: string) {
   cursor: pointer;
   background: var(--surface-soft);
 }
-.video-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.video-ph { width: 100%; height: 100%; display: grid; place-items: center; }
-.video-ph span { font-size: 22px; font-weight: 800; color: rgba(0,0,0,0.55); }
-.v-grade {
-  position: absolute; top: 6px; left: 6px;
-  font-size: 11px; font-weight: 800; color: #151515;
-  padding: 2px 7px; border-radius: 999px;
-}
 
 /* Hours */
 .hours-grid { display: grid; grid-template-columns: 24px 1fr; gap: 6px 12px; }
@@ -558,7 +530,7 @@ function openVideo(id: string) {
 .review-top { display: flex; align-items: center; gap: 10px; }
 .r-avatar {
   width: 34px; height: 34px; border-radius: 50%;
-  background: var(--tint-cyan, #d6f6fb); color: #066a78;
+  background: var(--tint-cyan, #d6f6fb); color: var(--on-tint-cyan);
   display: grid; place-items: center; font-size: 13px; font-weight: 700; flex-shrink: 0;
 }
 .r-meta { flex: 1; min-width: 0; }
@@ -566,7 +538,7 @@ function openVideo(id: string) {
 .r-stars { display: flex; gap: 1px; color: var(--hold-orange); font-size: 13px; }
 .r-time { font-size: 11px; color: var(--fg-muted); flex-shrink: 0; }
 .r-del { background: none; border: none; color: var(--fg-muted); font-size: 12px; cursor: pointer; flex-shrink: 0; }
-.r-content { font-size: 14px; line-height: 1.45; margin: 0; word-break: break-word; }
+.r-content { font-size: var(--fs-body); line-height: 1.45; margin: 0; word-break: break-word; }
 
 /* Chat preview */
 .chat-preview { display: flex; flex-direction: column; gap: 6px; cursor: pointer; }
@@ -588,13 +560,13 @@ function openVideo(id: string) {
 
 /* Review sheet */
 .sheet { padding: 24px 20px; display: flex; flex-direction: column; gap: 16px; }
-.sheet-title { font-size: 18px; font-weight: 800; margin: 0; }
+.sheet-title { font-size: var(--fs-h3); font-weight: 800; margin: 0; }
 .star-pick { display: flex; gap: 6px; justify-content: center; }
 .star-btn { background: none; border: none; cursor: pointer; font-size: 34px; color: var(--hold-orange); padding: 0; }
 .review-textarea {
   width: 100%; border: 1px solid var(--border); border-radius: 14px;
   background: var(--surface-soft); padding: 12px 14px;
-  font-family: var(--font-sans); font-size: 14px; color: var(--fg); resize: none; outline: none;
+  font-family: var(--font-sans); font-size: var(--fs-body); color: var(--fg); resize: none; outline: none;
 }
 .review-textarea:focus { border-color: var(--fg); }
 
@@ -614,7 +586,7 @@ function openVideo(id: string) {
 .cb-head { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
 .cb-name { font-size: 11px; font-weight: 700; color: var(--fg-muted); }
 .cb-verified { font-size: 10px; color: var(--fg-muted); }
-.cb-text { font-size: 14px; line-height: 1.4; word-break: break-word; }
+.cb-text { font-size: var(--fs-body); line-height: 1.4; word-break: break-word; }
 .cb-time { font-size: 10px; color: var(--fg-muted); padding: 0 4px; }
 
 .chat-bar {
@@ -625,7 +597,7 @@ function openVideo(id: string) {
 .chat-input {
   flex: 1; height: 42px; border: 1px solid var(--border); border-radius: 14px;
   background: var(--surface-soft); padding: 0 14px;
-  font-family: var(--font-sans); font-size: 14px; color: var(--fg); outline: none;
+  font-family: var(--font-sans); font-size: var(--fs-body); color: var(--fg); outline: none;
 }
 .chat-input:focus { border-color: var(--fg); }
 .chat-send {
