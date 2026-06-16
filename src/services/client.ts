@@ -1,11 +1,9 @@
 import axios from "axios";
 import type { AxiosInstance, InternalAxiosRequestConfig } from "axios";
+import { Capacitor } from "@capacitor/core";
 
 // 모든 요청과 토큰 재발급이 같은 베이스를 쓰도록 단일 상수로 관리.
-// 항상 "/api" 를 사용한다 — dev 는 Vite 프록시, 프로덕션은 동일 출처 리버스 프록시가
-// "/api" 를 백엔드로 넘겨준다. (백엔드 호스트를 직접 가리키면 LAN/CORS 로 깨질 수 있어
-//  VITE_API_BASE_URL 직접 지정은 사용하지 않는다.)
-const API_BASE = "/api";
+const API_BASE = Capacitor.isNativePlatform() ? import.meta.env.VITE_API_BASE_URL : "/api";
 
 const api: AxiosInstance = axios.create({
   baseURL: API_BASE,

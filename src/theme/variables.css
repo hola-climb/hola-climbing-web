@@ -35,6 +35,12 @@
   --on-tint-cyan:   #066A78;
   --on-tint-dark:   var(--fg);
 
+  /* ── Social brand (off-palette, fixed by each provider) ── */
+  --brand-kakao:    #FEE500;
+  --brand-kakao-fg: #3A1D1D;
+  --brand-naver:    #03C75A;
+  --brand-naver-fg: #FFFFFF;
+
   /* ── Semantic ─────────────────────────────────── */
   --success: var(--hold-lime);
   --info:    var(--hold-cyan);

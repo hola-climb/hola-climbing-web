@@ -1,9 +1,12 @@
 <script setup lang="ts">
 // imports → state → computed → methods → lifecycle
 import { onMounted, reactive, computed, ref, watch } from "vue";
-import { IonPage, IonHeader, IonToolbar, IonContent, IonRefresher, IonRefresherContent, IonInfiniteScroll, IonInfiniteScrollContent, IonSpinner } from "@ionic/vue";
+import { IonPage, IonHeader, IonToolbar, IonContent, IonRefresher, IonRefresherContent, IonInfiniteScroll, IonInfiniteScrollContent } from "@ionic/vue";
 import type { InfiniteScrollCustomEvent } from "@ionic/vue";
 import { useRouter } from "vue-router";
+import LoadingState from "@/components/common/LoadingState.vue";
+import EmptyState from "@/components/common/EmptyState.vue";
+import AppIcon from "@/components/common/AppIcon.vue";
 import { useVideoStore } from "@/stores/video";
 import { useAuthStore } from "@/stores/auth";
 import { useUIStore } from "@/stores/ui";
@@ -103,15 +106,19 @@ watch(
       </div>
 
       <!-- Initial loading -->
-      <div v-if="showInitialLoading" class="state-center">
-        <IonSpinner name="crescent" />
+      <div v-if="showInitialLoading" class="feed-skeleton">
+        <LoadingState variant="card" :count="3" label="추천 클립을 불러오는 중" />
       </div>
 
       <!-- Empty -->
-      <div v-else-if="videoStore.feedVideos.length === 0" class="state-center empty">
-        <p class="empty-title">추천할 클립이 아직 없어요</p>
-        <p class="empty-sub">팔로우를 늘리거나 영상을 업로드해 보세요.</p>
-      </div>
+      <EmptyState
+        v-else-if="videoStore.feedVideos.length === 0"
+        hold="lime"
+        title="추천할 클립이 아직 없어요"
+        description="팔로우를 늘리거나 영상을 업로드해 보세요."
+        action-label="영상 올리기"
+        @action="router.push('/upload')"
+      />
 
       <!-- Masonry grid (2-column) -->
       <div v-else class="masonry">
@@ -145,8 +152,8 @@ watch(
           <div class="card-meta">
             <div v-if="video.title" class="card-title">{{ video.title }}</div>
             <div class="card-stats">
-              <span class="stat">♥ {{ video.likeCount }}</span>
-              <span class="stat">▷ {{ video.viewCount }}</span>
+              <span class="stat"><AppIcon name="heart" :size="13" /> {{ video.likeCount }}</span>
+              <span class="stat"><AppIcon name="play" :size="12" /> {{ video.viewCount }}</span>
             </div>
           </div>
         </button>
@@ -267,35 +274,15 @@ watch(
   margin: 0;
   position: relative;
 }
+/* .micro-label type — canonical in global.css; keep only local layout */
 .micro-label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--fg-muted);
   margin-top: 10px;
   position: relative;
 }
 
 /* ── States ─────────────────────────────────────── */
-.state-center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 56px 24px;
-  text-align: center;
-}
-.empty-title {
-  font-size: 15px;
-  font-weight: 700;
-  margin: 0;
-}
-.empty-sub {
-  font-size: 13px;
-  color: var(--fg-muted);
-  margin: 0;
+.feed-skeleton {
+  padding: 8px 16px;
 }
 
 /* ── Masonry (CSS columns) ──────────────────────── */
@@ -423,5 +410,10 @@ watch(
   font-size: 11px;
   font-weight: 600;
   color: var(--fg-muted);
+}
+.stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
 </style>

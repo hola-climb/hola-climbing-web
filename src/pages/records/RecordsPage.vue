@@ -1,9 +1,11 @@
 <script setup lang="ts">
 // imports → state → computed → methods → lifecycle
 import { ref, computed, onMounted } from "vue";
-import { IonPage, IonHeader, IonToolbar, IonContent, IonRefresher, IonRefresherContent, IonSpinner } from "@ionic/vue";
+import { IonPage, IonHeader, IonToolbar, IonContent, IonRefresher, IonRefresherContent } from "@ionic/vue";
 import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
 import VideoThumbnail from "@/components/video/VideoThumbnail.vue";
+import LoadingState from "@/components/common/LoadingState.vue";
+import EmptyState from "@/components/common/EmptyState.vue";
 import { useRouter } from "vue-router";
 import { statsService } from "@/services/stats";
 import { gymService } from "@/services/gym";
@@ -478,21 +480,15 @@ onMounted(load);
         <!-- ── DETAIL VIEW ─────────────────────────── -->
         <div v-if="selectedDate || isDesktop" class="detail-pane">
           <!-- Desktop placeholder (no date selected) -->
-          <div v-if="!selectedDate" class="state-center empty">
-            <p class="empty-title">날짜를 선택하세요</p>
-            <p class="empty-sub">달력에서 기록이 있는 날짜를 누르면 상세를 볼 수 있어요.</p>
-          </div>
+          <EmptyState v-if="!selectedDate" compact hold="cyan" title="날짜를 선택하세요" description="달력에서 기록이 있는 날짜를 누르면 상세를 볼 수 있어요." />
 
           <!-- Loading -->
-          <div v-else-if="isDetailLoading" class="state-center">
-            <IonSpinner name="crescent" />
+          <div v-else-if="isDetailLoading" class="detail-skeleton page-padding">
+            <LoadingState variant="list" :count="3" label="기록을 불러오는 중" />
           </div>
 
           <!-- Empty -->
-          <div v-else-if="selectedSessions.length === 0" class="state-center empty">
-            <p class="empty-title">기록이 없어요</p>
-            <p class="empty-sub">해당 날짜에 저장된 기록이 없습니다.</p>
-          </div>
+          <EmptyState v-else-if="selectedSessions.length === 0" compact hold="orange" title="기록이 없어요" description="해당 날짜에 저장된 기록이 없습니다." />
 
           <!-- Desktop detail header (date label) -->
           <template v-else>
@@ -801,32 +797,10 @@ onMounted(load);
 }
 
 /* ── States ─────────────────────────────────────── */
-.state-center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 64px 24px;
-  text-align: center;
+.detail-skeleton {
+  padding-top: 16px;
 }
-.empty-title {
-  font-size: 15px;
-  font-weight: 700;
-  margin: 0;
-}
-.empty-sub {
-  font-size: 13px;
-  color: var(--fg-muted);
-  margin: 0;
-}
-.micro-label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--fg-muted);
-}
+/* .micro-label — canonical style in global.css */
 
 /* ── Session detail ─────────────────────────────── */
 .sessions {

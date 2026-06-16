@@ -7,6 +7,7 @@ import { useUIStore } from "@/stores/ui";
 import { gymService } from "@/services/gym";
 import type { Gym, GymGrade } from "@/types/api";
 import VideoTrimModal from "@/components/video/VideoTrimModal.vue";
+import BaseButton from "@/components/common/BaseButton.vue";
 
 const router = useRouter();
 const videoStore = useVideoStore();
@@ -229,7 +230,7 @@ async function handleSubmit() {
           </div>
 
           <!-- Submit CTA -->
-          <button class="analyze-btn" :disabled="!canSubmit" @click="handleSubmit" aria-label="업로드 및 분석 시작">업로드 ✦</button>
+          <BaseButton variant="accent" block class="analyze-btn" :disabled="!canSubmit" aria-label="업로드 및 분석 시작" @click="handleSubmit">업로드</BaseButton>
 
           <!-- Trim editor -->
           <VideoTrimModal :open="trimEditorOpen" :file="pendingFile" :max-duration="MAX_DURATION" @apply="onTrimApply" @cancel="onTrimCancel" />
@@ -302,13 +303,7 @@ async function handleSubmit() {
   justify-content: space-between;
   align-items: center;
 }
-.micro-label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--fg-muted);
-}
+/* .micro-label — canonical style in global.css */
 .close-btn {
   background: transparent;
   border: none;
@@ -433,7 +428,7 @@ async function handleSubmit() {
   padding: 6px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--r-button);
   box-shadow: var(--shadow-float);
   max-height: 220px;
   overflow-y: auto;
@@ -525,31 +520,7 @@ async function handleSubmit() {
 }
 
 .analyze-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 52px;
   margin-top: 18px;
-  border: none;
-  border-radius: 16px;
-  background: var(--hold-lime);
-  color: var(--fg);
-  font-family: var(--font-sans);
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  cursor: pointer;
-  transition:
-    opacity var(--dur-fast) var(--ease-state),
-    transform var(--dur-fast) var(--ease-state);
-}
-.analyze-btn:active {
-  transform: scale(0.97);
-}
-.analyze-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
 }
 
 /* ── Uploading ───────────────────────────────────── */

@@ -6,6 +6,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useUIStore } from "@/stores/ui";
 import { useRouter } from "vue-router";
 import HoldPebble from "@/components/common/HoldPebble.vue";
+import AppIcon from "@/components/common/AppIcon.vue";
 
 const props = defineProps<{ gym: Gym; selectable?: boolean }>();
 const emit = defineEmits<{ (e: "select", gym: Gym): void }>();
@@ -70,7 +71,7 @@ function openDetail() {
       <div class="gym-sub">
         {{ gym.address.split(" ").slice(0, 2).join(" ") }}
         <template v-if="gym.distanceKm !== null">· {{ gym.distanceKm.toFixed(1) }}km</template>
-        <template v-if="gym.ratingAvg">· ★ {{ gym.ratingAvg.toFixed(1) }}</template>
+        <template v-if="gym.ratingAvg"> · <span class="rating-inline"><AppIcon name="star" :size="11" /> {{ gym.ratingAvg.toFixed(1) }}</span></template>
       </div>
       <div class="chip-row">
         <span class="chip" :class="isOpen ? 'chip-lime' : 'chip-dark'">
@@ -106,7 +107,7 @@ function openDetail() {
 .thumb {
   width: 56px;
   height: 56px;
-  border-radius: 14px;
+  border-radius: var(--r-button);
   background: var(--surface-soft);
   display: grid;
   place-items: center;
@@ -134,6 +135,12 @@ function openDetail() {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.rating-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  vertical-align: middle;
 }
 .chip-row {
   display: flex;

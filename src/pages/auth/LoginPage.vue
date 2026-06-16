@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { IonPage, IonContent, IonIcon, IonButton, IonInput, IonSpinner } from "@ionic/vue";
+import { IonPage, IonContent, IonIcon, IonInput } from "@ionic/vue";
 import { eyeOutline, eyeOffOutline } from "ionicons/icons";
+import BaseButton from "@/components/common/BaseButton.vue";
 import { useRouter, useRoute } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useUIStore } from "@/stores/ui";
@@ -96,10 +97,7 @@ async function handleLogin() {
 
           <button class="forgot-link" @click="router.push('/auth/password-reset')">비밀번호를 잊으셨나요?</button>
 
-          <IonButton expand="block" :disabled="isLoading" @click="handleLogin" class="submit-btn">
-            <IonSpinner v-if="isLoading" name="crescent" slot="start" />
-            {{ isLoading ? "로그인 중..." : "로그인" }}
-          </IonButton>
+          <BaseButton variant="primary" block :loading="isLoading" class="submit-btn" @click="handleLogin">로그인</BaseButton>
 
           <div v-if="showResend" class="resend-box" aria-live="polite">
             <span class="resend-text">이메일 인증이 필요해요.</span>
@@ -232,11 +230,6 @@ async function handleLogin() {
 }
 
 .submit-btn {
-  --background: var(--hold-dark);
-  --border-radius: var(--r-button);
-  --box-shadow: none;
-  height: 52px;
-  font-weight: var(--w-bold);
   margin-top: 4px;
 }
 
@@ -300,17 +293,17 @@ async function handleLogin() {
   opacity: 0.7;
 }
 .social-btn.kakao {
-  background: #fee500;
-  border-color: #fee500;
-  color: #3a1d1d;
+  background: var(--brand-kakao);
+  border-color: var(--brand-kakao);
+  color: var(--brand-kakao-fg);
 }
 .social-btn.naver {
-  background: #03c75a;
-  border-color: #03c75a;
-  color: #fff;
+  background: var(--brand-naver);
+  border-color: var(--brand-naver);
+  color: var(--brand-naver-fg);
 }
 .social-btn.google {
-  background: #fff;
+  background: var(--surface);
 }
 
 .auth-footer {

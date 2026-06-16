@@ -1,8 +1,11 @@
 <script setup lang="ts">
 // imports → state → computed → methods → lifecycle
 import { ref, computed, onMounted } from "vue";
-import { IonPage, IonHeader, IonToolbar, IonContent, IonSpinner } from "@ionic/vue";
+import { IonPage, IonHeader, IonToolbar, IonContent } from "@ionic/vue";
 import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
+import LoadingState from "@/components/common/LoadingState.vue";
+import EmptyState from "@/components/common/EmptyState.vue";
+import BaseButton from "@/components/common/BaseButton.vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useUIStore } from "@/stores/ui";
@@ -176,7 +179,7 @@ onMounted(load);
               </div>
               <div class="profile-info">
                 <div class="profile-name">{{ authStore.user?.nickname ?? "—" }}</div>
-                <div class="profile-sub">{{ profileSub }}</div>
+                <!-- <div class="profile-sub">{{ profileSub }}</div> -->
                 <p v-if="authStore.user?.bio" class="profile-bio">{{ authStore.user.bio }}</p>
               </div>
               <button class="edit-btn" aria-label="프로필 편집" @click="startEdit">
@@ -214,11 +217,8 @@ onMounted(load);
               <textarea id="edit-bio" v-model="editBio" class="edit-input edit-textarea" rows="3" maxlength="200" placeholder="클라이머 소개 (선택)" aria-label="소개" />
             </div>
             <div class="edit-actions">
-              <button class="edit-cancel" :disabled="isSavingProfile" @click="cancelEdit">취소</button>
-              <button class="edit-save" :disabled="isSavingProfile" @click="saveProfile">
-                <IonSpinner v-if="isSavingProfile" name="crescent" class="btn-spinner save-spinner" />
-                <span v-else>저장</span>
-              </button>
+              <BaseButton variant="secondary" class="edit-btn-flex" :disabled="isSavingProfile" @click="cancelEdit">취소</BaseButton>
+              <BaseButton variant="primary" class="edit-btn-flex" :loading="isSavingProfile" @click="saveProfile">저장</BaseButton>
             </div>
           </div>
         </div>
@@ -240,13 +240,8 @@ onMounted(load);
             <div class="section-title">기술 사용 빈도</div>
           </div>
           <div class="pyramid-card hola-card">
-            <div v-if="isLoading" class="section-state">
-              <IonSpinner name="crescent" />
-            </div>
-            <div v-else-if="techniques.length === 0" class="section-state">
-              <p class="state-title">아직 분석된 기술이 없어요</p>
-              <p class="state-sub">영상을 업로드하면 AI가 기술을 분석해요.</p>
-            </div>
+            <LoadingState v-if="isLoading" variant="list" :count="3" label="기술 분석을 불러오는 중" />
+            <EmptyState v-else-if="techniques.length === 0" compact hold="cyan" title="아직 분석된 기술이 없어요" description="영상을 업로드하면 AI가 기술을 분석해요." />
             <div v-else class="pyramid-rows">
               <div v-for="row in techniques" :key="row.key" class="pyr-row">
                 <div class="pyr-grade tech-label">{{ row.label }}</div>
@@ -310,10 +305,9 @@ onMounted(load);
   --min-height: 52px;
   background: transparent;
 }
+/* Flat canvas (DS rule); ambient comes only from the hero glow blobs. */
 .my-page-content {
-  --background:
-    radial-gradient(circle at 82% -34px, rgba(255, 77, 148, 0.18) 0, rgba(255, 77, 148, 0.09) 32%, rgba(255, 77, 148, 0) 60%),
-    radial-gradient(circle at -18% 90px, rgba(200, 255, 0, 0.2) 0, rgba(200, 255, 0, 0.1) 30%, rgba(200, 255, 0, 0) 58%), var(--bg);
+  --background: var(--bg);
 }
 .brand-label {
   font-size: 11px;
@@ -348,12 +342,11 @@ onMounted(load);
   }
 }
 
-/* ── Profile hero card (transparent, outlined) ──── */
+/* ── Profile hero (transparent, sits on the ambient glow) ── */
 .profile-hero {
   position: relative;
-  padding: 20px;
-  border: 1.5px solid var(--fg);
-  border-radius: var(--r-card);
+  padding-inline: 20px;
+  padding-bottom: 10px;
   background: transparent;
 }
 
@@ -380,20 +373,20 @@ onMounted(load);
 
 .hero-top {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 14px;
   position: relative;
   z-index: 1;
 }
 .avatar-dark {
-  width: 64px;
-  height: 64px;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
   background: var(--hold-dark);
   color: #fff;
   display: grid;
   place-items: center;
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 800;
   flex-shrink: 0;
   overflow: hidden;
@@ -419,8 +412,9 @@ onMounted(load);
   padding-top: 2px;
 }
 .edit-btn {
-  background: var(--surface-soft);
-  border: none;
+  /* background: var(--surface-soft); */
+  background: transparent;
+  /* border: none; */
   border-radius: 50%;
   width: 36px;
   height: 36px;
@@ -442,9 +436,9 @@ onMounted(load);
 /* Hero stat row (followers / following / videos) */
 .hero-stats {
   display: flex;
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
+  margin-top: 16px;
+  padding-top: 12px;
+  /* border-top: 1px solid var(--border); */
   position: relative;
   z-index: 1;
 }
@@ -520,33 +514,8 @@ onMounted(load);
   display: flex;
   gap: 8px;
 }
-.edit-cancel,
-.edit-save {
+.edit-btn-flex {
   flex: 1;
-  height: 46px;
-  border: none;
-  border-radius: var(--r-button);
-  font-family: var(--font-sans);
-  font-size: var(--fs-body);
-  font-weight: 700;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-}
-.edit-cancel {
-  background: var(--surface-soft);
-  color: var(--fg);
-}
-.edit-save {
-  background: var(--hold-dark);
-  color: #fff;
-}
-.edit-cancel:disabled,
-.edit-save:disabled {
-  opacity: 0.5;
-}
-.save-spinner {
-  --color: #fff;
 }
 
 /* ── Headline stats ─────────────────────────────── */
@@ -625,25 +594,6 @@ onMounted(load);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.section-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 28px 12px;
-  text-align: center;
-}
-.state-title {
-  font-size: var(--fs-body);
-  font-weight: 700;
-  margin: 0;
-}
-.state-sub {
-  font-size: 12px;
-  color: var(--fg-muted);
-  margin: 0;
 }
 .pyr-track {
   flex: 1;

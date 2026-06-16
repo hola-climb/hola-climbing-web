@@ -2,7 +2,7 @@
 // imports → state → computed → methods → lifecycle
 import { ref, computed, onMounted } from 'vue'
 import {
-  IonPage, IonContent, IonIcon, IonSpinner,
+  IonPage, IonContent, IonIcon,
   IonInfiniteScroll, IonInfiniteScrollContent, IonRefresher, IonRefresherContent,
 } from '@ionic/vue'
 import type { InfiniteScrollCustomEvent } from '@ionic/vue'
@@ -11,6 +11,8 @@ import {
   personAddOutline, megaphoneOutline, returnDownForwardOutline,
 } from 'ionicons/icons'
 import AppHeader from '@/components/common/AppHeader.vue'
+import LoadingState from '@/components/common/LoadingState.vue'
+import EmptyState from '@/components/common/EmptyState.vue'
 import { useRouter } from 'vue-router'
 import { useUIStore } from '@/stores/ui'
 import { notificationService } from '@/services/notification'
@@ -120,14 +122,16 @@ onMounted(() => load(true))
         <IonRefresherContent />
       </IonRefresher>
 
-      <div v-if="initialLoading" class="state-center">
-        <IonSpinner name="crescent" />
+      <div v-if="initialLoading" class="noti-skeleton">
+        <LoadingState variant="list" :count="6" label="알림을 불러오는 중" />
       </div>
 
-      <div v-else-if="items.length === 0" class="state-center empty">
-        <p class="empty-title">새 알림이 없어요</p>
-        <p class="empty-sub">활동이 생기면 여기에 표시됩니다.</p>
-      </div>
+      <EmptyState
+        v-else-if="items.length === 0"
+        hold="lime"
+        title="새 알림이 없어요"
+        description="활동이 생기면 여기에 표시됩니다."
+      />
 
       <ul v-else class="noti-list">
         <li
@@ -165,12 +169,7 @@ onMounted(() => load(true))
   white-space: nowrap;
 }
 
-.state-center {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 6px; padding: 64px 24px; text-align: center;
-}
-.empty-title { font-size: 15px; font-weight: 700; margin: 0; }
-.empty-sub { font-size: 13px; color: var(--fg-muted); margin: 0; }
+.noti-skeleton { padding: 14px 20px; }
 
 .noti-list { list-style: none; margin: 0; padding: 8px 0 40px; }
 .noti-item {

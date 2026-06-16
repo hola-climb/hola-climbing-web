@@ -8,6 +8,8 @@ import { gymService } from "@/services/gym";
 import { useMediaQuery } from "@/composables/useMediaQuery";
 import GymCard from "@/components/gym/GymCard.vue";
 import GymDetailView from "./GymDetailView.vue";
+import LoadingState from "@/components/common/LoadingState.vue";
+import EmptyState from "@/components/common/EmptyState.vue";
 import type { Gym } from "@/types/api";
 
 const router = useRouter();
@@ -246,15 +248,17 @@ async function handleLocate() {
               </button>
             </div>
 
-            <div v-if="gymStore.isLoading && !displayGyms.length" class="loading-center">
-              <IonSpinner name="crescent" />
-            </div>
+            <LoadingState v-if="gymStore.isLoading && !displayGyms.length" variant="list" :count="5" label="암장을 불러오는 중" />
 
             <GymCard v-for="gym in displayGyms" :key="gym.id" :gym="gym" :selectable="isDesktop" :class="{ 'is-selected': isDesktop && selectedGymId === gym.id }" @select="openGym" />
 
-            <div v-if="!gymStore.isLoading && !gymStore.gyms.length" class="empty-state">
-              <p>검색 결과가 없어요.</p>
-            </div>
+            <EmptyState
+              v-if="!gymStore.isLoading && !gymStore.gyms.length"
+              compact
+              hold="orange"
+              title="검색 결과가 없어요"
+              description="다른 이름으로 검색하거나 위치로 찾아보세요."
+            />
           </div>
 
           <IonInfiniteScroll :disabled="gymStore.isLoading" @ion-infinite="handleInfinite">
@@ -361,12 +365,8 @@ async function handleLocate() {
   line-height: 1.05;
   margin: 0;
 }
+/* .micro-label type — canonical in global.css; keep only the local offset */
 .micro-label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--fg-muted);
   margin-top: 6px;
 }
 
@@ -425,7 +425,7 @@ async function handleLocate() {
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border-radius: 14px;
+  border-radius: var(--r-button);
   padding: 10px 14px;
   display: flex;
   justify-content: space-between;
@@ -470,14 +470,4 @@ async function handleLocate() {
   padding: 4px 0;
 }
 
-.loading-center {
-  display: grid;
-  place-items: center;
-  padding: 60px 0;
-}
-.empty-state {
-  text-align: center;
-  padding: 60px 0;
-  color: var(--fg-muted);
-}
 </style>

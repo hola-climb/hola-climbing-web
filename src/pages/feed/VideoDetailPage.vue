@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from "vue";
 import { IonPage, IonContent, IonIcon, IonSpinner } from "@ionic/vue";
 import { heartOutline, heart, shareOutline, chatbubbleOutline, refreshOutline } from "ionicons/icons";
 import AppHeader from "@/components/common/AppHeader.vue";
+import LoadingState from "@/components/common/LoadingState.vue";
 import { useRoute, useRouter } from "vue-router";
 import { useVideoStore } from "@/stores/video";
 import { useAuthStore } from "@/stores/auth";
@@ -135,8 +136,9 @@ async function retryAnalysis() {
     <AppHeader title="영상" />
 
     <IonContent>
-      <div v-if="isLoading" class="loading-center">
-        <IonSpinner name="crescent" />
+      <div v-if="isLoading" class="page-skeleton page-padding">
+        <LoadingState variant="card" :count="1" label="영상을 불러오는 중" />
+        <LoadingState variant="list" :count="3" />
       </div>
 
       <div v-else-if="video" class="video-detail-layout">
@@ -269,10 +271,11 @@ async function retryAnalysis() {
 </template>
 
 <style scoped>
-.loading-center {
-  display: grid;
-  place-items: center;
-  height: 60vh;
+.page-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 16px;
 }
 
 /* ── Desktop 2-pane layout ────────────────────────── */

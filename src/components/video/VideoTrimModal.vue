@@ -288,13 +288,7 @@ onBeforeUnmount(cleanupUrl);
   flex-direction: column;
   gap: 4px;
 }
-.micro-label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--fg-muted);
-}
+/* .micro-label — canonical style in global.css */
 .trim-title {
   font-size: var(--fs-h2);
   font-weight: var(--w-extrabold);

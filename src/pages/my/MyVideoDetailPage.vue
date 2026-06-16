@@ -9,6 +9,7 @@ import {
   shareOutline, chatbubbleOutline, refreshOutline, checkmarkCircle,
 } from 'ionicons/icons'
 import AppHeader from '@/components/common/AppHeader.vue'
+import LoadingState from '@/components/common/LoadingState.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useVideoStore } from '@/stores/video'
 import { useUIStore } from '@/stores/ui'
@@ -147,8 +148,9 @@ onMounted(async () => {
     <AppHeader title="내 영상" />
 
     <IonContent>
-      <div v-if="isLoading" class="loading-center">
-        <IonSpinner name="crescent" />
+      <div v-if="isLoading" class="page-skeleton page-padding">
+        <LoadingState variant="card" :count="1" label="영상을 불러오는 중" />
+        <LoadingState variant="list" :count="3" />
       </div>
 
       <div v-else-if="video" class="video-detail-layout">
@@ -355,10 +357,11 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.loading-center {
-  display: grid;
-  place-items: center;
-  height: 60vh;
+.page-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 16px;
 }
 
 /* ── Desktop 2-pane ───────────────────────────────── */
@@ -515,13 +518,13 @@ onMounted(async () => {
 .progress-bar-wrap {
   height: 3px;
   background: var(--border);
-  border-radius: 99px;
+  border-radius: var(--r-chip);
   overflow: hidden;
 }
 .progress-bar-fill {
   height: 100%;
   background: var(--hold-lime);
-  border-radius: 99px;
+  border-radius: var(--r-chip);
   transition: width 0.5s ease;
 }
 

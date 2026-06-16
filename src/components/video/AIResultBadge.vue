@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { TechniqueTag } from "@/types/api";
 import { getTagLabel } from "@/utils/tagLabels";
+import AppIcon from "@/components/common/AppIcon.vue";
 
 defineProps<{
   techniques: TechniqueTag[];
@@ -23,10 +24,14 @@ defineProps<{
     </div>
 
     <div class="techniques">
-      <span v-for="tag in techniques" :key="tag" class="technique-chip" :class="`feedback-${tag.userFeedback ?? 'none'}`">
-        {{ getTagLabel(tag) }}
-        <span v-if="tag.userFeedback === 'correct'" class="feedback-icon" aria-label="정확">✓</span>
-        <span v-else-if="tag.userFeedback === 'incorrect'" class="feedback-icon feedback-wrong" aria-label="오류">✗</span>
+      <span v-for="tag in techniques" :key="tag.key" class="technique-chip" :class="`feedback-${tag.userFeedback ?? 'none'}`">
+        {{ getTagLabel(tag.key) }}
+        <span v-if="tag.userFeedback === 'correct'" class="feedback-icon" role="img" aria-label="정확">
+          <AppIcon name="check" :size="13" :stroke-width="2.25" />
+        </span>
+        <span v-else-if="tag.userFeedback === 'incorrect'" class="feedback-icon feedback-wrong" role="img" aria-label="오류">
+          <AppIcon name="close" :size="13" :stroke-width="2.25" />
+        </span>
       </span>
       <span v-if="!techniques.length" class="empty-text">감지된 기술 없음</span>
     </div>
@@ -59,13 +64,17 @@ defineProps<{
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  height: 28px;
-  padding: 0 12px;
+  height: 24px;
+  padding: 0 10px;
   border-radius: var(--r-chip);
   background: var(--tint-cyan);
   color: var(--on-tint-cyan);
   font-size: 12px;
   font-weight: 600;
+}
+.feedback-icon {
+  display: inline-flex;
+  align-items: center;
 }
 .feedback-correct {
   background: var(--tint-lime);
@@ -74,9 +83,6 @@ defineProps<{
 .feedback-incorrect {
   background: var(--tint-pink);
   color: var(--on-tint-pink);
-}
-.feedback-icon {
-  font-size: 11px;
 }
 .feedback-wrong {
   color: var(--hold-pink);

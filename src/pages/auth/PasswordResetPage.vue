@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { IonPage, IonContent, IonButton, IonInput, IonSpinner, IonIcon } from '@ionic/vue'
+import { IonPage, IonContent, IonInput, IonIcon } from '@ionic/vue'
 import { chevronBackOutline } from 'ionicons/icons'
+import BaseButton from '@/components/common/BaseButton.vue'
+import AppIcon from '@/components/common/AppIcon.vue'
 import { useRouter } from 'vue-router'
 import { authService } from '@/services/auth'
 import { useUIStore } from '@/stores/ui'
@@ -56,14 +58,11 @@ async function handleSend() {
             />
           </div>
 
-          <IonButton expand="block" :disabled="isLoading || !email" @click="handleSend" class="submit-btn">
-            <IonSpinner v-if="isLoading" name="crescent" slot="start" />
-            {{ isLoading ? '발송 중...' : '인증 코드 받기' }}
-          </IonButton>
+          <BaseButton variant="primary" block :loading="isLoading" :disabled="!email" class="submit-btn" @click="handleSend">인증 코드 받기</BaseButton>
         </div>
 
         <div v-else class="sent-state">
-          <div class="sent-icon" aria-hidden="true">✉️</div>
+          <div class="sent-icon" aria-hidden="true"><AppIcon name="mail" :size="48" /></div>
           <p class="sent-title">이메일을 확인해주세요</p>
           <p class="sent-desc">{{ email }}으로<br/>재설정 링크를 발송했어요.</p>
           <button class="resend-link" @click="isSent = false">다른 이메일로 받기</button>
@@ -92,10 +91,9 @@ async function handleSend() {
   --background: var(--surface); --border-radius: var(--r-input); --padding-start: 14px;
   border: 1px solid var(--border); border-radius: var(--r-input); background: var(--surface); height: 50px;
 }
-.submit-btn { --background: var(--hold-dark); --border-radius: var(--r-button); --box-shadow: none; height: 52px; font-weight: var(--w-bold); }
 
 .sent-state { text-align: center; padding: 60px 0; display: flex; flex-direction: column; align-items: center; gap: 12px; }
-.sent-icon { font-size: 56px; }
+.sent-icon { display: flex; justify-content: center; color: var(--hold-cyan); margin-bottom: 4px; }
 .sent-title { font-size: var(--fs-h2); font-weight: var(--w-extrabold); margin: 0; }
 .sent-desc { font-size: var(--fs-body); color: var(--fg-muted); line-height: 1.5; margin: 0; }
 .resend-link { background: none; border: none; color: var(--fg-muted); font-size: var(--fs-caption); font-weight: var(--w-semibold); cursor: pointer; text-decoration: underline; }

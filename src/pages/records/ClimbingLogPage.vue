@@ -1,8 +1,10 @@
 <script setup lang="ts">
 // imports → router → state → computed → methods → lifecycle
 import { ref, computed, onMounted } from "vue";
-import { IonPage, IonContent, IonSpinner } from "@ionic/vue";
+import { IonPage, IonContent } from "@ionic/vue";
 import { useRouter, useRoute } from "vue-router";
+import LoadingState from "@/components/common/LoadingState.vue";
+import BaseButton from "@/components/common/BaseButton.vue";
 import { climbingLogService } from "@/services/climbingLog";
 import { gymService } from "@/services/gym";
 import { useUIStore } from "@/stores/ui";
@@ -192,7 +194,7 @@ onMounted(() => {
 
           <!-- Loading (edit prefill) -->
           <div v-if="isLoading" class="center-load">
-            <IonSpinner name="crescent" />
+            <LoadingState variant="list" :count="4" label="기록을 불러오는 중" />
           </div>
 
           <template v-else>
@@ -243,10 +245,9 @@ onMounted(() => {
             </div>
 
             <!-- Submit -->
-            <button class="analyze-btn" :disabled="!canSubmit" @click="handleSubmit" :aria-label="isEdit ? '기록 수정 저장' : '기록 저장'">
-              <IonSpinner v-if="isSaving" name="crescent" />
-              <span v-else>{{ isEdit ? "수정 저장" : "기록 저장 ✦" }}</span>
-            </button>
+            <BaseButton variant="accent" block class="analyze-btn" :loading="isSaving" :disabled="!canSubmit" :aria-label="isEdit ? '기록 수정 저장' : '기록 저장'" @click="handleSubmit">
+              {{ isEdit ? "수정 저장" : "기록 저장" }}
+            </BaseButton>
           </template>
         </div>
       </div>
@@ -280,13 +281,7 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
 }
-.micro-label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--fg-muted);
-}
+/* .micro-label — canonical style in global.css */
 .close-btn {
   background: transparent;
   border: none;
@@ -308,9 +303,7 @@ onMounted(() => {
   margin: 6px 0 0;
 }
 .center-load {
-  display: grid;
-  place-items: center;
-  padding: 60px 0;
+  padding: 24px 0;
 }
 
 .field-stub {
@@ -351,7 +344,7 @@ onMounted(() => {
   padding: 6px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--r-button);
   box-shadow: var(--shadow-float);
   max-height: 220px;
   overflow-y: auto;
@@ -466,30 +459,6 @@ onMounted(() => {
 }
 
 .analyze-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 52px;
   margin-top: 18px;
-  border: none;
-  border-radius: 16px;
-  background: var(--hold-lime);
-  color: var(--fg);
-  font-family: var(--font-sans);
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  cursor: pointer;
-  transition:
-    opacity var(--dur-fast) var(--ease-state),
-    transform var(--dur-fast) var(--ease-state);
-}
-.analyze-btn:active {
-  transform: scale(0.97);
-}
-.analyze-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
 }
 </style>

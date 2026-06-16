@@ -1,10 +1,12 @@
 <script setup lang="ts">
 // imports → state → methods → lifecycle
 import { ref, onMounted } from "vue";
-import { IonPage, IonContent, IonSpinner, IonInfiniteScroll, IonInfiniteScrollContent } from "@ionic/vue";
+import { IonPage, IonContent, IonInfiniteScroll, IonInfiniteScrollContent } from "@ionic/vue";
 import type { InfiniteScrollCustomEvent } from "@ionic/vue";
 import AppHeader from "@/components/common/AppHeader.vue";
 import UserListItem from "@/components/common/UserListItem.vue";
+import LoadingState from "@/components/common/LoadingState.vue";
+import EmptyState from "@/components/common/EmptyState.vue";
 import { authService } from "@/services/auth";
 import { useUIStore } from "@/stores/ui";
 import type { BlockedUser } from "@/types/api";
@@ -71,13 +73,15 @@ onMounted(() => load(true));
     <AppHeader title="차단 관리" />
 
     <IonContent>
-      <div v-if="initialLoading" class="state-center">
-        <IonSpinner name="crescent" />
+      <div v-if="initialLoading" class="list-skeleton">
+        <LoadingState variant="list" :count="6" label="차단 목록을 불러오는 중" />
       </div>
 
-      <div v-else-if="items.length === 0" class="state-center empty">
-        <p class="empty-title">차단한 사용자가 없어요</p>
-      </div>
+      <EmptyState
+        v-else-if="items.length === 0"
+        hold="dark"
+        title="차단한 사용자가 없어요"
+      />
 
       <ul v-else class="user-list">
         <li v-for="u in items" :key="u.id">
@@ -97,19 +101,8 @@ onMounted(() => load(true));
 </template>
 
 <style scoped>
-.state-center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 64px 24px;
-  text-align: center;
-}
-.empty-title {
-  font-size: var(--fs-body);
-  font-weight: 700;
-  margin: 0;
+.list-skeleton {
+  padding: 14px 20px;
 }
 
 .user-list {

@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
-import { IonPage, IonHeader, IonToolbar, IonContent, IonSpinner, IonButtons, IonBackButton, IonInfiniteScroll, IonInfiniteScrollContent } from "@ionic/vue";
+import { IonPage, IonHeader, IonToolbar, IonContent, IonButtons, IonBackButton, IonInfiniteScroll, IonInfiniteScrollContent } from "@ionic/vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useUIStore } from "@/stores/ui";
 import { videoService } from "@/services/video";
 import VideoThumbnail from "@/components/video/VideoThumbnail.vue";
+import LoadingState from "@/components/common/LoadingState.vue";
+import EmptyState from "@/components/common/EmptyState.vue";
 import type { FeedVideo } from "@/types/api";
 
 const router = useRouter();
@@ -83,16 +85,17 @@ onMounted(async () => {
     <IonContent fullscreen class="videos-page-content" :scroll-events="true" @ion-scroll="handleScroll">
       <div class="page-inner page-padding">
         <!-- Loading -->
-        <div v-if="isLoading" class="state-center">
-          <IonSpinner name="crescent" />
-        </div>
+        <LoadingState v-if="isLoading" variant="card" :count="4" label="영상을 불러오는 중" />
 
         <!-- Empty -->
-        <div v-else-if="videos.length === 0" class="state-center">
-          <div class="empty-icon" aria-hidden="true">🧗</div>
-          <p class="state-title">아직 업로드한 영상이 없어요</p>
-          <p class="state-sub">첫 번째 클라이밍 영상을 올려보세요!</p>
-        </div>
+        <EmptyState
+          v-else-if="videos.length === 0"
+          hold="lime"
+          title="아직 업로드한 영상이 없어요"
+          description="첫 번째 클라이밍 영상을 올려보세요."
+          action-label="영상 올리기"
+          @action="router.push('/upload')"
+        />
 
         <!-- Grid -->
         <div v-else class="video-grid">
@@ -191,32 +194,6 @@ onMounted(async () => {
 .page-inner {
   padding-top: calc(var(--ion-safe-area-top) + 64px);
   padding-bottom: 40px;
-}
-
-/* ── State ───────────────────────────────────────── */
-.state-center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 80px 24px;
-  text-align: center;
-}
-.empty-icon {
-  font-size: 48px;
-  margin-bottom: 4px;
-}
-.state-title {
-  font-size: var(--fs-body);
-  font-weight: 700;
-  margin: 0;
-  color: var(--fg);
-}
-.state-sub {
-  font-size: 13px;
-  color: var(--fg-muted);
-  margin: 0;
 }
 
 /* ── Grid ────────────────────────────────────────── */

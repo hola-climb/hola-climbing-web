@@ -3,9 +3,12 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import {
   IonContent, IonIcon,
-  IonSpinner, IonModal, IonButton,
+  IonSpinner, IonModal,
 } from '@ionic/vue'
 import AppHeader from '@/components/common/AppHeader.vue'
+import LoadingState from '@/components/common/LoadingState.vue'
+import BaseButton from '@/components/common/BaseButton.vue'
+import AppIcon from '@/components/common/AppIcon.vue'
 import {
   bookmarkOutline, bookmark, locationOutline,
   timeOutline, closeOutline, sendOutline, star, starOutline,
@@ -199,8 +202,9 @@ function openVideo(id: string) {
 
 <template>
   <div class="gym-detail-view">
-      <div v-if="isLoading" class="loading-center">
-        <IonSpinner name="crescent" />
+      <div v-if="isLoading" class="page-skeleton page-padding">
+        <LoadingState variant="card" :count="1" label="암장 정보를 불러오는 중" />
+        <LoadingState variant="list" :count="3" />
       </div>
 
       <div v-else-if="gym" class="gym-detail page-padding">
@@ -214,7 +218,7 @@ function openVideo(id: string) {
             <h1 class="gym-name">{{ gym.name }}</h1>
             <p class="gym-address">{{ gym.address }}</p>
             <div class="header-chips">
-              <span v-if="avgRating" class="chip chip-orange">★ {{ avgRating.toFixed(1) }}</span>
+              <span v-if="avgRating" class="chip chip-orange"><AppIcon name="star" :size="11" /> {{ avgRating.toFixed(1) }}</span>
               <span v-if="gym.distanceKm !== null" class="chip chip-dark">{{ gym.distanceKm.toFixed(1) }}km</span>
             </div>
           </div>
@@ -373,10 +377,7 @@ function openVideo(id: string) {
           placeholder="암장은 어땠나요? (선택)"
           aria-label="리뷰 내용"
         />
-        <IonButton expand="block" :disabled="isSubmittingReview || newRating < 1" @click="submitReview">
-          <IonSpinner v-if="isSubmittingReview" name="crescent" />
-          <span v-else>등록</span>
-        </IonButton>
+        <BaseButton variant="primary" block :loading="isSubmittingReview" :disabled="newRating < 1" @click="submitReview">등록</BaseButton>
       </div>
     </IonModal>
 
@@ -400,7 +401,7 @@ function openVideo(id: string) {
             <div class="chat-bubble">
               <div class="cb-head">
                 <span class="cb-name">{{ m.user.nickname }}</span>
-                <span v-if="m.verifiedAtGym" class="cb-verified">📍 암장</span>
+                <span v-if="m.verifiedAtGym" class="cb-verified"><AppIcon name="pin" :size="11" /> 암장</span>
               </div>
               <span class="cb-text">{{ m.content }}</span>
             </div>
@@ -441,7 +442,7 @@ function openVideo(id: string) {
 .fav-btn ion-icon.favorited { color: var(--fg); }
 
 .gym-detail-view { position: relative; }
-.loading-center { display: grid; place-items: center; height: 60vh; }
+.page-skeleton { display: flex; flex-direction: column; gap: 16px; padding-top: 16px; }
 
 .gym-detail { padding-top: 18px; padding-bottom: 60px; display: flex; flex-direction: column; gap: 18px; }
 
@@ -493,7 +494,7 @@ function openVideo(id: string) {
   flex: 0 0 auto;
   width: 96px;
   height: 96px;
-  border-radius: 14px;
+  border-radius: var(--r-button);
   overflow: hidden;
   border: none;
   padding: 0;
@@ -509,7 +510,7 @@ function openVideo(id: string) {
   flex: 0 0 auto;
   width: 116px;
   height: 160px;
-  border-radius: 14px;
+  border-radius: var(--r-button);
   overflow: hidden;
   position: relative;
   border: none;
@@ -564,7 +565,7 @@ function openVideo(id: string) {
 .star-pick { display: flex; gap: 6px; justify-content: center; }
 .star-btn { background: none; border: none; cursor: pointer; font-size: 34px; color: var(--hold-orange); padding: 0; }
 .review-textarea {
-  width: 100%; border: 1px solid var(--border); border-radius: 14px;
+  width: 100%; border: 1px solid var(--border); border-radius: var(--r-button);
   background: var(--surface-soft); padding: 12px 14px;
   font-family: var(--font-sans); font-size: var(--fs-body); color: var(--fg); resize: none; outline: none;
 }
@@ -580,12 +581,12 @@ function openVideo(id: string) {
 .chat-msg { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; max-width: 80%; }
 .chat-msg.mine { align-self: flex-end; align-items: flex-end; }
 .chat-bubble {
-  background: var(--surface-soft); border-radius: 14px; padding: 8px 12px;
+  background: var(--surface-soft); border-radius: var(--r-button); padding: 8px 12px;
 }
 .chat-msg.mine .chat-bubble { background: var(--hold-lime); }
 .cb-head { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
 .cb-name { font-size: 11px; font-weight: 700; color: var(--fg-muted); }
-.cb-verified { font-size: 10px; color: var(--fg-muted); }
+.cb-verified { display: inline-flex; align-items: center; gap: 2px; font-size: 10px; color: var(--fg-muted); }
 .cb-text { font-size: var(--fs-body); line-height: 1.4; word-break: break-word; }
 .cb-time { font-size: 10px; color: var(--fg-muted); padding: 0 4px; }
 
@@ -595,7 +596,7 @@ function openVideo(id: string) {
   background: var(--surface); border-top: 1px solid var(--border);
 }
 .chat-input {
-  flex: 1; height: 42px; border: 1px solid var(--border); border-radius: 14px;
+  flex: 1; height: 42px; border: 1px solid var(--border); border-radius: var(--r-button);
   background: var(--surface-soft); padding: 0 14px;
   font-family: var(--font-sans); font-size: var(--fs-body); color: var(--fg); outline: none;
 }

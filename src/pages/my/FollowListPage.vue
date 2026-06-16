@@ -1,11 +1,13 @@
 <script setup lang="ts">
 // imports → state → computed → methods → lifecycle
 import { ref, computed, onMounted } from "vue";
-import { IonPage, IonContent, IonSpinner, IonInfiniteScroll, IonInfiniteScrollContent } from "@ionic/vue";
+import { IonPage, IonContent, IonInfiniteScroll, IonInfiniteScrollContent } from "@ionic/vue";
 import type { InfiniteScrollCustomEvent } from "@ionic/vue";
 import { useRoute } from "vue-router";
 import AppHeader from "@/components/common/AppHeader.vue";
 import UserListItem from "@/components/common/UserListItem.vue";
+import LoadingState from "@/components/common/LoadingState.vue";
+import EmptyState from "@/components/common/EmptyState.vue";
 import { authService } from "@/services/auth";
 import { useAuthStore } from "@/stores/auth";
 import { useUIStore } from "@/stores/ui";
@@ -95,13 +97,15 @@ onMounted(() => load(true));
         <button class="tab" :class="{ active: tab === 'following' }" @click="switchTab('following')">팔로잉</button>
       </div>
 
-      <div v-if="initialLoading" class="state-center">
-        <IonSpinner name="crescent" />
+      <div v-if="initialLoading" class="list-skeleton">
+        <LoadingState variant="list" :count="6" label="목록을 불러오는 중" />
       </div>
 
-      <div v-else-if="items.length === 0" class="state-center empty">
-        <p class="empty-title">{{ tab === "followers" ? "팔로워가 없어요" : "팔로잉이 없어요" }}</p>
-      </div>
+      <EmptyState
+        v-else-if="items.length === 0"
+        hold="cyan"
+        :title="tab === 'followers' ? '팔로워가 없어요' : '팔로잉이 없어요'"
+      />
 
       <ul v-else class="user-list">
         <li v-for="u in items" :key="u.id">
@@ -162,19 +166,8 @@ onMounted(() => load(true));
   background: var(--fg);
 }
 
-.state-center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 64px 24px;
-  text-align: center;
-}
-.empty-title {
-  font-size: var(--fs-body);
-  font-weight: 700;
-  margin: 0;
+.list-skeleton {
+  padding: 14px 20px;
 }
 
 .user-list {

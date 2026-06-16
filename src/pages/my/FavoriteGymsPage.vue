@@ -1,10 +1,12 @@
 <script setup lang="ts">
 // imports → state → methods → lifecycle
 import { ref } from "vue";
-import { IonPage, IonContent, IonSpinner, IonInfiniteScroll, IonInfiniteScrollContent, onIonViewWillEnter } from "@ionic/vue";
+import { IonPage, IonContent, IonInfiniteScroll, IonInfiniteScrollContent, onIonViewWillEnter } from "@ionic/vue";
 import type { InfiniteScrollCustomEvent } from "@ionic/vue";
 import AppHeader from "@/components/common/AppHeader.vue";
 import GymCard from "@/components/gym/GymCard.vue";
+import LoadingState from "@/components/common/LoadingState.vue";
+import EmptyState from "@/components/common/EmptyState.vue";
 import { gymService } from "@/services/gym";
 import { useUIStore } from "@/stores/ui";
 import type { Gym } from "@/types/api";
@@ -55,14 +57,16 @@ onIonViewWillEnter(() => load(true));
     <AppHeader title="즐겨찾기 암장" />
 
     <IonContent>
-      <div v-if="initialLoading" class="state-center">
-        <IonSpinner name="crescent" />
+      <div v-if="initialLoading" class="gym-list">
+        <LoadingState variant="list" :count="5" label="즐겨찾기를 불러오는 중" />
       </div>
 
-      <div v-else-if="items.length === 0" class="state-center empty">
-        <p class="empty-title">즐겨찾기한 암장이 없어요</p>
-        <p class="empty-sub">탐색에서 마음에 드는 암장을 저장해보세요.</p>
-      </div>
+      <EmptyState
+        v-else-if="items.length === 0"
+        hold="cyan"
+        title="즐겨찾기한 암장이 없어요"
+        description="탐색에서 마음에 드는 암장을 저장해보세요."
+      />
 
       <div v-else class="gym-list">
         <GymCard v-for="gym in items" :key="gym.id" :gym="gym" />
@@ -76,26 +80,6 @@ onIonViewWillEnter(() => load(true));
 </template>
 
 <style scoped>
-.state-center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 64px 24px;
-  text-align: center;
-}
-.empty-title {
-  font-size: var(--fs-body);
-  font-weight: 700;
-  margin: 0;
-}
-.empty-sub {
-  font-size: var(--fs-caption);
-  color: var(--fg-muted);
-  margin: 0;
-}
-
 .gym-list {
   display: flex;
   flex-direction: column;

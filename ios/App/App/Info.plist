@@ -47,5 +47,21 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<!-- 개발용 평문(HTTP) 백엔드 접속 허용. iOS ATS 는 기본적으로 http:// 를 차단하므로
+	     LAN 개발 서버(192.168.35.162)에 한해 예외를 둔다. 배포 시에는 https 도메인으로
+	     교체하고 이 예외를 제거할 것. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>192.168.35.162</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
 </dict>
 </plist>

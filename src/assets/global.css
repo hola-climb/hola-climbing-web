@@ -18,6 +18,10 @@ body {
 .text-caption { font-size: var(--fs-caption); font-weight: var(--w-medium);    color: var(--fg-muted); }
 .text-micro   { font-size: var(--fs-micro);   font-weight: var(--w-semibold);  text-transform: uppercase; letter-spacing: 0.08em; color: var(--fg-muted); }
 
+/* Canonical micro label (DS name). Pages previously redefined this locally;
+   use this global class and add only positional tweaks in scoped styles. */
+.micro-label  { font-size: var(--fs-micro);   font-weight: var(--w-semibold);  text-transform: uppercase; letter-spacing: 0.08em; color: var(--fg-muted); }
+
 .text-muted   { color: var(--fg-muted); }
 
 /* Canonical top-level section heading (e.g. "주변 암장", "기술 사용 빈도") */

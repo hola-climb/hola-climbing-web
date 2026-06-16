@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import {
-  IonPage, IonContent, IonIcon, IonSpinner, IonActionSheet,
+  IonPage, IonContent, IonIcon, IonActionSheet,
 } from '@ionic/vue'
 import { ellipsisHorizontal } from 'ionicons/icons'
 import AppHeader from '@/components/common/AppHeader.vue'
+import LoadingState from '@/components/common/LoadingState.vue'
+import EmptyState from '@/components/common/EmptyState.vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/services/client'
 import { authService } from '@/services/auth'
@@ -155,8 +157,9 @@ async function handleFollow() {
     </AppHeader>
 
     <IonContent>
-      <div v-if="isLoading" class="loading-center">
-        <IonSpinner name="crescent" />
+      <div v-if="isLoading" class="page-skeleton page-padding">
+        <LoadingState variant="card" :count="1" label="프로필을 불러오는 중" />
+        <LoadingState variant="list" :count="3" />
       </div>
 
       <div v-else-if="user" class="profile-content page-padding">
@@ -207,10 +210,10 @@ async function handleFollow() {
         <!-- Video grid (public videos only, no AI results) -->
         <template v-else>
           <div class="section-title">영상</div>
-          <div class="video-grid">
+          <div v-if="videos.length" class="video-grid">
             <VideoCard v-for="video in videos" :key="video.id" :video="video" />
-            <p v-if="!videos.length" class="empty">공개 영상이 없어요.</p>
           </div>
+          <EmptyState v-else compact hold="cyan" title="공개 영상이 없어요" />
         </template>
       </div>
 
@@ -227,7 +230,7 @@ async function handleFollow() {
 <style scoped>
 .more-btn { background: none; border: none; cursor: pointer; color: var(--fg); font-size: 22px; display: grid; place-items: center; padding: 6px; }
 
-.loading-center { display: grid; place-items: center; height: 60vh; }
+.page-skeleton { display: flex; flex-direction: column; gap: 16px; padding-top: 16px; }
 
 .profile-content { padding-top: 20px; padding-bottom: 40px; display: flex; flex-direction: column; gap: 20px; }
 

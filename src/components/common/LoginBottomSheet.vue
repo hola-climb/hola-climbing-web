@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { IonModal, IonButton, IonIcon } from '@ionic/vue'
+import { IonModal, IonIcon } from '@ionic/vue'
 import { closeOutline } from 'ionicons/icons'
 import { useRouter } from 'vue-router'
+import BaseButton from '@/components/common/BaseButton.vue'
 
 defineProps<{ isOpen: boolean }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
@@ -35,12 +36,8 @@ function goRegister() {
       <p class="desc">기록, 업로드, 마이 페이지는<br/>로그인 후 이용할 수 있어요.</p>
 
       <div class="actions">
-        <IonButton expand="block" @click="goLogin" class="login-btn">
-          로그인
-        </IonButton>
-        <IonButton expand="block" fill="outline" @click="goRegister" class="register-btn">
-          회원가입
-        </IonButton>
+        <BaseButton variant="primary" block @click="goLogin">로그인</BaseButton>
+        <BaseButton variant="secondary" block @click="goRegister">회원가입</BaseButton>
       </div>
     </div>
   </IonModal>
@@ -79,21 +76,5 @@ function goRegister() {
   display: flex;
   flex-direction: column;
   gap: 10px;
-}
-
-.login-btn {
-  --background: var(--hold-dark);
-  --border-radius: var(--r-button);
-  --box-shadow: none;
-  height: 52px;
-  font-weight: var(--w-bold);
-}
-
-.register-btn {
-  --color: var(--fg);
-  --border-color: var(--border);
-  --border-radius: var(--r-button);
-  height: 52px;
-  font-weight: var(--w-bold);
 }
 </style>

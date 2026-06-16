@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import { IonPage, IonContent, IonButton, IonInput, IonCheckbox, IonSpinner, IonIcon } from "@ionic/vue";
+import { IonPage, IonContent, IonInput, IonCheckbox, IonIcon } from "@ionic/vue";
 import { chevronBackOutline } from "ionicons/icons";
+import BaseButton from "@/components/common/BaseButton.vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useUIStore } from "@/stores/ui";
@@ -169,10 +170,14 @@ onMounted(loadTerms);
             </div>
           </div>
 
-          <IonButton expand="block" :disabled="isLoading || !nickname || !email || !password" @click="handleRegister" class="submit-btn">
-            <IonSpinner v-if="isLoading" name="crescent" slot="start" />
-            {{ isLoading ? "처리 중..." : "계정 만들기" }}
-          </IonButton>
+          <BaseButton
+            variant="primary"
+            block
+            :loading="isLoading"
+            :disabled="!nickname || !email || !password"
+            class="submit-btn"
+            @click="handleRegister"
+          >계정 만들기</BaseButton>
         </div>
 
         <div class="auth-footer">
@@ -279,11 +284,6 @@ onMounted(loadTerms);
 }
 
 .submit-btn {
-  --background: var(--hold-dark);
-  --border-radius: var(--r-button);
-  --box-shadow: none;
-  height: 52px;
-  font-weight: var(--w-bold);
   margin-top: 4px;
 }
 

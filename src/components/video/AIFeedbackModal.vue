@@ -103,7 +103,7 @@ async function submitDynamicFeedback(feedback: "correct" | "incorrect") {
         </div>
 
         <div v-for="tag in techniques" :key="tag.key" class="tag-row">
-          <span class="tag-label">{{ getTagLabel(tag) }}</span>
+          <span class="tag-label">{{ getTagLabel(tag.key) }}</span>
           <!-- <span class="confidence">{{ Math.round(tag.confidence * 100) }}%</span> -->
 
           <div class="feedback-btns">
