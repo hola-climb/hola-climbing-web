@@ -127,8 +127,9 @@ async function handleSubmit() {
       title: title.value.trim() || undefined,
       durationSeconds: durationSeconds.value ?? undefined,
     });
-    uiStore.showToast("영상 업로드 완료! AI가 분석을 시작해요.");
-    router.replace(`/videos/${video.id}`);
+
+    uiStore.showToast("영상 업로드 완료! AI 분석을 시작해요.");
+    router.replace(`/my/videos/${video.id}`);
   } catch (err: unknown) {
     uploadState.value = "failed";
     const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;

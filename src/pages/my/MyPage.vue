@@ -75,17 +75,28 @@ function handleScroll(event: CustomEvent<{ scrollTop: number }>) {
   window.dispatchEvent(new CustomEvent("hola:tab-bar-scroll", { detail: { scrolled } }));
 }
 
+function formatLastClimbed(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (days === 0) return "오늘";
+  if (days === 1) return "어제";
+  if (days < 7) return `${days}일 전`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `${weeks}주 전`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}달 전`;
+  return `${Math.floor(months / 12)}년 전`;
+}
+
 // Headline stats — derived from real /stats/me
 const headlineStats = computed(() => {
   const s = stats.value;
-  const moves = s ? Object.values(s.techniqueCounts).reduce((a, b) => a + b, 0) : 0;
   const hours = s ? (s.totalClimbingSeconds / 3600).toFixed(1) : "0";
   return [
     { value: s?.isDynamic ? "다이나믹" : "스태틱", label: "STYLE" },
-    { value: String(s?.totalVideos ?? 0), label: "VIDEOS" },
     { value: `${hours}h`, label: "CLIMB" },
-    { value: String(moves), label: "MOVES" },
-    // { value: formatLastClimbed(s?.lastClimbedAt ?? null), label: "LAST" },
+    { value: formatLastClimbed(s?.lastClimbedAt), label: "LAST" },
   ];
 });
 
@@ -186,7 +197,7 @@ onMounted(load);
                 <span class="hs-lbl">팔로잉</span>
               </button>
               <button class="hero-stat" @click="router.push('/my/videos')">
-                <span class="hs-val">{{ authStore.user?.videoCount ?? 0 }}</span>
+                <span class="hs-val">{{ stats?.totalVideos ?? authStore.user?.videoCount ?? 0 }}</span>
                 <span class="hs-lbl">영상</span>
               </button>
             </div>
@@ -555,7 +566,7 @@ onMounted(load);
 }
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 18px 12px;
   position: relative;
 }

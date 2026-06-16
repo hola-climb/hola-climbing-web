@@ -182,12 +182,12 @@ async function retryAnalysis() {
 
               <!-- AI Analysis (owner only) -->
               <div v-if="showAIResult" class="ai-section hola-card">
-                <AIResultBadge :techniques="video.analysis!.techniques" :problem-type="video.analysis!.problemType ?? null" />
+                <AIResultBadge :techniques="video.analysis!.techniques" :problem-type="video.analysis!.problemType ?? null" :is-dynamic="video.analysis!.isDynamic ?? null" />
                 <button class="feedback-link" @click="showFeedbackModal = true">AI 결과가 맞나요? 피드백 남기기</button>
               </div>
 
               <!-- Analyzing state (owner only) -->
-              <div v-else-if="isOwner && video.status === 'analyzing'" class="ai-section hola-card ai-pending">
+              <div v-else-if="isOwner && (video.status === 'analyzing' || video.status === 'pending')" class="ai-section hola-card ai-pending">
                 <span class="ai-dot" />
                 <span class="analyzing-text">AI가 영상을 분석하고 있어요...</span>
               </div>
@@ -264,7 +264,7 @@ async function retryAnalysis() {
       </button>
     </div>
 
-    <AIFeedbackModal v-if="showFeedbackModal && video?.analysis" :is-open="showFeedbackModal" :video-id="videoId" :techniques="video.analysis.techniques" @close="showFeedbackModal = false" />
+    <AIFeedbackModal v-if="showFeedbackModal && video?.analysis" :is-open="showFeedbackModal" :video-id="videoId" :techniques="video.analysis.techniques" :is-dynamic="video.analysis.isDynamic ?? null" @close="showFeedbackModal = false" />
   </IonPage>
 </template>
 

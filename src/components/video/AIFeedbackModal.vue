@@ -11,18 +11,43 @@ const props = defineProps<{
   isOpen: boolean;
   videoId: string;
   techniques: TechniqueTag[];
+  isDynamic?: boolean | null;
 }>();
 const emit = defineEmits<{ (e: "close"): void }>();
 
 const videoStore = useVideoStore();
 const uiStore = useUIStore();
 const submitting = ref<string | null>(null);
+const dynamicFeedback = ref<"correct" | "incorrect" | null>(null);
+
+function feedbackContext() {
+  return {
+    isDynamic: props.isDynamic ?? false,
+    techniques: props.techniques
+      .map((t) => (typeof t === "string" ? t : t?.key))
+      .filter((k): k is string => typeof k === "string" && k.trim() !== ""),
+  };
+}
 
 async function submitFeedback(tag: TechniqueTag, feedback: "correct" | "incorrect") {
   if (submitting.value) return;
   submitting.value = tag.key;
   try {
-    await videoStore.submitFeedback(props.videoId, tag.key, feedback === "correct");
+    await videoStore.submitFeedback(props.videoId, tag.key, feedback === "correct", feedbackContext());
+    uiStore.showToast("피드백 감사해요!", "success");
+  } catch {
+    uiStore.showToast("피드백 처리에 실패했어요.", "danger");
+  } finally {
+    submitting.value = null;
+  }
+}
+
+async function submitDynamicFeedback(feedback: "correct" | "incorrect") {
+  if (submitting.value) return;
+  submitting.value = "is_dynamic";
+  try {
+    await videoStore.submitFeedback(props.videoId, "is_dynamic", feedback === "correct", feedbackContext());
+    dynamicFeedback.value = feedback;
     uiStore.showToast("피드백 감사해요!", "success");
   } catch {
     uiStore.showToast("피드백 처리에 실패했어요.", "danger");
@@ -49,6 +74,34 @@ async function submitFeedback(tag: TechniqueTag, feedback: "correct" | "incorrec
       </p>
 
       <div class="tag-list">
+        <!-- 다이나믹/스태틱 분류 피드백 -->
+        <div v-if="isDynamic != null" class="tag-row">
+          <span class="tag-label">
+            {{ isDynamic ? '다이나믹' : '스태틱' }}
+            <span class="tag-sub">움직임 유형</span>
+          </span>
+          <div class="feedback-btns">
+            <button
+              class="fb-btn"
+              :class="{ active: dynamicFeedback === 'correct', loading: submitting === 'is_dynamic' }"
+              aria-label="맞아요"
+              @click="submitDynamicFeedback('correct')"
+            >
+              <IonIcon :icon="checkmarkOutline" />
+              맞아요
+            </button>
+            <button
+              class="fb-btn wrong"
+              :class="{ active: dynamicFeedback === 'incorrect', loading: submitting === 'is_dynamic' }"
+              aria-label="틀렸어요"
+              @click="submitDynamicFeedback('incorrect')"
+            >
+              <IonIcon :icon="closeCircleOutline" />
+              틀렸어요
+            </button>
+          </div>
+        </div>
+
         <div v-for="tag in techniques" :key="tag.key" class="tag-row">
           <span class="tag-label">{{ getTagLabel(tag) }}</span>
           <!-- <span class="confidence">{{ Math.round(tag.confidence * 100) }}%</span> -->
@@ -113,6 +166,14 @@ async function submitFeedback(tag: TechniqueTag, feedback: "correct" | "incorrec
   flex: 1;
   font-size: var(--fs-body);
   font-weight: var(--w-semibold);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tag-sub {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--fg-muted);
 }
 .confidence {
   font-size: var(--fs-caption);

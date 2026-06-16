@@ -53,7 +53,7 @@ interface DayCount {
 const router = useRouter();
 const authStore = useAuthStore();
 const uiStore = useUIStore();
-const isDesktop = useMediaQuery("(min-width: 1024px)");
+const isDesktop = useMediaQuery("(min-width: 700px)");
 
 // ── State ──────────────────────────────────────────
 const now = new Date();
@@ -572,7 +572,7 @@ onMounted(load);
 
 <style scoped>
 /* ── Desktop two-pane ───────────────────────────── */
-@media (min-width: 1024px) {
+@media (min-width: 700px) {
   .records-layout {
     display: flex;
     height: 100%;
@@ -650,6 +650,7 @@ onMounted(load);
   gap: 10px;
   padding-top: 16px;
   padding-bottom: 0;
+  max-width: 500px;
 }
 .mini-stat {
   padding: 12px;
@@ -672,6 +673,7 @@ onMounted(load);
 .calendar-section {
   padding-top: 24px;
   padding-bottom: 120px;
+  max-width: 500px;
 }
 .month-nav {
   display: flex;

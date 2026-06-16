@@ -152,6 +152,7 @@ export interface AnalysisResult {
   timeline: Array<{ startSec: number; endSec: number; label: string; confidence: number }>;
   skeletonOverlayUrl: string | null;
   analyzedAt: string;
+  isDynamic?: boolean | null;
   // kept for legacy UI compatibility
   problemType?: "DYNAMIC" | "STATIC" | null;
 }
@@ -246,7 +247,7 @@ export interface UserStats {
   totalVideos: number;
   totalClimbingSeconds: number;
   techniqueCounts: Record<string, number>;
-  // lastClimbedAt: string | null;
+  lastClimbedAt: string | null;
   dynamicCount: number;
   staticCount: number;
   isDynamic: boolean;
@@ -480,7 +481,7 @@ export function parseTechniqueTags(techniqueLabels: Record<string, number>, time
     }
   }
   return Object.entries(techniqueLabels)
-    .filter(([, count]) => count > 0)
+    .filter(([key, count]) => key.trim() !== "" && count > 0)
     .map(([key]) => ({
       key,
       confidence: confMap[key] ?? 0.8,

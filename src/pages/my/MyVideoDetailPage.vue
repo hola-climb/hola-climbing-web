@@ -6,7 +6,7 @@ import {
 } from '@ionic/vue'
 import {
   heartOutline, heart,
-  shareOutline, chatbubbleOutline, refreshOutline,
+  shareOutline, chatbubbleOutline, refreshOutline, checkmarkCircle,
 } from 'ionicons/icons'
 import AppHeader from '@/components/common/AppHeader.vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -38,6 +38,25 @@ const isAnalyzing = computed(() =>
   video.value?.status === 'analyzing' || video.value?.status === 'pending',
 )
 const analysisFailed = computed(() => video.value?.status === 'failed')
+
+const ANALYSIS_STEPS = [
+  { stage: 'started',          label: '분석 시작' },
+  { stage: 'downloaded',       label: '영상 다운로드' },
+  { stage: 'pose_estimation',  label: '포즈 추정' },
+  { stage: 'classification',   label: '기술 분류' },
+  { stage: 'completed',        label: '분석 완료' },
+] as const
+
+const STAGE_ORDER = ANALYSIS_STEPS.map((s) => s.stage)
+
+function stepState(stage: string): 'done' | 'active' | 'pending' {
+  const currentIdx = STAGE_ORDER.indexOf(videoStore.analysisStage as typeof STAGE_ORDER[number])
+  const stepIdx = STAGE_ORDER.indexOf(stage as typeof STAGE_ORDER[number])
+  if (currentIdx === -1) return 'pending'
+  if (stepIdx < currentIdx) return 'done'
+  if (stepIdx === currentIdx) return 'active'
+  return 'pending'
+}
 
 // ── Comments ───────────────────────────────────────
 const comments = ref<Comment[]>([])
@@ -183,6 +202,7 @@ onMounted(async () => {
                 <AIResultBadge
                   :techniques="video.analysis!.techniques"
                   :problem-type="video.analysis!.problemType ?? null"
+                  :is-dynamic="video.analysis!.isDynamic ?? null"
                 />
                 <button class="feedback-link" @click="showFeedbackModal = true">
                   AI 결과가 맞나요? 피드백 남기기
@@ -191,8 +211,30 @@ onMounted(async () => {
 
               <!-- analyzing / pending -->
               <div v-else-if="isAnalyzing" class="ai-section hola-card ai-pending">
-                <span class="ai-dot" aria-hidden="true" />
-                <span class="analyzing-text">AI가 영상을 분석하고 있어요...</span>
+                <div class="progress-header">
+                  <div class="progress-label-row">
+                    <span class="ai-dot" aria-hidden="true" />
+                    <span class="analyzing-text">{{ videoStore.analysisProgressMessage || 'AI가 영상을 분석하고 있어요...' }}</span>
+                  </div>
+                  <span class="progress-pct">{{ videoStore.analysisProgress }}%</span>
+                </div>
+                <div class="progress-bar-wrap" role="progressbar" :aria-valuenow="videoStore.analysisProgress" aria-valuemin="0" aria-valuemax="100">
+                  <div class="progress-bar-fill" :style="{ width: videoStore.analysisProgress + '%' }" />
+                </div>
+                <div class="analysis-steps">
+                  <div
+                    v-for="step in ANALYSIS_STEPS"
+                    :key="step.stage"
+                    class="analysis-step"
+                    :class="stepState(step.stage)"
+                  >
+                    <div class="step-icon-wrap">
+                      <IonIcon v-if="stepState(step.stage) === 'done'" :icon="checkmarkCircle" class="step-icon step-icon--done" aria-hidden="true" />
+                      <span v-else class="step-dot" aria-hidden="true" />
+                    </div>
+                    <span class="step-label">{{ step.label }}</span>
+                  </div>
+                </div>
               </div>
 
               <!-- failed -->
@@ -306,6 +348,7 @@ onMounted(async () => {
       :is-open="showFeedbackModal"
       :video-id="videoId"
       :techniques="video.analysis.techniques"
+      :is-dynamic="video.analysis.isDynamic ?? null"
       @close="showFeedbackModal = false"
     />
   </IonPage>
@@ -432,16 +475,33 @@ onMounted(async () => {
   letter-spacing: 0.08em;
   color: var(--fg-muted);
 }
-.ai-pending {
-  flex-direction: row;
+.ai-pending { gap: 10px; }
+
+.progress-header {
+  display: flex;
   align-items: center;
-  gap: 10px;
-  color: var(--fg-muted);
+  justify-content: space-between;
 }
-.analyzing-text { font-size: var(--fs-caption); }
+.progress-label-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.analyzing-text {
+  font-size: var(--fs-caption);
+  color: var(--fg);
+  font-weight: 600;
+}
+.progress-pct {
+  font-size: var(--fs-caption);
+  font-weight: 700;
+  color: var(--fg-muted);
+  min-width: 36px;
+  text-align: right;
+}
 .ai-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: var(--hold-lime);
   flex-shrink: 0;
@@ -449,8 +509,79 @@ onMounted(async () => {
 }
 @keyframes blink {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.2; }
+  50% { opacity: 0.25; }
 }
+
+.progress-bar-wrap {
+  height: 3px;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.progress-bar-fill {
+  height: 100%;
+  background: var(--hold-lime);
+  border-radius: 99px;
+  transition: width 0.5s ease;
+}
+
+.analysis-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 4px;
+}
+.analysis-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+  position: relative;
+}
+.analysis-step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: 26px;
+  width: 1.5px;
+  height: calc(100% - 6px);
+  background: var(--border);
+}
+.analysis-step.done::after { background: var(--hold-lime); opacity: 0.4; }
+
+.step-icon-wrap {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  z-index: 1;
+}
+.step-icon {
+  font-size: 18px;
+  color: var(--hold-lime);
+}
+.step-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--border);
+  display: block;
+  margin: auto;
+}
+.analysis-step.active .step-dot {
+  background: var(--hold-lime);
+  animation: blink 1.2s ease-in-out infinite;
+}
+
+.step-label {
+  font-size: 12px;
+  color: var(--fg-muted);
+  font-weight: 500;
+}
+.analysis-step.done .step-label,
+.analysis-step.active .step-label { color: var(--fg); }
 .ai-failed {
   flex-direction: row;
   align-items: center;

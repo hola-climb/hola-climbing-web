@@ -5,6 +5,7 @@ import { getTagLabel } from "@/utils/tagLabels";
 defineProps<{
   techniques: TechniqueTag[];
   problemType: "DYNAMIC" | "STATIC" | null;
+  isDynamic?: boolean | null;
 }>();
 </script>
 
@@ -12,9 +13,12 @@ defineProps<{
   <div class="ai-result">
     <div class="section-label">AI 분석 결과</div>
 
-    <div v-if="problemType" class="problem-type">
-      <span class="chip" :class="problemType === 'DYNAMIC' ? 'chip-cyan' : 'chip-dark'">
-        {{ problemType === "DYNAMIC" ? "다이나믹" : "스태틱" }}
+    <div v-if="isDynamic != null || problemType" class="problem-type">
+      <span
+        class="chip"
+        :class="(isDynamic ?? (problemType === 'DYNAMIC')) ? 'chip-cyan' : 'chip-dark'"
+      >
+        {{ (isDynamic ?? (problemType === 'DYNAMIC')) ? '다이나믹' : '스태틱' }}
       </span>
     </div>
 

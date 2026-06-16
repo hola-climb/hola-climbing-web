@@ -165,6 +165,100 @@ export const videoService = {
 
   getVideoStatus: (id: string) => api.get<VideoStatus>(`/videos/${id}/status`),
 
+  /**
+   * SSE stream for analysis progress (`GET /api/videos/{videoId}/analysis/stream`).
+   * Actual payload: { videoId, status, progress, stage, message, updatedAt }
+   *   status  — "analyzing" | "done" | "failed"  (lowercase, direct AnalysisStatus)
+   *   stage   — "started" | "downloaded" | "pose_estimation" | "classification" | "completed"
+   *   progress — 0–100 number from server
+   * onProgress called for non-terminal events (status !== "done"/"failed").
+   * Terminal events resolve the promise without calling onProgress so the caller
+   * can set status + analysis atomically and avoid a blank-state flash.
+   */
+  streamAnalysis: (
+    videoId: string,
+    onProgress: (status: AnalysisStatus, progress: number, stage: string, message: string) => void,
+  ): Promise<AnalysisStatus> => {
+    return new Promise((resolve, reject) => {
+      const token = localStorage.getItem("access_token");
+      const headers: Record<string, string> = { Accept: "text/event-stream" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      const controller = new AbortController();
+
+      fetch(`/api/videos/${videoId}/analysis/stream`, { headers, signal: controller.signal })
+        .then((res) => {
+          if (!res.ok || !res.body) {
+            reject(new Error(`SSE error: ${res.status}`));
+            return;
+          }
+
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+          let currentEvent = "";
+
+          const read = () => {
+            reader
+              .read()
+              .then(({ done, value }) => {
+                if (done) {
+                  resolve("done");
+                  return;
+                }
+
+                buffer += decoder.decode(value, { stream: true });
+                const messages = buffer.split("\n\n");
+                buffer = messages.pop() ?? "";
+
+                for (const msg of messages) {
+                  currentEvent = "";
+                  let dataLine = "";
+
+                  for (const line of msg.split("\n")) {
+                    if (line.startsWith("event:")) currentEvent = line.slice(6).trim();
+                    else if (line.startsWith("data:")) dataLine = line.slice(5).trim();
+                  }
+
+                  if (currentEvent !== "progress" || !dataLine) continue;
+
+                  try {
+                    const payload = JSON.parse(dataLine) as {
+                      videoId: number;
+                      status: AnalysisStatus;
+                      progress: number;
+                      stage: string;
+                      message: string;
+                      updatedAt: string;
+                    };
+
+                    if (payload.status === "done" || payload.status === "failed") {
+                      controller.abort();
+                      resolve(payload.status);
+                      return;
+                    }
+
+                    onProgress(payload.status, payload.progress ?? 0, payload.stage ?? "", payload.message ?? "");
+                  } catch {
+                    // malformed SSE line — skip
+                  }
+                }
+
+                read();
+              })
+              .catch((err: unknown) => {
+                if ((err as Error)?.name !== "AbortError") reject(err);
+              });
+          };
+
+          read();
+        })
+        .catch((err: unknown) => {
+          if ((err as Error)?.name !== "AbortError") reject(err);
+        });
+    });
+  },
+
   /** 내 영상 전체 목록 — GET /api/videos?userId={id}&cursor={cursor}&size=20
    *  커서 기반 페이지네이션. cursor 없으면 첫 페이지. */
   getMyVideos: async (
@@ -270,6 +364,9 @@ export const videoService = {
         }
         if (res.data.techniqueLabels) {
           res.data.techniques = parseTagsFn(res.data.techniqueLabels, res.data.timeline ?? []);
+        } else {
+          // Ensure techniques is always TechniqueTag[], never a raw string[]
+          res.data.techniques = [];
         }
       }
       return res;
@@ -281,8 +378,10 @@ export const videoService = {
     videoId: string,
     payload: {
       techniqueLabel: string;
-      timestampSec?: number;
       isCorrect: boolean;
+      isDynamic: boolean;
+      techniques: string[];
+      timestampSec?: number;
       correctLabel?: string;
       note?: string;
     },

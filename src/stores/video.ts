@@ -4,8 +4,6 @@ import type { AnalysisStatus, FeedVideo, Video } from '@/types/api'
 import { parseTechniqueTags } from '@/types/api'
 import { videoService } from '@/services/video'
 
-const POLL_INTERVAL_MS = 3000
-const POLL_MAX_ATTEMPTS = 20
 
 export const useVideoStore = defineStore('video', () => {
   // state
@@ -17,6 +15,9 @@ export const useVideoStore = defineStore('video', () => {
   const currentVideo = ref<Video | null>(null)
   const isUploading = ref(false)
   const uploadProgress = ref(0)
+  const analysisProgressMessage = ref("")
+  const analysisStage = ref("")
+  const analysisProgress = ref(0)
 
   // actions
   async function loadFeed(reset = false) {
@@ -98,48 +99,43 @@ export const useVideoStore = defineStore('video', () => {
   }
 
   async function pollAnalysis(videoId: string): Promise<AnalysisStatus> {
-    let attempts = 0
-    return new Promise((resolve, reject) => {
-      const poll = async () => {
-        attempts++
-        try {
-          const { data } = await videoService.getVideoStatus(videoId)
-          // Update current video progress if it's the same video
-          if (currentVideo.value?.id === videoId) {
-            currentVideo.value.status = data.status
-            currentVideo.value.progress = data.progress
-          }
+    analysisProgressMessage.value = ""
+    analysisStage.value = ""
+    analysisProgress.value = 0
+    const finalStatus = await videoService.streamAnalysis(videoId, (status, progress, stage, message) => {
+      if (currentVideo.value?.id === videoId) {
+        currentVideo.value.status = status
+        currentVideo.value.progress = progress
+      }
+      analysisProgress.value = progress
+      if (stage) analysisStage.value = stage
+      if (message) analysisProgressMessage.value = message
+    })
 
-          if (data.status === 'done') {
-            // Fetch full analysis on completion
-            try {
-              const { data: analysis } = await videoService.getAnalysis(videoId)
-              if (currentVideo.value?.id === videoId) {
-                currentVideo.value.analysis = analysis
-              }
-            } catch {
-              // Analysis fetch is best-effort
-            }
-            resolve('done')
-            return
-          }
-
-          if (data.status === 'failed') {
-            resolve('failed')
-            return
-          }
-
-          if (attempts >= POLL_MAX_ATTEMPTS) {
-            resolve('failed')
-            return
-          }
-          setTimeout(poll, POLL_INTERVAL_MS)
-        } catch (e) {
-          reject(e)
+    if (finalStatus === 'done') {
+      try {
+        const { data: analysis } = await videoService.getAnalysis(videoId)
+        // Set status and analysis together so the UI transitions directly from
+        // "analyzing" spinner → result card without an intermediate blank state
+        if (currentVideo.value?.id === videoId) {
+          currentVideo.value.analysis = analysis
+          currentVideo.value.status = 'done'
+          currentVideo.value.progress = 100
+        }
+      } catch {
+        // getAnalysis failed — still mark done so the page isn't stuck on spinner
+        if (currentVideo.value?.id === videoId) {
+          currentVideo.value.status = 'done'
+          currentVideo.value.progress = 100
         }
       }
-      poll()
-    })
+    } else if (finalStatus === 'failed') {
+      if (currentVideo.value?.id === videoId) {
+        currentVideo.value.status = 'failed'
+      }
+    }
+
+    return finalStatus
   }
 
   async function retryAnalysis(videoId: string) {
@@ -150,8 +146,18 @@ export const useVideoStore = defineStore('video', () => {
     }
   }
 
-  async function submitFeedback(videoId: string, techniqueKey: string, isCorrect: boolean) {
-    await videoService.submitFeedback(videoId, { techniqueLabel: techniqueKey, isCorrect })
+  async function submitFeedback(
+    videoId: string,
+    techniqueKey: string,
+    isCorrect: boolean,
+    context: { isDynamic: boolean; techniques: string[] },
+  ) {
+    await videoService.submitFeedback(videoId, {
+      techniqueLabel: techniqueKey,
+      isCorrect,
+      isDynamic: context.isDynamic,
+      techniques: context.techniques,
+    })
     if (currentVideo.value?.id === videoId && currentVideo.value.analysis) {
       const tag = currentVideo.value.analysis.techniques.find((t) => t.key === techniqueKey)
       if (tag) tag.userFeedback = isCorrect ? 'correct' : 'incorrect'
@@ -184,6 +190,9 @@ export const useVideoStore = defineStore('video', () => {
     currentVideo,
     isUploading,
     uploadProgress,
+    analysisProgressMessage,
+    analysisStage,
+    analysisProgress,
     loadFeed,
     fetchVideo,
     uploadVideo,
