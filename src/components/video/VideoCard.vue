@@ -1,36 +1,39 @@
 <script setup lang="ts">
-import { IonIcon } from '@ionic/vue'
-import { heartOutline, heart, chatbubbleOutline } from 'ionicons/icons'
-import type { Video } from '@/types/api'
-import { useVideoStore } from '@/stores/video'
-import { useAuthStore } from '@/stores/auth'
-import { useUIStore } from '@/stores/ui'
-import { useRouter } from 'vue-router'
-import { gradeColor, gradeTextColor } from '@/utils/gradeColor'
-import VideoThumbnail from './VideoThumbnail.vue'
+import { IonIcon } from "@ionic/vue";
+import { heartOutline, heart, chatbubbleOutline } from "ionicons/icons";
+import type { Video } from "@/types/api";
+import { useVideoStore } from "@/stores/video";
+import { useAuthStore } from "@/stores/auth";
+import { useUIStore } from "@/stores/ui";
+import { useRouter } from "vue-router";
+import { gradeColor, gradeTextColor } from "@/utils/gradeColor";
+import VideoThumbnail from "./VideoThumbnail.vue";
 
-const props = defineProps<{ video: Video }>()
+const props = defineProps<{ video: Video }>();
 
-const videoStore = useVideoStore()
-const authStore = useAuthStore()
-const uiStore = useUIStore()
-const router = useRouter()
+const videoStore = useVideoStore();
+const authStore = useAuthStore();
+const uiStore = useUIStore();
+const router = useRouter();
 
 async function handleLike() {
-  if (!authStore.isAuthenticated) { uiStore.openLoginSheet(); return }
+  if (!authStore.isAuthenticated) {
+    uiStore.openLoginSheet();
+    return;
+  }
   try {
-    await videoStore.toggleLike(props.video.id)
+    await videoStore.toggleLike(props.video.id);
   } catch {
-    uiStore.showToast('좋아요 처리 중 오류가 발생했어요.', 'danger')
+    uiStore.showToast("좋아요 처리 중 오류가 발생했어요.", "danger");
   }
 }
 
 function openDetail() {
-  router.push(`/videos/${props.video.id}`)
+  router.push(`/videos/${props.video.id}`);
 }
 
 function openProfile() {
-  if (props.video.user?.id) router.push(`/users/${props.video.user.id}`)
+  if (props.video.user?.id) router.push(`/users/${props.video.user.id}`);
 }
 </script>
 
@@ -38,12 +41,8 @@ function openProfile() {
   <div class="video-card" @click="openDetail">
     <!-- Thumbnail -->
     <div class="thumbnail-wrap">
-      <VideoThumbnail
-        :thumbnail-url="video.thumbnailUrl"
-        :grade="video.grade"
-        :alt="`${video.user.nickname}의 클라이밍 영상`"
-        :status="video.status"
-      /></div>
+      <VideoThumbnail :title="video.title" :thumbnail-url="video.thumbnailUrl" :grade="video.grade" :alt="`${video.user.nickname}의 클라이밍 영상`" :status="video.status" />
+    </div>
 
     <!-- Meta -->
     <div class="meta">
@@ -85,7 +84,9 @@ function openProfile() {
   cursor: pointer;
   transition: transform var(--dur-fast) var(--ease-state);
 }
-.video-card:active { transform: scale(0.98); }
+.video-card:active {
+  transform: scale(0.98);
+}
 
 .thumbnail-wrap {
   position: relative;
@@ -93,9 +94,15 @@ function openProfile() {
   overflow: hidden;
 }
 
-.meta { padding: 12px 14px; }
+.meta {
+  padding: 12px 14px;
+}
 
-.author-row { display: flex; align-items: center; gap: 8px; }
+.author-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .author-link {
   display: flex;
   align-items: center;
@@ -108,7 +115,9 @@ function openProfile() {
   cursor: pointer;
   text-align: left;
 }
-.author-link:active { opacity: 0.6; }
+.author-link:active {
+  opacity: 0.6;
+}
 .avatar {
   width: 32px;
   height: 32px;
@@ -121,11 +130,35 @@ function openProfile() {
   font-weight: 700;
   flex-shrink: 0;
 }
-.author-info { flex: 1; font-size: var(--fs-caption); min-width: 0; overflow: hidden; }
-.author-name { font-weight: 600; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
-.gym-name { color: var(--fg-muted); margin-left: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.author-info {
+  flex: 1;
+  font-size: var(--fs-caption);
+  min-width: 0;
+  overflow: hidden;
+}
+.author-name {
+  font-weight: 600;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+.gym-name {
+  color: var(--fg-muted);
+  margin-left: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
 
-.actions { display: flex; align-items: center; gap: 16px; margin-top: 10px; }
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 10px;
+}
 .action-btn {
   display: flex;
   align-items: center;
@@ -137,6 +170,10 @@ function openProfile() {
   font-size: var(--fs-caption);
   color: var(--fg-muted);
 }
-.action-btn ion-icon { font-size: 18px; }
-.liked { color: var(--hold-pink); }
+.action-btn ion-icon {
+  font-size: 18px;
+}
+.liked {
+  color: var(--hold-pink);
+}
 </style>

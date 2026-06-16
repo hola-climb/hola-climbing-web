@@ -263,7 +263,7 @@ function openVideo(id: string) {
               @click="openVideo(v.id)"
               :aria-label="v.title ?? '클라이밍 영상'"
             >
-              <VideoThumbnail :thumbnail-url="v.thumbnailUrl" :grade="v.grade" :alt="v.title ?? ''" />
+              <VideoThumbnail :title="v.title" :thumbnail-url="v.thumbnailUrl" :grade="v.grade" :alt="v.title ?? ''" />
             </button>
           </div>
         </div>

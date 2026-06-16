@@ -1,71 +1,48 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import type { AnalysisStatus } from '@/types/api'
-import { gradeColor, gradeTextColor } from '@/utils/gradeColor'
+import { ref } from "vue";
+import type { AnalysisStatus } from "@/types/api";
+import { gradeColor, gradeTextColor } from "@/utils/gradeColor";
 
 const props = defineProps<{
-  thumbnailUrl?: string | null
-  grade?: string | null
-  alt?: string
+  title: string | null;
+  thumbnailUrl?: string | null;
+  grade?: string | null;
+  alt?: string;
   /** 상태 배지 표시 (VideoCard 등에서 사용) */
-  status?: AnalysisStatus
-}>()
+  status?: AnalysisStatus;
+}>();
 
 const emit = defineEmits<{
-  error: []
-}>()
+  error: [];
+}>();
 
-const broken = ref(false)
+const broken = ref(false);
 
 const statusLabel: Record<string, string> = {
-  pending: '업로드 중',
-  analyzing: 'AI 분석 중',
-  failed: '분석 실패',
-}
+  pending: "업로드 중",
+  analyzing: "AI 분석 중",
+  failed: "분석 실패",
+};
 
 function onError() {
-  broken.value = true
-  emit('error')
+  broken.value = true;
+  emit("error");
 }
 </script>
 
 <template>
   <div class="vt-wrap">
-    <img
-      v-if="thumbnailUrl && !broken"
-      :src="thumbnailUrl"
-      :alt="alt ?? '클라이밍 영상'"
-      class="vt-img"
-      loading="lazy"
-      @error="onError"
-    />
-    <div
-      v-else
-      class="vt-placeholder"
-      :style="grade ? { background: gradeColor(grade) } : {}"
-      aria-hidden="true"
-    >
-      <span
-        v-if="grade"
-        class="vt-ph-label"
-        :style="{ color: gradeTextColor(gradeColor(grade)) }"
-      >{{ grade }}</span>
+    <img v-if="thumbnailUrl && !broken" :src="thumbnailUrl" :alt="alt ?? '클라이밍 영상'" class="vt-img" loading="lazy" @error="onError" />
+    <div v-else class="vt-placeholder" :style="grade ? { background: gradeColor(grade) } : {}" aria-hidden="true">
+      <span v-if="grade" class="vt-ph-label" :style="{ color: gradeTextColor(gradeColor(grade)) }">{{ title }}</span>
       <span v-else class="vt-ph-label">HOLA</span>
     </div>
 
     <!-- Grade badge -->
-    <span
-      v-if="grade"
-      class="vt-grade-badge"
-      :style="{ background: gradeColor(grade), color: gradeTextColor(gradeColor(grade)) }"
-    >{{ grade }}</span>
+    <span v-if="grade && thumbnailUrl && !broken" class="vt-grade-badge" :style="{ background: gradeColor(grade), color: gradeTextColor(gradeColor(grade)) }">{{ grade }}</span>
 
     <!-- Status badge (pending / analyzing / failed) -->
-    <div
-      v-if="status && status !== 'done'"
-      class="vt-status-badge"
-      :class="`vt-status-${status}`"
-    >
+    <div v-if="status && status !== 'done'" class="vt-status-badge" :class="`vt-status-${status}`">
       <span v-if="status === 'analyzing'" class="vt-ai-dot" />
       <span>{{ statusLabel[status] }}</span>
     </div>
@@ -100,8 +77,8 @@ function onError() {
 }
 
 .vt-ph-label {
-  font-size: 22px;
-  font-weight: 800;
+  /* font-size: 22px; */
+  font-weight: 600;
   color: rgba(0, 0, 0, 0.55);
 }
 
@@ -131,7 +108,9 @@ function onError() {
   color: var(--fg);
 }
 
-.vt-status-failed { color: var(--hold-pink); }
+.vt-status-failed {
+  color: var(--hold-pink);
+}
 
 .vt-ai-dot {
   width: 6px;
@@ -142,7 +121,12 @@ function onError() {
 }
 
 @keyframes vt-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
 }
 </style>

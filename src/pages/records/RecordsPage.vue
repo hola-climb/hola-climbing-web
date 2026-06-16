@@ -543,7 +543,7 @@ onMounted(load);
                 <!-- Video thumbnails -->
                 <div v-if="session.videos.length" class="video-row">
                   <button v-for="v in session.videos" :key="v.id" class="video-thumb" :aria-label="v.title ?? '클라이밍 영상'" @click="router.push(`/my/videos/${v.id}`)">
-                    <VideoThumbnail :thumbnail-url="v.thumbnailUrl" :grade="v.grade" :alt="v.title ?? ''" />
+                    <VideoThumbnail :thumbnail-url="v.thumbnailUrl" :grade="v.grade" :title="v.title" :alt="v.title ?? ''" />
                   </button>
                 </div>
               </div>

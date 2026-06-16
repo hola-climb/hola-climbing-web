@@ -8,6 +8,7 @@ import type {
   PageResponse,
   RawRecommendedVideo,
   RegisterVideoPayload,
+  ThumbnailUploadResponse,
   UploadUrlPayload,
   UploadUrlResponse,
   Video,
@@ -26,7 +27,7 @@ function toFeedVideo(raw: RawRecommendedVideo): FeedVideo {
     gymName: raw.gymName,
     gymGrade: raw.gymGrade ?? null,
     grade: raw.gymGrade?.label ?? raw.grade ?? null,
-    thumbnailUrl: raw.thumbnailPath,
+    thumbnailUrl: raw.thumbnailUrl ?? raw.thumbnailPath,
     streamUrl: raw.streamUrl,
     durationSeconds: raw.durationSeconds,
     viewCount: raw.viewCount,
@@ -51,6 +52,7 @@ interface RawVideoDetail {
   gcsPath: string | null;
   gcsStreamingPath: string | null;
   thumbnailPath: string | null;
+  thumbnailUrl?: string | null; // signed URL (백엔드가 내려줄 때만 존재)
   streamUrl: string | null;
   durationSeconds: number | null;
   status: string;
@@ -148,7 +150,7 @@ export const videoService = {
       gym,
       gymName: raw.gymName ?? null,
       streamingUrl: raw.streamUrl ?? raw.gcsStreamingPath ?? null,
-      thumbnailUrl: raw.thumbnailPath,
+      thumbnailUrl: raw.thumbnailUrl ?? raw.thumbnailPath,
       duration: raw.durationSeconds,
       status: (raw.status as AnalysisStatus) ?? "done",
       progress: raw.status === "done" ? 100 : 0,
@@ -175,10 +177,7 @@ export const videoService = {
    * Terminal events resolve the promise without calling onProgress so the caller
    * can set status + analysis atomically and avoid a blank-state flash.
    */
-  streamAnalysis: (
-    videoId: string,
-    onProgress: (status: AnalysisStatus, progress: number, stage: string, message: string) => void,
-  ): Promise<AnalysisStatus> => {
+  streamAnalysis: (videoId: string, onProgress: (status: AnalysisStatus, progress: number, stage: string, message: string) => void): Promise<AnalysisStatus> => {
     return new Promise((resolve, reject) => {
       const token = localStorage.getItem("access_token");
       const headers: Record<string, string> = { Accept: "text/event-stream" };
@@ -261,11 +260,7 @@ export const videoService = {
 
   /** 내 영상 전체 목록 — GET /api/videos?userId={id}&cursor={cursor}&size=20
    *  커서 기반 페이지네이션. cursor 없으면 첫 페이지. */
-  getMyVideos: async (
-    userId: string,
-    cursor?: string | null,
-    size = 20,
-  ): Promise<{ content: FeedVideo[]; nextCursor: string | null; hasNext: boolean }> => {
+  getMyVideos: async (userId: string, cursor?: string | null, size = 20): Promise<{ content: FeedVideo[]; nextCursor: string | null; hasNext: boolean }> => {
     const params: Record<string, unknown> = { userId, size };
     if (cursor) params.cursor = cursor;
     const { data } = await api.get<{
@@ -309,7 +304,7 @@ export const videoService = {
           description: null,
           gym: null,
           streamingUrl: raw.streamUrl ?? null,
-          thumbnailUrl: raw.thumbnailPath,
+          thumbnailUrl: raw.thumbnailUrl ?? raw.thumbnailPath,
           duration: raw.durationSeconds,
           status: "done" as AnalysisStatus,
           progress: 100,
@@ -346,6 +341,14 @@ export const videoService = {
   },
 
   registerVideo: (payload: RegisterVideoPayload) => api.post<Video>("/videos", payload),
+
+  uploadThumbnail: (imageFile: File) => {
+    const form = new FormData();
+    form.append("image", imageFile);
+    return api.post<ThumbnailUploadResponse>("/videos/thumbnail", form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
 
   updateVideo: (id: string, payload: Partial<RegisterVideoPayload>) => api.patch<Video>(`/videos/${id}`, payload),
 

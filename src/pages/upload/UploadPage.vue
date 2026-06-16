@@ -7,6 +7,7 @@ import { useUIStore } from "@/stores/ui";
 import { gymService } from "@/services/gym";
 import type { Gym, GymGrade } from "@/types/api";
 import VideoTrimModal from "@/components/video/VideoTrimModal.vue";
+import VideoThumbnailModal from "@/components/video/VideoThumbnailModal.vue";
 import BaseButton from "@/components/common/BaseButton.vue";
 
 const router = useRouter();
@@ -25,6 +26,10 @@ const durationSeconds = ref<number | null>(null);
 // Trim editor
 const trimEditorOpen = ref(false);
 const pendingFile = ref<File | null>(null);
+
+// Thumbnail selector
+const thumbnailSelectorOpen = ref(false);
+const selectedThumbnail = ref<File | null>(null);
 const title = ref("");
 const isPublic = ref(true);
 const recordedDate = ref(new Date().toISOString().slice(0, 10)); // YYYY-MM-DD
@@ -69,11 +74,17 @@ function onTrimApply(result: { file: File; durationSeconds: number }) {
   durationSeconds.value = result.durationSeconds;
   pendingFile.value = null;
   trimEditorOpen.value = false;
+  thumbnailSelectorOpen.value = true;
 }
 
 function onTrimCancel() {
   pendingFile.value = null;
   trimEditorOpen.value = false;
+}
+
+function onThumbnailApply(result: { thumbnailFile: File | null }) {
+  selectedThumbnail.value = result.thumbnailFile;
+  thumbnailSelectorOpen.value = false;
 }
 
 function onGymQuery() {
@@ -127,6 +138,7 @@ async function handleSubmit() {
       isPublic: isPublic.value,
       title: title.value.trim() || undefined,
       durationSeconds: durationSeconds.value ?? undefined,
+      thumbnailFile: selectedThumbnail.value,
     });
 
     uiStore.showToast("영상 업로드 완료! AI 분석을 시작해요.");
@@ -234,6 +246,9 @@ async function handleSubmit() {
 
           <!-- Trim editor -->
           <VideoTrimModal :open="trimEditorOpen" :file="pendingFile" :max-duration="MAX_DURATION" @apply="onTrimApply" @cancel="onTrimCancel" />
+
+          <!-- Thumbnail frame selector -->
+          <VideoThumbnailModal :open="thumbnailSelectorOpen" :file="selectedFile" @apply="onThumbnailApply" />
         </div>
 
         <!-- ── UPLOADING STATE ────────────────────────── -->

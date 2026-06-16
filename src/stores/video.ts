@@ -59,6 +59,7 @@ export const useVideoStore = defineStore('video', () => {
     title?: string
     description?: string
     durationSeconds?: number
+    thumbnailFile?: File | null
   }): Promise<Video> {
     isUploading.value = true
     uploadProgress.value = 0
@@ -75,6 +76,13 @@ export const useVideoStore = defineStore('video', () => {
         uploadProgress.value = pct
       })
 
+      // Step 2.5: Upload thumbnail if user selected a frame
+      let thumbnailPath: string | undefined
+      if (payload.thumbnailFile) {
+        const { data: thumbData } = await videoService.uploadThumbnail(payload.thumbnailFile)
+        thumbnailPath = thumbData.thumbnailPath
+      }
+
       // Step 3: Register video in backend (status=pending → AI analysis queued)
       const { data: video } = await videoService.registerVideo({
         objectPath: urlData.objectPath,
@@ -84,6 +92,7 @@ export const useVideoStore = defineStore('video', () => {
         title: payload.title,
         description: payload.description,
         durationSeconds: payload.durationSeconds,
+        thumbnailPath,
         isPublic: payload.isPublic ?? true,
       })
       return video

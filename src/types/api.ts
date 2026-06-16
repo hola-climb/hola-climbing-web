@@ -105,6 +105,7 @@ export interface RawRecommendedVideo {
   gymGrade?: GymGrade | null; // structured grade (current backend)
   gymName: string | null;
   thumbnailPath: string | null;
+  thumbnailUrl?: string | null; // signed URL (백엔드가 내려줄 때만 존재)
   streamUrl: string | null;
   durationSeconds: number | null;
   viewCount: number;
@@ -187,6 +188,12 @@ export interface RegisterVideoPayload {
   thumbnailPath?: string;
   durationSeconds?: number;
   isPublic: boolean;
+}
+
+/** POST /api/videos/thumbnail 응답 */
+export interface ThumbnailUploadResponse {
+  thumbnailPath: string;
+  thumbnailUrl: string;
 }
 
 /** GET /api/gyms/{gymId}/grades — backend GymGradeResponse */
