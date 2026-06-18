@@ -48,7 +48,7 @@ export default defineConfig({
     host: true,
     proxy: {
       "/api": {
-        target: "http://localhost:8080",
+        target: "https://www.hola-climb.app",
         changeOrigin: true,
       },
     },

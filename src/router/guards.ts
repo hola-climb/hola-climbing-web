@@ -17,8 +17,13 @@ export async function authGuard(
   const isAuthPath = authPaths.some(path => to.path.startsWith(path))
 
   // Public content paths — accessible without authentication (per spec)
-  const publicPaths = ['/feed', '/explore']
+  const publicPaths = ['/feed', '/explore', '/verify-email']
   const isPublicPath = publicPaths.some(path => to.path.startsWith(path))
+
+  // 백엔드 인증 메일 링크가 /feed?token=... 형태로 오는 경우 → /verify-email로 리다이렉트
+  if (to.path === '/feed' && to.query.token) {
+    return next({ path: '/verify-email', query: { token: to.query.token } })
+  }
 
   // Already authenticated → keep auth pages out of reach, send to feed
   if (isAuthPath && authStore.isAuthenticated) {

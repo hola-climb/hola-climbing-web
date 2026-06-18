@@ -382,6 +382,7 @@ export interface Gym {
   ratingCount: number; // was "reviewCount"
   distanceKm: number | null;
   isFavorited: boolean;
+  businessHours?: BusinessHours | null;
   // Kept for mock data / future API support
   logoUrl?: string | null;
   operatingHours?: OperatingHours | null;
@@ -446,6 +447,21 @@ export interface OperatingHours {
   fri: string | null;
   sat: string | null;
   sun: string | null;
+}
+
+export interface BusinessHourSlot {
+  open: string;
+  close: string;
+}
+
+export interface BusinessHours {
+  mon: BusinessHourSlot | null;
+  tue: BusinessHourSlot | null;
+  wed: BusinessHourSlot | null;
+  thu: BusinessHourSlot | null;
+  fri: BusinessHourSlot | null;
+  sat: BusinessHourSlot | null;
+  sun: BusinessHourSlot | null;
 }
 
 // ── Notification ──────────────────────────────────────────────────────────────

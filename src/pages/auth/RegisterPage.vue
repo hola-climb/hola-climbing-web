@@ -58,9 +58,7 @@ async function checkEmailAvailability() {
 const terms = ref<Term[]>([]);
 const agreed = ref<Record<number, boolean>>({});
 
-const allRequiredAgreed = computed(() =>
-  terms.value.filter((t) => t.required).every((t) => agreed.value[t.termId]),
-);
+const allRequiredAgreed = computed(() => terms.value.filter((t) => t.required).every((t) => agreed.value[t.termId]));
 
 const pwErrors = ref<string[]>([]);
 
@@ -144,13 +142,17 @@ onMounted(loadTerms);
 
           <div class="field">
             <label class="field-label" for="reg-email">이메일</label>
-            <IonInput id="reg-email" v-model="email" type="email" placeholder="hello@climbing.kr" class="hola-input" autocomplete="email" @ion-input="onEmailInput" @ion-blur="checkEmailAvailability" />
-            <p
-              v-if="emailStatus !== 'idle'"
-              class="field-hint"
-              :class="{ ok: emailStatus === 'available', err: emailStatus === 'taken' || emailStatus === 'invalid' }"
-              aria-live="polite"
-            >
+            <IonInput
+              id="reg-email"
+              v-model="email"
+              type="email"
+              placeholder="hello@climbing.kr"
+              class="hola-input"
+              autocomplete="email"
+              @ion-input="onEmailInput"
+              @ion-blur="checkEmailAvailability"
+            />
+            <p v-if="emailStatus !== 'idle'" class="field-hint" :class="{ ok: emailStatus === 'available', err: emailStatus === 'taken' || emailStatus === 'invalid' }" aria-live="polite">
               {{ emailMessages[emailStatus] }}
             </p>
           </div>
@@ -166,18 +168,11 @@ onMounted(loadTerms);
           <div class="terms-group">
             <div v-for="term in terms" :key="term.termId" class="terms-row">
               <IonCheckbox v-model="agreed[term.termId]" />
-              <span class="terms-text">({{ term.required ? '필수' : '선택' }}) {{ term.title }}</span>
+              <span class="terms-text">({{ term.required ? "필수" : "선택" }}) {{ term.title }}</span>
             </div>
           </div>
 
-          <BaseButton
-            variant="primary"
-            block
-            :loading="isLoading"
-            :disabled="!nickname || !email || !password"
-            class="submit-btn"
-            @click="handleRegister"
-          >계정 만들기</BaseButton>
+          <BaseButton variant="primary" block :loading="isLoading" :disabled="!nickname || !email || !password" class="submit-btn" @click="handleRegister">계정 만들기</BaseButton>
         </div>
 
         <div class="auth-footer">
@@ -266,7 +261,9 @@ onMounted(loadTerms);
   color: var(--fg-muted);
 }
 .field-hint.ok {
-  color: var(--hold-lime);
+  /* color: yellowgreen; */
+  /* color: var(--hold-cyan); */
+  color: #9bc600;
 }
 .field-hint.err {
   color: var(--hold-pink);

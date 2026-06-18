@@ -202,9 +202,54 @@ function openVideo(id: string) {
 
 <template>
   <div class="gym-detail-view">
-      <div v-if="isLoading" class="page-skeleton page-padding">
-        <LoadingState variant="card" :count="1" label="암장 정보를 불러오는 중" />
-        <LoadingState variant="list" :count="3" />
+      <div v-if="isLoading" class="gd-skeleton page-padding" role="status" aria-label="암장 정보를 불러오는 중">
+
+        <!-- Header card: logo + name / address / chips -->
+        <div class="sk-header hola-card">
+          <div class="sk sk-logo" />
+          <div class="sk-header-info">
+            <div class="sk sk-line" style="width:55%;height:16px;" />
+            <div class="sk sk-line" style="width:75%;height:11px;margin-top:6px;" />
+            <div class="sk sk-chips">
+              <div class="sk sk-chip" />
+              <div class="sk sk-chip" style="width:48px;" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Photos section: title + horizontal strip of squares -->
+        <div class="sk-section">
+          <div class="sk sk-section-title" />
+          <div class="sk-photo-row">
+            <div v-for="i in 4" :key="i" class="sk sk-photo" />
+          </div>
+        </div>
+
+        <!-- Hours card: title + 7 day rows -->
+        <div class="sk-hours hola-card">
+          <div class="sk sk-section-title" style="width:80px;margin-bottom:12px;" />
+          <div v-for="i in 7" :key="i" class="sk-hours-row">
+            <div class="sk sk-dow" />
+            <div class="sk sk-line" :style="{ width: `${42 + (i % 3) * 12}%`, height: '11px' }" />
+          </div>
+        </div>
+
+        <!-- Reviews section: title + 2 review items -->
+        <div class="sk-section">
+          <div class="sk sk-section-title" />
+          <div v-for="i in 2" :key="i" class="sk-review hola-card">
+            <div class="sk-review-top">
+              <div class="sk sk-avatar" />
+              <div class="sk-review-meta">
+                <div class="sk sk-line" style="width:60%;height:11px;" />
+                <div class="sk sk-line" style="width:40%;height:9px;margin-top:5px;" />
+              </div>
+            </div>
+            <div class="sk sk-line" style="width:90%;height:11px;" />
+            <div class="sk sk-line" style="width:65%;height:11px;" />
+          </div>
+        </div>
+
       </div>
 
       <div v-else-if="gym" class="gym-detail page-padding reveal-on-load">
@@ -443,6 +488,80 @@ function openVideo(id: string) {
 
 .gym-detail-view { position: relative; }
 .page-skeleton { display: flex; flex-direction: column; gap: 16px; padding-top: 16px; }
+
+/* ── Layout-matched skeleton ─────────────────────── */
+.gd-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-top: 18px;
+  padding-bottom: 60px;
+}
+
+/* Shimmer base */
+.sk {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-soft);
+  border-radius: var(--r-chip);
+}
+.sk::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent);
+  animation: gd-shimmer 1400ms var(--ease-state) infinite;
+}
+@keyframes gd-shimmer { 100% { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .sk::after { animation: none; } }
+
+/* Header card */
+.sk-header { display: flex; align-items: center; gap: 16px; }
+.sk-logo {
+  width: 64px; height: 64px;
+  border-radius: 18px;
+  flex-shrink: 0;
+}
+.sk-header-info { flex: 1; min-width: 0; }
+.sk-chips { display: flex; gap: 6px; margin-top: 8px; }
+.sk-chip {
+  height: 22px; width: 36px;
+  border-radius: var(--r-chip);
+}
+
+/* Section containers */
+.sk-section { display: flex; flex-direction: column; gap: 12px; }
+.sk-section-title { height: 14px; width: 64px; }
+.sk-line { border-radius: var(--r-chip); }
+
+/* Photo row */
+.sk-photo-row { display: flex; gap: 8px; }
+.sk-photo {
+  flex: 0 0 auto;
+  width: 96px; height: 96px;
+  border-radius: var(--r-button);
+}
+
+/* Hours card */
+.sk-hours { display: flex; flex-direction: column; }
+.sk-hours-row {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 8px 12px;
+  margin-bottom: 8px;
+}
+.sk-dow { height: 11px; width: 16px; border-radius: var(--r-chip); }
+
+/* Review items */
+.sk-review { display: flex; flex-direction: column; gap: 8px; }
+.sk-review-top { display: flex; align-items: center; gap: 10px; }
+.sk-avatar {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.sk-review-meta { flex: 1; min-width: 0; }
 
 .gym-detail { padding-top: 18px; padding-bottom: 60px; display: flex; flex-direction: column; gap: 18px; }
 

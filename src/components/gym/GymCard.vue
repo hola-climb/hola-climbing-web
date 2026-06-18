@@ -22,15 +22,26 @@ const holdColor = computed(() => {
   return holdColors[hash % 4];
 });
 
-// Determine open/closed: check per-day operatingHours if available
 const isOpen = computed(() => {
+  const days = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
+  const today = days[new Date().getDay()];
+
+  if (props.gym.businessHours) {
+    const slot = props.gym.businessHours[today];
+    if (!slot) return false;
+    const now = new Date();
+    const [oh, om] = slot.open.split(":").map(Number);
+    const [ch, cm] = slot.close.split(":").map(Number);
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    return nowMin >= oh * 60 + om && nowMin < ch * 60 + cm;
+  }
+
   if (props.gym.operatingHours) {
-    const days: (keyof NonNullable<Gym["operatingHours"]>)[] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
-    const today = days[new Date().getDay()];
     const hours = props.gym.operatingHours[today];
     return !!hours && hours !== "정기 휴무";
   }
-  return true; // default open if no hours data
+
+  return true;
 });
 
 // Show AI BETA for highly-rated gyms

@@ -16,7 +16,7 @@ interface RawChatMessage {
 
 /** Derive the STOMP broker URL from the REST base URL. */
 function brokerUrl(): string {
-  const base = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api'
+  const base = import.meta.env.VITE_API_BASE_URL ?? 'https://www.hola-climb.app/api'
   // strip trailing /api → origin, then swap http(s)→ws(s) and append /ws
   const origin = base.replace(/\/api\/?$/, '')
   return origin.replace(/^http/, 'ws') + '/ws'

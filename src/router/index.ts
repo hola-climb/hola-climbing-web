@@ -82,6 +82,12 @@ const routes: Array<RouteRecordRaw> = [
     ],
   },
 
+  // ── Email verification (딥링크: hola-climb.app/verify-email?token=) ────
+  {
+    path: '/verify-email',
+    component: () => import('@/pages/auth/EmailVerifyPage.vue'),
+  },
+
   // ── My video list ─────────────────────────────────────────────────────
   {
     path: '/my/videos',
