@@ -39,9 +39,3 @@ npm-debug.log*
 .claude
 .vite
 .vscode
-
-*.config.*
-tsconfig.*
-.browserslistrc
-.eslintignore
-.eslintrc.cjs
