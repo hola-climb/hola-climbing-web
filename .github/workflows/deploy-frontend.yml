@@ -1,0 +1,42 @@
+name: Deploy Frontend
+
+# main 에 push 되면 빌드 후 Nginx VM 으로 dist 업로드
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "ios/**" # 네이티브 변경은 웹 배포와 무관
+      - "**.md"
+
+# 동시에 여러 배포가 겹치지 않도록 (마지막 push 만 반영)
+concurrency:
+  group: deploy-frontend
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build (production)
+        run: npm run build # .env.production 의 VITE_API_BASE_URL=/api 사용
+
+      - name: Upload dist to Nginx VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          source: "dist/*"
+          target: "/var/www/hola/dist"
+          strip_components: 1 # 앞의 dist/ 를 떼고 target 바로 아래로
+          rm: true # 업로드 전 기존 파일 정리 (해시 파일 누적 방지)
