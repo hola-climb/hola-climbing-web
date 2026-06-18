@@ -293,13 +293,7 @@ async function handleLocate() {
               <GymCard v-for="gym in displayGyms" :key="gym.id" :gym="gym" :selectable="isDesktop" :class="{ 'is-selected': isDesktop && selectedGymId === gym.id }" @select="openGym" />
             </div>
 
-            <EmptyState
-              v-if="!gymStore.isLoading && !gymStore.gyms.length"
-              compact
-              hold="orange"
-              title="검색 결과가 없어요"
-              description="다른 이름으로 검색하거나 위치로 찾아보세요."
-            />
+            <EmptyState v-if="!gymStore.isLoading && !gymStore.gyms.length" compact hold="orange" title="검색 결과가 없어요" description="다른 이름으로 검색하거나 위치로 찾아보세요." />
           </div>
 
           <IonInfiniteScroll :disabled="gymStore.isLoading" @ion-infinite="handleInfinite">
@@ -547,5 +541,4 @@ async function handleLocate() {
   color: var(--fg-muted);
   padding: 4px 0;
 }
-
 </style>

@@ -396,7 +396,6 @@ export interface GymDetail extends Gym {
   description: string | null;
   photos: string[];
   videoCount: number;
-  businessHours: string | null;
 }
 
 /** GET /api/recommendations/gyms — backend RecommendedGymResponse (+ distance/style fields) */
