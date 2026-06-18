@@ -226,7 +226,16 @@ onMounted(load);
         <!-- Headline stats card (cyan glow) -->
         <div class="stats-card hola-card">
           <div class="stats-glow" aria-hidden="true" />
-          <div class="stats-grid">
+
+          <!-- Loading skeleton (mirrors .stats-grid layout) -->
+          <div v-if="isLoading" class="stats-grid" role="status" aria-label="기록을 불러오는 중">
+            <div v-for="i in 3" :key="i" class="big-stat">
+              <div class="stat-sk stat-sk-val" />
+              <div class="stat-sk stat-sk-lbl" />
+            </div>
+          </div>
+
+          <div v-else class="stats-grid reveal-on-load">
             <div v-for="stat in headlineStats" :key="stat.label" class="big-stat">
               <div class="big-val">{{ stat.value }}</div>
               <div class="big-lbl">{{ stat.label }}</div>
@@ -242,7 +251,7 @@ onMounted(load);
           <div class="pyramid-card hola-card">
             <LoadingState v-if="isLoading" variant="list" :count="3" label="기술 분석을 불러오는 중" />
             <EmptyState v-else-if="techniques.length === 0" compact hold="cyan" title="아직 분석된 기술이 없어요" description="영상을 업로드하면 AI가 기술을 분석해요." />
-            <div v-else class="pyramid-rows">
+            <div v-else class="pyramid-rows reveal-on-load">
               <div v-for="row in techniques" :key="row.key" class="pyr-row">
                 <div class="pyr-grade tech-label">{{ row.label }}</div>
                 <div class="pyr-track">
@@ -426,9 +435,10 @@ onMounted(load);
 }
 
 .profile-bio {
-  font-size: var(--fs-body);
+  font-size: small;
+  color: #444;
   line-height: 1.5;
-  margin: 8px 0 0;
+  margin: 4px 0 0;
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -469,7 +479,8 @@ onMounted(load);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
-  color: var(--fg-muted);
+  /* color: var(--fg-muted); */
+  color: gray;
 }
 
 /* Inline edit */
@@ -559,6 +570,42 @@ onMounted(load);
   letter-spacing: 0.08em;
   color: var(--fg-muted);
   margin-top: 2px;
+}
+
+/* Headline stats skeleton — sized to .big-val / .big-lbl line boxes */
+.stat-sk {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-soft);
+  border-radius: var(--r-chip);
+}
+.stat-sk::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: sk-shimmer 1400ms var(--ease-state) infinite;
+}
+@keyframes sk-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+.stat-sk-val {
+  height: 18px;
+  width: 72%;
+  margin: 5px 0;
+}
+.stat-sk-lbl {
+  height: 9px;
+  width: 46%;
+  margin-top: 4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .stat-sk::after {
+    animation: none;
+  }
 }
 
 /* ── Grade pyramid ──────────────────────────────── */

@@ -68,7 +68,7 @@ onIonViewWillEnter(() => load(true));
         description="탐색에서 마음에 드는 암장을 저장해보세요."
       />
 
-      <div v-else class="gym-list">
+      <div v-else class="gym-list reveal-on-load">
         <GymCard v-for="gym in items" :key="gym.id" :gym="gym" />
       </div>
 

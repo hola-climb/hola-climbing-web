@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { AnalysisStatus, FeedVideo, Video } from '@/types/api'
+import type { AnalysisStatus, FeedVideo, UpdateVideoPayload, Video } from '@/types/api'
 import { parseTechniqueTags } from '@/types/api'
 import { videoService } from '@/services/video'
 
@@ -98,6 +98,17 @@ export const useVideoStore = defineStore('video', () => {
       return video
     } finally {
       isUploading.value = false
+    }
+  }
+
+  async function updateVideo(id: string, payload: UpdateVideoPayload): Promise<void> {
+    const { data: updated } = await videoService.updateVideo(id, payload)
+    if (currentVideo.value?.id === id) {
+      currentVideo.value = { ...currentVideo.value, ...updated }
+    }
+    const idx = feedVideos.value.findIndex((v) => v.id === id)
+    if (idx !== -1 && updated.title !== undefined) {
+      feedVideos.value[idx] = { ...feedVideos.value[idx], title: updated.title }
     }
   }
 
@@ -205,6 +216,7 @@ export const useVideoStore = defineStore('video', () => {
     loadFeed,
     fetchVideo,
     uploadVideo,
+    updateVideo,
     deleteVideo,
     pollAnalysis,
     retryAnalysis,

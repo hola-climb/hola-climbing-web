@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { nextTick, ref } from 'vue'
 import { notificationService } from '@/services/notification'
 
 export const useUIStore = defineStore('ui', () => {
@@ -12,7 +12,10 @@ export const useUIStore = defineStore('ui', () => {
   const unreadCount = ref(0)
 
   // actions
-  function showToast(message: string, color: 'success' | 'danger' | 'warning' = 'success') {
+  async function showToast(message: string, color: 'success' | 'danger' | 'warning' = 'success') {
+    // Reset first so a back-to-back toast still triggers IonToast's false→true transition.
+    isToastOpen.value = false
+    await nextTick()
     toastMessage.value = message
     toastColor.value = color
     isToastOpen.value = true

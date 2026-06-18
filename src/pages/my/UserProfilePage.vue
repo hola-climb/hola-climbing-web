@@ -162,7 +162,7 @@ async function handleFollow() {
         <LoadingState variant="list" :count="3" />
       </div>
 
-      <div v-else-if="user" class="profile-content page-padding">
+      <div v-else-if="user" class="profile-content page-padding reveal-on-load">
         <!-- Profile header -->
         <div class="profile-header">
           <div class="avatar-lg">

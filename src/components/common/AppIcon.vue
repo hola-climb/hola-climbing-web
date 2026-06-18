@@ -16,6 +16,9 @@ const ICONS: Record<string, IconDef> = {
     fill: true,
   },
   play: { d: "M6 4v16l13-8z", fill: true },
+  pause: { d: "M7 5h3v14H7zM14 5h3v14h-3z", fill: true },
+  fullscreen: { d: "M4 9V5a1 1 0 0 1 1-1h4M20 9V5a1 1 0 0 0-1-1h-4M4 15v4a1 1 0 0 0 1 1h4M20 15v4a1 1 0 0 1-1 1h-4" },
+  "fullscreen-exit": { d: "M9 4v4a1 1 0 0 1-1 1H4M15 4v4a1 1 0 0 0 1 1h4M9 20v-4a1 1 0 0 0-1-1H4M15 20v-4a1 1 0 0 1 1-1h4" },
   pin: {
     d: "M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 4a2.5 2.5 0 0 1 0 5.5z",
     fill: true,

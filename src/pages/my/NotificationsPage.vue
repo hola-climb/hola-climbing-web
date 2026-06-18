@@ -133,7 +133,7 @@ onMounted(() => load(true))
         description="활동이 생기면 여기에 표시됩니다."
       />
 
-      <ul v-else class="noti-list">
+      <ul v-else class="noti-list reveal-on-load">
         <li
           v-for="n in items"
           :key="n.id"

@@ -14,6 +14,7 @@ import { gradeColor, gradeTextColor } from "@/utils/gradeColor";
 import type { Comment } from "@/types/api";
 import AIResultBadge from "@/components/video/AIResultBadge.vue";
 import AIFeedbackModal from "@/components/video/AIFeedbackModal.vue";
+import VideoPlayer from "@/components/video/VideoPlayer.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -141,11 +142,11 @@ async function retryAnalysis() {
         <LoadingState variant="list" :count="3" />
       </div>
 
-      <div v-else-if="video" class="video-detail-layout">
+      <div v-else-if="video" class="video-detail-layout reveal-on-load">
         <!-- ── Left: video pane ───────────────────── -->
         <div class="video-pane">
           <div class="video-wrap">
-            <video v-if="video.streamingUrl" :src="video.streamingUrl" controls playsinline class="video-player" :aria-label="`${video.user.nickname}의 클라이밍 영상`" />
+            <VideoPlayer v-if="video.streamingUrl" :src="video.streamingUrl" :ariaLabel="`${video.user.nickname}의 클라이밍 영상`" />
             <div v-else class="video-placeholder">
               <span class="placeholder-text">
                 <span v-if="video.status === 'analyzing'" class="ai-dot" />
@@ -332,12 +333,6 @@ async function retryAnalysis() {
   display: grid;
   place-items: center;
   overflow: hidden;
-}
-.video-player {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
 }
 .video-placeholder {
   width: 100%;

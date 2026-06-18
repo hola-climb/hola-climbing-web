@@ -4,18 +4,22 @@ import { IonPage, IonHeader, IonToolbar, IonContent, IonRefresher, IonRefresherC
 import { useRouter } from "vue-router";
 import { useGymStore } from "@/stores/gym";
 import { useUIStore } from "@/stores/ui";
+import { useAuthStore } from "@/stores/auth";
 import { gymService } from "@/services/gym";
 import { useMediaQuery } from "@/composables/useMediaQuery";
+import { useGeolocation } from "@/composables/useGeolocation";
 import GymCard from "@/components/gym/GymCard.vue";
 import GymDetailView from "./GymDetailView.vue";
 import LoadingState from "@/components/common/LoadingState.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
-import type { Gym } from "@/types/api";
+import type { Gym, RecommendedGym } from "@/types/api";
 
 const router = useRouter();
 const gymStore = useGymStore();
 const uiStore = useUIStore();
+const authStore = useAuthStore();
 const isDesktop = useMediaQuery("(min-width: 1024px)");
+const { locate } = useGeolocation();
 
 const searchQuery = ref("");
 const currentPage = ref(0);
@@ -35,10 +39,20 @@ function openGym(gym: Gym) {
 // Location state
 const nearbyGyms = ref<Gym[]>([]);
 const nearestGym = ref<Gym | null>(null);
+const recommendedGyms = ref<RecommendedGym[]>([]);
 const isLocating = ref(false);
 
 const displayGyms = computed(() => (nearbyGyms.value.length ? nearbyGyms.value : gymStore.gyms));
 const isNearbyMode = computed(() => nearbyGyms.value.length > 0);
+// 추천 섹션은 위치를 한 번이라도 획득(근처 모드)했을 때만 노출
+const showRecoSection = computed(() => isNearbyMode.value);
+
+/** 근처/추천 상태 초기화 — 검색·새로고침·전체보기 시 호출 */
+function resetLocation() {
+  nearbyGyms.value = [];
+  nearestGym.value = null;
+  recommendedGyms.value = [];
+}
 
 onMounted(() => loadGyms(true));
 
@@ -53,16 +67,14 @@ async function loadGyms(reset = false) {
 }
 
 function handleSearch() {
-  nearbyGyms.value = [];
-  nearestGym.value = null;
+  resetLocation();
   if (searchTimer) clearTimeout(searchTimer);
   searchTimer = setTimeout(() => loadGyms(true), 300);
 }
 
 function handleSearchEnter() {
   if (searchTimer) clearTimeout(searchTimer);
-  nearbyGyms.value = [];
-  nearestGym.value = null;
+  resetLocation();
   loadGyms(true);
 }
 
@@ -71,8 +83,7 @@ onUnmounted(() => {
 });
 
 async function handleRefresh(event: CustomEvent) {
-  nearbyGyms.value = [];
-  nearestGym.value = null;
+  resetLocation();
   await loadGyms(true);
   (event.target as HTMLIonRefresherElement).complete();
 }
@@ -84,39 +95,37 @@ async function handleInfinite(event: CustomEvent) {
 }
 
 async function handleLocate() {
-  if (!navigator.geolocation) {
-    uiStore.showToast("이 기기에서 위치 서비스를 지원하지 않아요.", "warning");
-    return;
-  }
   isLocating.value = true;
-  navigator.geolocation.getCurrentPosition(
-    async (pos) => {
+  try {
+    const coords = await locate();
+    if (!coords) {
+      uiStore.showToast("위치 권한을 허용하면 주변 암장을 찾아드려요.", "warning");
+      return;
+    }
+
+    // 1) 공개 근처 암장 (거리순) — /gyms/nearby
+    try {
+      const { data } = await gymService.getNearby({ lat: coords.lat, lng: coords.lng, radius: 5, size: 20 });
+      nearbyGyms.value = data;
+      nearestGym.value = data[0] ?? null;
+      searchQuery.value = "";
+    } catch {
+      uiStore.showToast("주변 암장을 불러오지 못했어요.", "danger");
+      return;
+    }
+
+    // 2) 로그인 사용자 한정 개인화 추천 — /recommendations/gyms (실패해도 근처 목록은 유지)
+    if (authStore.isAuthenticated) {
       try {
-        const { data } = await gymService.getNearby({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          radius: 5,
-          size: 20,
-        });
-        nearbyGyms.value = data;
-        nearestGym.value = data[0] ?? null;
-        searchQuery.value = "";
+        const { data } = await gymService.getRecommendations({ lat: coords.lat, lng: coords.lng, radius: 10, size: 20 });
+        recommendedGyms.value = data;
       } catch {
-        uiStore.showToast("주변 암장을 불러오지 못했어요.", "danger");
-      } finally {
-        isLocating.value = false;
+        recommendedGyms.value = [];
       }
-    },
-    (err) => {
-      isLocating.value = false;
-      if (err.code === err.PERMISSION_DENIED) {
-        uiStore.showToast("위치 권한을 허용해주세요.", "warning");
-      } else {
-        uiStore.showToast("위치를 가져오지 못했어요.", "danger");
-      }
-    },
-    { timeout: 8000 },
-  );
+    }
+  } finally {
+    isLocating.value = false;
+  }
 }
 </script>
 
@@ -158,7 +167,7 @@ async function handleLocate() {
           <div class="explore-hero page-padding">
             <h1 class="hero-title">{{ isNearbyMode ? "내 주변 암장" : "암장 탐색" }}</h1>
             <div class="micro-label">
-              <span v-if="isNearbyMode">반경 5km · {{ nearbyGyms.length }}개</span>
+              <span v-if="isNearbyMode">반경 5km · 가까운 순 · {{ nearbyGyms.length }}개</span>
               <span v-else>{{ gymStore.gyms.length }}개의 암장</span>
             </div>
           </div>
@@ -210,10 +219,7 @@ async function handleLocate() {
               <div v-if="nearestGym" class="map-pill" role="button" tabindex="0" :aria-label="`${nearestGym.name} 상세 보기`" @click="openGym(nearestGym)">
                 <div>
                   <div class="micro-label">NEAREST</div>
-                  <div class="map-gym-name">
-                    {{ nearestGym.name }}
-                    <span v-if="nearestGym.distanceKm != null">· {{ nearestGym.distanceKm.toFixed(1) }}km</span>
-                  </div>
+                  <div class="map-gym-name">{{ nearestGym.name }}</div>
                 </div>
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="m9 5 7 7-7 7" />
@@ -231,6 +237,40 @@ async function handleLocate() {
             </div>
           </div>
 
+          <!-- 맞춤 추천 (위치 획득 후 노출) -->
+          <div v-if="showRecoSection" class="reco-section page-padding">
+            <div class="section-header">
+              <div class="section-title">맞춤 추천</div>
+            </div>
+
+            <!-- 로그인 + 추천 결과 -->
+            <div v-if="authStore.isAuthenticated && recommendedGyms.length" class="gym-results reveal-on-load">
+              <GymCard
+                v-for="gym in recommendedGyms"
+                :key="`reco-${gym.id}`"
+                :gym="gym"
+                :source="gym.source"
+                :selectable="isDesktop"
+                :class="{ 'is-selected': isDesktop && selectedGymId === gym.id }"
+                @select="openGym"
+              />
+            </div>
+
+            <!-- 로그인했지만 추천 없음 -->
+            <p v-else-if="authStore.isAuthenticated" class="reco-hint">아직 추천할 암장이 부족해요. 영상을 올리면 스타일에 맞는 암장을 찾아드려요.</p>
+
+            <!-- 비로그인 CTA -->
+            <button v-else class="reco-cta hola-card" @click="uiStore.openLoginSheet()">
+              <div>
+                <div class="micro-label">맞춤 추천</div>
+                <div class="reco-cta-title">로그인하면 내 스타일에 맞는 암장을 추천해드려요</div>
+              </div>
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m9 5 7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+
           <!-- Gym list -->
           <div class="gym-list page-padding">
             <div class="section-header">
@@ -239,8 +279,7 @@ async function handleLocate() {
                 v-if="isNearbyMode"
                 class="sort-btn"
                 @click="
-                  nearbyGyms = [];
-                  nearestGym = null;
+                  resetLocation();
                   loadGyms(true);
                 "
               >
@@ -250,7 +289,9 @@ async function handleLocate() {
 
             <LoadingState v-if="gymStore.isLoading && !displayGyms.length" variant="list" :count="5" label="암장을 불러오는 중" />
 
-            <GymCard v-for="gym in displayGyms" :key="gym.id" :gym="gym" :selectable="isDesktop" :class="{ 'is-selected': isDesktop && selectedGymId === gym.id }" @select="openGym" />
+            <div v-if="displayGyms.length" class="gym-results reveal-on-load">
+              <GymCard v-for="gym in displayGyms" :key="gym.id" :gym="gym" :selectable="isDesktop" :class="{ 'is-selected': isDesktop && selectedGymId === gym.id }" @select="openGym" />
+            </div>
 
             <EmptyState
               v-if="!gymStore.isLoading && !gymStore.gyms.length"
@@ -444,10 +485,47 @@ async function handleLocate() {
   font-weight: 500;
 }
 
+/* ── 맞춤 추천 ───────────────────────────────────── */
+.reco-section {
+  padding-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.reco-hint {
+  font-size: 13px;
+  color: var(--fg-muted);
+  margin: 0;
+  padding: 0 4px;
+}
+.reco-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  cursor: pointer;
+  text-align: left;
+  border: none;
+  width: 100%;
+  color: var(--fg);
+  font-family: var(--font-sans);
+}
+.reco-cta-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
 /* ── Gym list ───────────────────────────────────── */
 .gym-list {
   padding-top: 24px;
   padding-bottom: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.gym-results {
   display: flex;
   flex-direction: column;
   gap: 12px;

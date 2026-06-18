@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import type { AnalysisStatus } from "@/types/api";
 import { gradeColor, gradeTextColor } from "@/utils/gradeColor";
 
@@ -10,6 +10,10 @@ const props = defineProps<{
   alt?: string;
   /** 상태 배지 표시 (VideoCard 등에서 사용) */
   status?: AnalysisStatus;
+  /** 영상 길이(초). 있을 때만 duration 배지 표시 */
+  durationSeconds?: number | null;
+  /** 중앙 재생 아이콘 오버레이 숨기기 (기본: 표시) */
+  hidePlayIcon?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -24,6 +28,17 @@ const statusLabel: Record<string, string> = {
   failed: "분석 실패",
 };
 
+const durationLabel = computed(() => {
+  const sec = props.durationSeconds;
+  if (!sec || sec <= 0) return "";
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+});
+
+/** 분석이 끝나 재생 가능한 상태일 때만 재생 아이콘 노출 */
+const showPlayIcon = computed(() => !props.hidePlayIcon && (!props.status || props.status === "done"));
+
 function onError() {
   broken.value = true;
   emit("error");
@@ -37,6 +52,14 @@ function onError() {
       <span v-if="grade" class="vt-ph-label" :style="{ color: gradeTextColor(gradeColor(grade)) }">{{ title }}</span>
       <span v-else class="vt-ph-label">HOLA</span>
     </div>
+
+    <!-- Play icon overlay (영상임을 명확히 표시) -->
+    <span v-if="showPlayIcon" class="vt-play" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+    </span>
+
+    <!-- Duration badge -->
+    <span v-if="durationLabel" class="vt-dur">{{ durationLabel }}</span>
 
     <!-- Grade badge -->
     <span v-if="grade && thumbnailUrl && !broken" class="vt-grade-badge" :style="{ background: gradeColor(grade), color: gradeTextColor(gradeColor(grade)) }">{{ grade }}</span>
@@ -88,6 +111,35 @@ function onError() {
   left: 6px;
   font-size: 11px;
   font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+.vt-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.42);
+  color: #fff;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  padding-left: 2px;
+}
+
+.vt-dur {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.6);
   padding: 2px 7px;
   border-radius: 999px;
 }

@@ -1,6 +1,8 @@
 /* Global utility classes — do not add component-specific styles here */
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
 body {
   font-family: var(--font-sans);
@@ -10,19 +12,58 @@ body {
 }
 
 /* ── Type utilities ─────────────────────────────── */
-.text-display { font-size: var(--fs-display); font-weight: var(--w-extrabold); letter-spacing: -0.02em; line-height: 1.0; }
-.text-h1      { font-size: var(--fs-h1);      font-weight: var(--w-extrabold); letter-spacing: -0.015em; line-height: 1.1; }
-.text-h2      { font-size: var(--fs-h2);      font-weight: var(--w-semibold);  letter-spacing: -0.01em; }
-.text-h3      { font-size: var(--fs-h3);      font-weight: var(--w-semibold); }
-.text-body    { font-size: var(--fs-body);    font-weight: var(--w-medium);    line-height: 1.45; }
-.text-caption { font-size: var(--fs-caption); font-weight: var(--w-medium);    color: var(--fg-muted); }
-.text-micro   { font-size: var(--fs-micro);   font-weight: var(--w-semibold);  text-transform: uppercase; letter-spacing: 0.08em; color: var(--fg-muted); }
+.text-display {
+  font-size: var(--fs-display);
+  font-weight: var(--w-extrabold);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.text-h1 {
+  font-size: var(--fs-h1);
+  font-weight: var(--w-extrabold);
+  letter-spacing: -0.015em;
+  line-height: 1.1;
+}
+.text-h2 {
+  font-size: var(--fs-h2);
+  font-weight: var(--w-semibold);
+  letter-spacing: -0.01em;
+}
+.text-h3 {
+  font-size: var(--fs-h3);
+  font-weight: var(--w-semibold);
+}
+.text-body {
+  font-size: var(--fs-body);
+  font-weight: var(--w-medium);
+  line-height: 1.45;
+}
+.text-caption {
+  font-size: var(--fs-caption);
+  font-weight: var(--w-medium);
+  color: var(--fg-muted);
+}
+.text-micro {
+  font-size: var(--fs-micro);
+  font-weight: var(--w-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-muted);
+}
 
 /* Canonical micro label (DS name). Pages previously redefined this locally;
    use this global class and add only positional tweaks in scoped styles. */
-.micro-label  { font-size: var(--fs-micro);   font-weight: var(--w-semibold);  text-transform: uppercase; letter-spacing: 0.08em; color: var(--fg-muted); }
+.micro-label {
+  font-size: var(--fs-micro);
+  font-weight: var(--w-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-muted);
+}
 
-.text-muted   { color: var(--fg-muted); }
+.text-muted {
+  color: var(--fg-muted);
+}
 
 /* Canonical top-level section heading (e.g. "주변 암장", "기술 사용 빈도") */
 .section-title {
@@ -32,15 +73,29 @@ body {
 }
 
 /* ── Layout utilities ───────────────────────────── */
-.page-padding   { padding: 0 20px; }
-.page-content   { padding-bottom: 100px; }
+.page-padding {
+  padding: 0 20px;
+}
+.page-content {
+  padding-bottom: 100px;
+}
 
 /* ── Spacing utilities (margin-top, on the 4/8/12/16/24 scale) ── */
-.mt-1 { margin-top: var(--s-1); }
-.mt-2 { margin-top: var(--s-2); }
-.mt-3 { margin-top: var(--s-3); }
-.mt-4 { margin-top: var(--s-4); }
-.mt-6 { margin-top: var(--s-6); }
+.mt-1 {
+  margin-top: var(--s-1);
+}
+.mt-2 {
+  margin-top: var(--s-2);
+}
+.mt-3 {
+  margin-top: var(--s-3);
+}
+.mt-4 {
+  margin-top: var(--s-4);
+}
+.mt-6 {
+  margin-top: var(--s-6);
+}
 
 /* ── Hola card ──────────────────────────────────── */
 .hola-card {
@@ -66,19 +121,68 @@ body {
   letter-spacing: 0.07em;
   text-transform: uppercase;
 }
-.chip-pink   { background: var(--tint-pink);   color: var(--on-tint-pink); }
-.chip-lime   { background: var(--tint-lime);   color: var(--on-tint-lime); }
-.chip-orange { background: var(--tint-orange); color: var(--on-tint-orange); }
-.chip-cyan   { background: var(--tint-cyan);   color: var(--on-tint-cyan); }
-.chip-dark   { background: var(--tint-dark);   color: var(--on-tint-dark); }
+.chip-pink {
+  background: var(--tint-pink);
+  color: var(--on-tint-pink);
+}
+.chip-lime {
+  background: var(--tint-lime);
+  color: var(--on-tint-lime);
+}
+.chip-orange {
+  background: var(--tint-orange);
+  color: var(--on-tint-orange);
+}
+.chip-cyan {
+  background: var(--tint-cyan);
+  color: var(--on-tint-cyan);
+}
+.chip-dark {
+  background: var(--tint-dark);
+  color: var(--on-tint-dark);
+}
 
 /* ── Inline button spinner ──────────────────────── */
-.btn-spinner { width: 16px; height: 16px; }
+.btn-spinner {
+  width: 16px;
+  height: 16px;
+}
+
+/* ── Content reveal (skeleton → loaded) ─────────────
+   Applied to the real-content container that renders in the v-else
+   branch after a skeleton. Because the element mounts fresh when
+   loading flips to false, the animation plays exactly at reveal time,
+   giving a natural fade + settle instead of a hard pop. */
+@keyframes hola-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.reveal-on-load {
+  animation: hola-reveal var(--dur-base) var(--ease-soft) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal-on-load {
+    animation: none;
+  }
+}
 
 /* ── AI breathing dot ───────────────────────────── */
 @keyframes breathe {
-  0%, 100% { opacity: 0.3; transform: scale(0.9); }
-  50%       { opacity: 1;   transform: scale(1.1); }
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
 }
 .ai-dot {
   display: inline-block;
@@ -122,10 +226,10 @@ ion-toolbar {
   --border-color: transparent;
 }
 ion-tab-bar {
-  --background: rgba(247,247,245,0.78);
+  --background: rgba(247, 247, 245, 0.78);
   backdrop-filter: blur(20px) saturate(140%);
   -webkit-backdrop-filter: blur(20px) saturate(140%);
-  border-top: 1px solid rgba(231,234,240,0.6);
+  border-top: 1px solid rgba(231, 234, 240, 0.6);
   height: 60px;
   padding-bottom: env(safe-area-inset-bottom);
 }

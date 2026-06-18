@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { IonPage, IonTabs, IonTabBar, IonTabButton, IonRouterOutlet, IonFab, IonFabButton, IonIcon, IonToast } from "@ionic/vue";
+import { IonPage, IonTabs, IonTabBar, IonTabButton, IonRouterOutlet, IonFab, IonFabButton, IonIcon } from "@ionic/vue";
 import { homeOutline, calendarOutline, compassOutline, personOutline, addOutline } from "ionicons/icons";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
@@ -16,6 +16,8 @@ const uiStore = useUIStore();
 // FAB 선택 시트 — '영상 업로드' vs '클라이밍 기록'
 const showFabSheet = ref(false);
 const isTabBarScrolled = ref(false);
+// 키보드가 열리면 FAB가 키보드 위로 떠오르므로 숨긴다
+const isKeyboardOpen = ref(false);
 
 function handleUploadFab() {
   if (!authStore.isAuthenticated) {
@@ -43,12 +45,24 @@ function handleTabBarScroll(event: Event) {
   isTabBarScrolled.value = Boolean(detail?.scrolled);
 }
 
+function handleKeyboardShow() {
+  isKeyboardOpen.value = true;
+}
+
+function handleKeyboardHide() {
+  isKeyboardOpen.value = false;
+}
+
 onMounted(() => {
   window.addEventListener("hola:tab-bar-scroll", handleTabBarScroll);
+  window.addEventListener("ionKeyboardDidShow", handleKeyboardShow);
+  window.addEventListener("ionKeyboardDidHide", handleKeyboardHide);
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener("hola:tab-bar-scroll", handleTabBarScroll);
+  window.removeEventListener("ionKeyboardDidShow", handleKeyboardShow);
+  window.removeEventListener("ionKeyboardDidHide", handleKeyboardHide);
 });
 
 watch(
@@ -91,7 +105,7 @@ watch(
     </IonTabs>
 
     <!-- Central FAB — 기록/업로드 선택 -->
-    <IonFab slot="fixed" vertical="bottom" horizontal="center" class="upload-fab">
+    <IonFab slot="fixed" vertical="bottom" horizontal="center" class="upload-fab" :class="{ 'is-hidden': isKeyboardOpen }">
       <IonFabButton @click="handleUploadFab" aria-label="기록 또는 영상 업로드">
         <IonIcon :icon="addOutline" />
       </IonFabButton>
@@ -100,9 +114,6 @@ watch(
     <!-- FAB 선택 시트 -->
     <UploadChoiceSheet :open="showFabSheet" @select="handleFabChoice" @close="showFabSheet = false" />
 
-    <!-- Global toast -->
-    <IonToast :is-open="uiStore.isToastOpen" :message="uiStore.toastMessage" :color="uiStore.toastColor" :duration="2500" position="top" @did-dismiss="uiStore.dismissToast" />
-
     <!-- Login bottom sheet -->
     <LoginBottomSheet :is-open="uiStore.showLoginSheet" @close="uiStore.closeLoginSheet" />
   </IonPage>
@@ -110,7 +121,7 @@ watch(
 
 <style scoped>
 .main-tab-bar {
-  --background: rgba(247, 247, 245, 0.78);
+  --background: rgba(247, 247, 245);
   border-top-color: rgba(231, 234, 240, 0.6);
   box-shadow: none;
   transition:
@@ -137,7 +148,15 @@ watch(
 }
 
 .upload-fab {
-  --bottom: 12px;
+  /* ion-fab는 `--bottom` 변수를 지원하지 않고 bottom:10px가 하드코딩돼 있다.
+     그래서 safe-area만큼 margin-bottom으로 끌어올려 탭바와 같은 높이에 맞춘다.
+     (탭바의 padding-bottom: env(safe-area-inset-bottom)와 동일한 값) */
+  margin-bottom: env(safe-area-inset-bottom);
+}
+
+/* 키보드가 열리면 FAB가 키보드 위로 떠오르므로 숨긴다 */
+.upload-fab.is-hidden {
+  display: none;
 }
 
 ion-fab-button {

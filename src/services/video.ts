@@ -8,7 +8,9 @@ import type {
   PageResponse,
   RawRecommendedVideo,
   RegisterVideoPayload,
+  TechniqueTag,
   ThumbnailUploadResponse,
+  UpdateVideoPayload,
   UploadUrlPayload,
   UploadUrlResponse,
   Video,
@@ -350,7 +352,7 @@ export const videoService = {
     });
   },
 
-  updateVideo: (id: string, payload: Partial<RegisterVideoPayload>) => api.patch<Video>(`/videos/${id}`, payload),
+  updateVideo: (id: string, payload: UpdateVideoPayload) => api.patch<Video>(`/videos/${id}`, payload),
 
   deleteVideo: (id: string) => api.delete(`/videos/${id}`),
 
@@ -368,8 +370,15 @@ export const videoService = {
         if (res.data.techniqueLabels) {
           res.data.techniques = parseTagsFn(res.data.techniqueLabels, res.data.timeline ?? []);
         } else {
-          // Ensure techniques is always TechniqueTag[], never a raw string[]
-          res.data.techniques = [];
+          // API may return techniques as string[] — convert to TechniqueTag[]
+          const rawTechs = res.data.techniques as unknown as Array<string | TechniqueTag>;
+          if (Array.isArray(rawTechs) && rawTechs.length > 0 && typeof rawTechs[0] === "string") {
+            res.data.techniques = (rawTechs as string[])
+              .filter((k) => k.trim() !== "")
+              .map((key) => ({ key, confidence: 0.8, userFeedback: null }));
+          } else if (!Array.isArray(rawTechs)) {
+            res.data.techniques = [];
+          }
         }
       }
       return res;

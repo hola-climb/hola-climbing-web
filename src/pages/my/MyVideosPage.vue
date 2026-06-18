@@ -85,7 +85,7 @@ onMounted(async () => {
     <IonContent fullscreen class="videos-page-content" :scroll-events="true" @ion-scroll="handleScroll">
       <div class="page-inner page-padding">
         <!-- Loading -->
-        <LoadingState v-if="isLoading" variant="card" :count="4" label="영상을 불러오는 중" />
+        <LoadingState v-if="isLoading" variant="grid" :count="6" thumb-aspect="1/1" label="영상을 불러오는 중" />
 
         <!-- Empty -->
         <EmptyState
@@ -98,7 +98,7 @@ onMounted(async () => {
         />
 
         <!-- Grid -->
-        <div v-else class="video-grid">
+        <div v-else class="video-grid reveal-on-load">
           <button v-for="video in videos" :key="video.id" class="video-item" :aria-label="`${video.title ?? '제목 없음'} 영상 보기`" @click="goDetail(video)">
             <div class="thumb-wrap">
               <VideoThumbnail :title="video.title" :thumbnail-url="video.thumbnailUrl" :grade="video.grade" :alt="`${video.title ?? '클라이밍 영상'} 썸네일`" />

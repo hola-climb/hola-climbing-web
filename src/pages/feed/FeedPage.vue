@@ -24,8 +24,6 @@ const hasScrolled = ref(false);
 const greetingHour = new Date().getHours();
 const greeting = greetingHour < 12 ? "좋은 아침이에요" : greetingHour < 18 ? "오늘도 높이 올라요" : "오늘 하루도 수고했어요";
 
-const placeholderHeights = [150, 200, 175, 225, 190];
-
 const showInitialLoading = computed(() => videoStore.isLoadingFeed && videoStore.feedVideos.length === 0);
 
 function durationLabel(sec: number | null): string {
@@ -107,7 +105,7 @@ watch(
 
       <!-- Initial loading -->
       <div v-if="showInitialLoading" class="feed-skeleton">
-        <LoadingState variant="card" :count="3" label="추천 클립을 불러오는 중" />
+        <LoadingState variant="grid" :count="6" label="추천 클립을 불러오는 중" />
       </div>
 
       <!-- Empty -->
@@ -120,10 +118,10 @@ watch(
         @action="router.push('/upload')"
       />
 
-      <!-- Masonry grid (2-column) -->
-      <div v-else class="masonry">
-        <button v-for="(video, i) in videoStore.feedVideos" :key="video.id" class="masonry-card" @click="openVideo(video.id)" :aria-label="video.title ?? '추천 클립'">
-          <!-- Thumbnail or placeholder -->
+      <!-- Video grid (uniform 9:16) -->
+      <div v-else class="video-grid reveal-on-load">
+        <button v-for="video in videoStore.feedVideos" :key="video.id" class="video-grid-card" @click="openVideo(video.id)" :aria-label="video.title ?? '추천 클립'">
+          <!-- Thumbnail or placeholder. 향후 previewUrl 생기면 <video muted loop>로 교체 가능한 자리 -->
           <div class="thumb-wrap">
             <img
               v-if="video.thumbnailUrl && !brokenThumbs.has(video.id)"
@@ -133,9 +131,14 @@ watch(
               loading="lazy"
               @error="onThumbError(video.id)"
             />
-            <div v-else class="thumb-placeholder" :style="{ height: placeholderHeights[i % placeholderHeights.length] + 'px', background: `var(--hold-lime)` }">
-              <span class="placeholder-grade">{{ "HOLA" }}</span>
+            <div v-else class="thumb-placeholder">
+              <span class="placeholder-grade">HOLA</span>
             </div>
+
+            <!-- Play icon (영상임을 명확히) -->
+            <span class="play-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+            </span>
 
             <!-- Grade chip -->
             <span v-if="video.grade" class="grade-chip">
@@ -285,35 +288,34 @@ watch(
   padding: 8px 16px;
 }
 
-/* ── Masonry (CSS columns) ──────────────────────── */
-.masonry {
-  column-count: 2;
-  column-gap: 12px;
+/* ── Video grid (uniform 9:16) ──────────────────── */
+.video-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
   padding: 8px 16px 120px;
 }
 @media (min-width: 768px) {
-  .masonry {
-    column-count: 3;
+  .video-grid {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 @media (min-width: 1024px) {
-  .masonry {
-    column-count: 4;
-    column-gap: 16px;
+  .video-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
   }
 }
 @media (min-width: 1440px) {
-  .masonry {
-    column-count: 5;
+  .video-grid {
+    grid-template-columns: repeat(5, 1fr);
     max-width: 1600px;
     margin: 0 auto;
   }
 }
-.masonry-card {
+.video-grid-card {
   display: block;
   width: 100%;
-  break-inside: avoid;
-  margin-bottom: 12px;
   padding: 0;
   border: none;
   background: var(--surface);
@@ -324,23 +326,42 @@ watch(
   text-align: left;
   transition: transform var(--dur-fast) var(--ease-state);
 }
-.masonry-card:active {
+.video-grid-card:active {
   transform: scale(0.98);
 }
 
 .thumb-wrap {
   position: relative;
+  aspect-ratio: 9 / 16;
 }
 .thumb-img {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
   object-fit: cover;
 }
 .thumb-placeholder {
   display: grid;
   place-items: center;
   width: 100%;
+  height: 100%;
+  background: var(--hold-lime);
+}
+.play-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.42);
+  color: #fff;
+  padding-left: 2px;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 .placeholder-grade {
   font-size: 28px;

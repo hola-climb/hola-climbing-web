@@ -2,14 +2,16 @@
 import { ref, computed, onMounted } from 'vue'
 import {
   IonPage, IonContent, IonIcon,
-  IonButton, IonSpinner,
+  IonButton, IonSpinner, IonModal,
 } from '@ionic/vue'
 import {
   heartOutline, heart,
   shareOutline, chatbubbleOutline, refreshOutline, checkmarkCircle,
+  ellipsisVertical, createOutline, trashOutline,
 } from 'ionicons/icons'
 import AppHeader from '@/components/common/AppHeader.vue'
 import LoadingState from '@/components/common/LoadingState.vue'
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useVideoStore } from '@/stores/video'
 import { useUIStore } from '@/stores/ui'
@@ -19,6 +21,8 @@ import { gradeColor, gradeTextColor } from '@/utils/gradeColor'
 import type { Comment } from '@/types/api'
 import AIResultBadge from '@/components/video/AIResultBadge.vue'
 import AIFeedbackModal from '@/components/video/AIFeedbackModal.vue'
+import VideoPlayer from '@/components/video/VideoPlayer.vue'
+import VideoEditModal from '@/components/video/VideoEditModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -29,6 +33,10 @@ const isDesktop = useMediaQuery('(min-width: 1024px)')
 const videoId = route.params.id as string
 const isLoading = ref(true)
 const showFeedbackModal = ref(false)
+const showActionSheet = ref(false)
+const showDeleteDialog = ref(false)
+const showEditModal = ref(false)
+const isDeleting = ref(false)
 
 const video = computed(() => videoStore.currentVideo)
 
@@ -115,6 +123,31 @@ async function retryAnalysis() {
   }
 }
 
+async function onEditSave(payload: { title: string | null; description: string | null; isPublic: boolean }) {
+  try {
+    await videoStore.updateVideo(videoId, payload)
+    showEditModal.value = false
+    uiStore.showToast('영상 정보를 수정했어요.')
+  } catch (err) {
+    if (import.meta.env.DEV) console.error('[onEditSave]', err)
+    uiStore.showToast('수정에 실패했어요.', 'danger')
+  }
+}
+
+async function onDeleteConfirm() {
+  if (isDeleting.value) return
+  isDeleting.value = true
+  try {
+    await videoStore.deleteVideo(videoId)
+    uiStore.showToast('영상을 삭제했어요.')
+    router.replace('/my')
+  } catch {
+    uiStore.showToast('삭제에 실패했어요.', 'danger')
+  } finally {
+    isDeleting.value = false
+  }
+}
+
 function formatTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
   const min = Math.floor(diff / 60000)
@@ -145,7 +178,13 @@ onMounted(async () => {
 
 <template>
   <IonPage>
-    <AppHeader title="내 영상" />
+    <AppHeader title="내 영상">
+      <template #action>
+        <button class="more-btn" aria-label="더보기" @click="showActionSheet = true">
+          <IonIcon :icon="ellipsisVertical" />
+        </button>
+      </template>
+    </AppHeader>
 
     <IonContent>
       <div v-if="isLoading" class="page-skeleton page-padding">
@@ -153,17 +192,14 @@ onMounted(async () => {
         <LoadingState variant="list" :count="3" />
       </div>
 
-      <div v-else-if="video" class="video-detail-layout">
+      <div v-else-if="video" class="video-detail-layout reveal-on-load">
         <!-- ── 영상 플레이어 ──────────────────────── -->
         <div class="video-pane">
           <div class="video-wrap">
-            <video
+            <VideoPlayer
               v-if="video.streamingUrl"
               :src="video.streamingUrl"
-              controls
-              playsinline
-              class="video-player"
-              :aria-label="`${video.user.nickname}의 클라이밍 영상`"
+              :ariaLabel="`${video.user.nickname}의 클라이밍 영상`"
             />
             <div v-else class="video-placeholder">
               <span class="placeholder-text">
@@ -353,10 +389,111 @@ onMounted(async () => {
       :is-dynamic="video.analysis.isDynamic ?? null"
       @close="showFeedbackModal = false"
     />
+
+    <!-- 수정 / 삭제 선택 -->
+    <IonModal
+      class="options-modal"
+      :is-open="showActionSheet"
+      :initial-breakpoint="1"
+      :breakpoints="[0, 1]"
+      @did-dismiss="showActionSheet = false"
+    >
+      <div class="options-sheet">
+        <div class="options-grabber" aria-hidden="true" />
+        <p class="options-label micro-label">영상 관리</p>
+        <button
+          class="option-row"
+          aria-label="영상 수정"
+          @click="showActionSheet = false; showEditModal = true"
+        >
+          <IonIcon :icon="createOutline" aria-hidden="true" />
+          <span>수정</span>
+        </button>
+        <button
+          class="option-row option-row--danger"
+          aria-label="영상 삭제"
+          @click="showActionSheet = false; showDeleteDialog = true"
+        >
+          <IonIcon :icon="trashOutline" aria-hidden="true" />
+          <span>삭제</span>
+        </button>
+      </div>
+    </IonModal>
+
+    <!-- 삭제 확인 -->
+    <ConfirmDialog
+      :open="showDeleteDialog"
+      title="영상 삭제"
+      message="삭제하면 복구할 수 없어요."
+      confirm-text="삭제"
+      cancel-text="취소"
+      danger
+      @confirm="showDeleteDialog = false; onDeleteConfirm()"
+      @cancel="showDeleteDialog = false"
+    />
+
+    <!-- 수정 모달 -->
+    <VideoEditModal
+      :open="showEditModal"
+      :video="video"
+      @save="onEditSave"
+      @cancel="showEditModal = false"
+    />
   </IonPage>
 </template>
 
 <style scoped>
+.more-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--fg);
+  font-size: 22px;
+  display: grid;
+  place-items: center;
+  padding: 6px;
+  width: 44px;
+  height: 44px;
+}
+
+/* ── 영상 관리 옵션 시트 ──────────────────────────── */
+.options-modal {
+  --border-radius: var(--r-sheet);
+  --height: auto;
+}
+.options-sheet {
+  background: var(--bg);
+  padding: 10px 0 calc(20px + env(safe-area-inset-bottom));
+}
+.options-grabber {
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border);
+  margin: 0 auto 16px;
+}
+.options-label {
+  padding: 0 22px 8px;
+  margin: 0;
+}
+.option-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 16px 22px;
+  background: none;
+  border: none;
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  font-weight: var(--w-semibold);
+  color: var(--fg);
+  cursor: pointer;
+  text-align: left;
+}
+.option-row ion-icon { font-size: 20px; flex-shrink: 0; }
+.option-row--danger { color: var(--hold-pink); }
+
 .page-skeleton {
   display: flex;
   flex-direction: column;
@@ -412,12 +549,6 @@ onMounted(async () => {
   display: grid;
   place-items: center;
   overflow: hidden;
-}
-.video-player {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
 }
 .video-placeholder {
   width: 100%;

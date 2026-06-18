@@ -107,7 +107,7 @@ onMounted(() => load(true));
         :title="tab === 'followers' ? '팔로워가 없어요' : '팔로잉이 없어요'"
       />
 
-      <ul v-else class="user-list">
+      <ul v-else class="user-list reveal-on-load">
         <li v-for="u in items" :key="u.id">
           <UserListItem :id="u.id" :nickname="u.nickname" :profile-image-url="u.profileImageUrl">
             <template v-if="u.id !== myId" #action>

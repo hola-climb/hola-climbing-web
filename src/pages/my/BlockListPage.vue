@@ -83,7 +83,7 @@ onMounted(() => load(true));
         title="차단한 사용자가 없어요"
       />
 
-      <ul v-else class="user-list">
+      <ul v-else class="user-list reveal-on-load">
         <li v-for="u in items" :key="u.id">
           <UserListItem :id="u.id" :nickname="u.nickname" :profile-image-url="u.profileImageUrl">
             <template #action>

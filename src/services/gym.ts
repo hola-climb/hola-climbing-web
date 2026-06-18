@@ -1,5 +1,5 @@
 import api from "./client";
-import type { FeedVideo, Gym, GymDetail, GymGrade, GymPhoto, GymReview, OperatingHours, PageResponse, RawRecommendedVideo, Video } from "@/types/api";
+import type { FeedVideo, Gym, GymDetail, GymGrade, GymPhoto, GymReview, OperatingHours, PageResponse, RawRecommendedVideo, RecommendedGym, Video } from "@/types/api";
 import { resolveUser, resolveUsers } from "./userResolver";
 
 export interface BoardPost {
@@ -72,6 +72,12 @@ interface RawGymSummary {
   isFavorited?: boolean;
 }
 
+interface RawRecommendedGym extends RawGymSummary {
+  distanceKm: number;
+  rankingDistance?: number | null;
+  source: "style_match" | "nearby";
+}
+
 interface RawGymDetail extends RawGymSummary {
   description: string | null;
   phone: string | null;
@@ -113,6 +119,15 @@ function toOperatingHours(bh: Record<string, RawDayHours | null> | null): Operat
     } else out[d] = null;
   }
   return any ? out : null;
+}
+
+function toRecommendedGym(raw: RawRecommendedGym): RecommendedGym {
+  return {
+    ...toGym(raw),
+    distanceKm: raw.distanceKm != null ? Number(raw.distanceKm) : null,
+    source: raw.source,
+    rankingDistance: raw.rankingDistance != null ? Number(raw.rankingDistance) : null,
+  };
 }
 
 function toGymDetail(raw: RawGymDetail): GymDetail {
@@ -214,7 +229,8 @@ export const gymService = {
 
   deleteBoardPost: (boardId: string) => api.delete(`/gyms/board/${boardId}`),
 
-  // ── Recommendations ───────────────────────────────────────────────────────
+  // ── Recommendations (인증 필요 · 좌표 기반 개인화 추천) ──────────────────────
 
-  getRecommended: (limit = 10) => api.get<RawGymSummary[]>("/recommendations/gyms", { params: { limit } }).then((res) => ({ ...res, data: res.data.map(toGym) })) as Promise<{ data: Gym[] }>,
+  getRecommendations: (params: { lat: number; lng: number; radius?: number; size?: number }) =>
+    api.get<RawRecommendedGym[]>("/recommendations/gyms", { params }).then((res) => ({ ...res, data: res.data.map(toRecommendedGym) })) as Promise<{ data: RecommendedGym[] }>,
 };

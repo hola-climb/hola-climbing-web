@@ -207,7 +207,7 @@ function openVideo(id: string) {
         <LoadingState variant="list" :count="3" />
       </div>
 
-      <div v-else-if="gym" class="gym-detail page-padding">
+      <div v-else-if="gym" class="gym-detail page-padding reveal-on-load">
         <!-- Header -->
         <div class="gym-header hola-card">
           <div class="gym-logo-wrap">

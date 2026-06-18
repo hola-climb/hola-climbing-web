@@ -190,6 +190,13 @@ export interface RegisterVideoPayload {
   isPublic: boolean;
 }
 
+/** PATCH /api/videos/{id} 요청 바디 — 수정 가능한 필드만 */
+export interface UpdateVideoPayload {
+  title?: string | null;
+  description?: string | null;
+  isPublic?: boolean;
+}
+
 /** POST /api/videos/thumbnail 응답 */
 export interface ThumbnailUploadResponse {
   thumbnailPath: string;
@@ -389,6 +396,12 @@ export interface GymDetail extends Gym {
   photos: string[];
   videoCount: number;
   businessHours: string | null;
+}
+
+/** GET /api/recommendations/gyms — backend RecommendedGymResponse (+ distance/style fields) */
+export interface RecommendedGym extends Gym {
+  source: "style_match" | "nearby";
+  rankingDistance: number | null; // pgvector cosine distance, style ranking 불가 시 null
 }
 
 /** GET /api/gyms/{id}/photos — backend GymPhotoResponse */

@@ -455,7 +455,7 @@ onMounted(load);
             </div>
 
             <!-- Calendar cells -->
-            <div v-else class="cal-grid">
+            <div v-else class="cal-grid reveal-on-load">
               <button
                 v-for="cell in calendarCells"
                 :key="cell.date"
@@ -493,7 +493,7 @@ onMounted(load);
           <!-- Desktop detail header (date label) -->
           <template v-else>
             <div v-if="isDesktop" class="detail-date-head page-padding">{{ selectedDateLabel }}</div>
-            <div class="sessions page-padding">
+            <div class="sessions page-padding reveal-on-load">
               <div v-for="session in selectedSessions" :key="session.key" class="session-group">
                 <!-- Session header -->
                 <div class="session-header">
@@ -543,7 +543,7 @@ onMounted(load);
                 <!-- Video thumbnails -->
                 <div v-if="session.videos.length" class="video-row">
                   <button v-for="v in session.videos" :key="v.id" class="video-thumb" :aria-label="v.title ?? '클라이밍 영상'" @click="router.push(`/my/videos/${v.id}`)">
-                    <VideoThumbnail :thumbnail-url="v.thumbnailUrl" :grade="v.grade" :title="v.title" :alt="v.title ?? ''" />
+                    <VideoThumbnail :thumbnail-url="v.thumbnailUrl" :grade="v.grade" :title="v.title" :alt="v.title ?? ''" :duration-seconds="v.durationSeconds" />
                   </button>
                 </div>
               </div>
@@ -924,8 +924,8 @@ onMounted(load);
 }
 .video-thumb {
   flex: 0 0 auto;
-  width: 100px;
-  height: 100px;
+  width: 96px;
+  aspect-ratio: 9 / 16;
   border-radius: 12px;
   overflow: hidden;
   position: relative;

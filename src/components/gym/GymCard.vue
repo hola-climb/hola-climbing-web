@@ -8,7 +8,7 @@ import { useRouter } from "vue-router";
 import HoldPebble from "@/components/common/HoldPebble.vue";
 import AppIcon from "@/components/common/AppIcon.vue";
 
-const props = defineProps<{ gym: Gym; selectable?: boolean }>();
+const props = defineProps<{ gym: Gym; selectable?: boolean; source?: string }>();
 const emit = defineEmits<{ (e: "select", gym: Gym): void }>();
 
 const gymStore = useGymStore();
@@ -71,23 +71,30 @@ function openDetail() {
       <div class="gym-sub">
         {{ gym.address.split(" ").slice(0, 2).join(" ") }}
         <template v-if="gym.distanceKm !== null">· {{ gym.distanceKm.toFixed(1) }}km</template>
-        <template v-if="gym.ratingAvg"> · <span class="rating-inline"><AppIcon name="star" :size="11" /> {{ gym.ratingAvg.toFixed(1) }}</span></template>
+        <template v-if="gym.ratingAvg">
+          ·
+          <span class="rating-inline">
+            <AppIcon name="star" :size="11" />
+            {{ gym.ratingAvg.toFixed(1) }}
+          </span>
+        </template>
       </div>
       <div class="chip-row">
+        <span v-if="source === 'style_match'" class="chip chip-cyan">맞춤</span>
         <span class="chip" :class="isOpen ? 'chip-lime' : 'chip-dark'">
           {{ isOpen ? "OPEN" : "CLOSED" }}
         </span>
-        <span v-if="showAiBeta" class="chip chip-cyan">AI BETA</span>
+        <!-- <span v-if="showAiBeta" class="chip chip-cyan">AI BETA</span> -->
       </div>
     </div>
 
     <!-- Chevron / favorite -->
-    <button class="fav-btn" @click="handleFavorite" :aria-label="gym.isFavorited ? '즐겨찾기 해제' : '즐겨찾기 추가'">
-      <!-- chevron right icon -->
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-        <path d="m9 5 7 7-7 7" />
-      </svg>
-    </button>
+    <!-- <button class="fav-btn" @click="handleFavorite" :aria-label="gym.isFavorited ? '즐겨찾기 해제' : '즐겨찾기 추가'"> -->
+    <!-- chevron right icon -->
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="m9 5 7 7-7 7" />
+    </svg>
+    <!-- </button> -->
   </div>
 </template>
 
