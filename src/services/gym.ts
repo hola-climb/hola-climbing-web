@@ -1,5 +1,5 @@
 import api from "./client";
-import type { FeedVideo, Gym, GymDetail, GymGrade, GymReview, OperatingHours, PageResponse, RawRecommendedVideo, RecommendedGym, Video } from "@/types/api";
+import type { BusinessHours, FeedVideo, Gym, GymDetail, GymGrade, GymReview, PageResponse, RawRecommendedVideo, RecommendedGym, Video } from "@/types/api";
 import { resolveUser, resolveUsers } from "./userResolver";
 
 export interface BoardPost {
@@ -60,6 +60,7 @@ interface RawGymSummary {
   lng?: number | null;
   distanceKm?: number | null;
   isFavorited?: boolean;
+  businessHours?: Record<string, RawDayHours | null> | null;
 }
 
 interface RawRecommendedGym extends RawGymSummary {
@@ -89,25 +90,21 @@ function toGym(raw: RawGymSummary): Gym {
     ratingCount: raw.ratingCount ?? 0,
     distanceKm: raw.distanceKm != null ? Number(raw.distanceKm) : null,
     isFavorited: raw.isFavorited ?? false,
+    businessHours: toBusinessHours(raw.businessHours),
   };
 }
 
-/** Map backend businessHours Map → client OperatingHours ("09:00 - 22:00" | null) */
-function toOperatingHours(bh: Record<string, RawDayHours | null> | null): OperatingHours | null {
+function toBusinessHours(bh: Record<string, RawDayHours | null> | null | undefined): BusinessHours | null {
   if (!bh) return null;
   const norm: Record<string, RawDayHours | null> = {};
   for (const [k, v] of Object.entries(bh)) norm[k.toLowerCase().slice(0, 3)] = v;
   const days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
-  const out = {} as OperatingHours;
-  let any = false;
+  const out = {} as BusinessHours;
   for (const d of days) {
     const v = norm[d];
-    if (v && v.open && v.close) {
-      out[d] = `${v.open} - ${v.close}`;
-      any = true;
-    } else out[d] = null;
+    out[d] = v && v.open && v.close ? { open: v.open, close: v.close } : null;
   }
-  return any ? out : null;
+  return out;
 }
 
 function toRecommendedGym(raw: RawRecommendedGym): RecommendedGym {
@@ -125,8 +122,6 @@ function toGymDetail(raw: RawGymDetail): GymDetail {
     phone: raw.phone ?? null,
     description: raw.description ?? null,
     videoCount: 0,
-    businessHours: null,
-    operatingHours: toOperatingHours(raw.businessHours),
   };
 }
 
@@ -165,7 +160,7 @@ export const gymService = {
         content: data.content.map((r) => ({
           id: String(r.id),
           gymId: String(r.gymId),
-          user: userMap.get(String(r.userId)) ?? { id: String(r.userId), nickname: "사용자", profileImageUrl: null },
+          user: userMap.get(String(r.userId)) ?? { id: String(r.userId), nickname: "사용자", profileImage: null },
           rating: r.rating,
           content: r.content,
           createdAt: r.createdAt,

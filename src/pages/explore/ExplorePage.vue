@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { IonPage, IonHeader, IonToolbar, IonContent, IonRefresher, IonRefresherContent, IonSpinner, IonInfiniteScroll, IonInfiniteScrollContent } from "@ionic/vue";
 import { useRouter } from "vue-router";
 import { useGymStore } from "@/stores/gym";
@@ -35,6 +35,18 @@ function openGym(gym: Gym) {
     router.push(`/gyms/${gym.id}`);
   }
 }
+
+// 데스크톱 2-pane에서 상세(채팅 포함)를 열어둔 채 창을 좁히면 detail-pane이
+// v-if로 언마운트된다. 모바일 레이아웃으로 전환되는 순간 선택된 암장을 상세
+// 라우트로 넘겨 상세 화면을 유지한다. 열려 있던 채팅은 chatStore가 보존하므로
+// 새로 마운트된 상세 뷰에서 끊김 없이 그대로 이어진다.
+watch(isDesktop, (desktop) => {
+  if (!desktop && selectedGymId.value) {
+    const id = selectedGymId.value;
+    selectedGymId.value = null;
+    router.push(`/gyms/${id}`);
+  }
+});
 
 // Location state
 const nearbyGyms = ref<Gym[]>([]);

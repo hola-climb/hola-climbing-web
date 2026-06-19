@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from "vue";
 import { IonPage, IonContent, IonInput, IonCheckbox, IonIcon } from "@ionic/vue";
 import { chevronBackOutline } from "ionicons/icons";
 import BaseButton from "@/components/common/BaseButton.vue";
+import TermViewModal from "@/components/common/TermViewModal.vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useUIStore } from "@/stores/ui";
@@ -57,6 +58,9 @@ async function checkEmailAvailability() {
 // Active terms loaded from API. agreed map keyed by termId.
 const terms = ref<Term[]>([]);
 const agreed = ref<Record<number, boolean>>({});
+
+// '보기'로 펼쳐 볼 약관. null 이면 모달 닫힘.
+const viewingTerm = ref<Term | null>(null);
 
 const allRequiredAgreed = computed(() => terms.value.filter((t) => t.required).every((t) => agreed.value[t.termId]));
 
@@ -169,6 +173,7 @@ onMounted(loadTerms);
             <div v-for="term in terms" :key="term.termId" class="terms-row">
               <IonCheckbox v-model="agreed[term.termId]" />
               <span class="terms-text">({{ term.required ? "필수" : "선택" }}) {{ term.title }}</span>
+              <button type="button" class="terms-view" :aria-label="`${term.title} 약관 보기`" @click="viewingTerm = term">보기</button>
             </div>
           </div>
 
@@ -180,6 +185,8 @@ onMounted(loadTerms);
           <button class="footer-link" @click="router.push('/auth/login')">로그인</button>
         </div>
       </div>
+
+      <TermViewModal :term="viewingTerm" @close="viewingTerm = null" />
     </IonContent>
   </IonPage>
 </template>
@@ -278,6 +285,20 @@ onMounted(loadTerms);
 .terms-text {
   font-size: var(--fs-caption);
   line-height: 1.4;
+}
+.terms-view {
+  margin-left: auto;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 4px 2px;
+  font-family: var(--font-sans);
+  font-size: var(--fs-caption);
+  font-weight: var(--w-semibold);
+  color: var(--fg-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
 }
 
 .submit-btn {

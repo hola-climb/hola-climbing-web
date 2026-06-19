@@ -45,6 +45,8 @@ function toFeedVideo(raw: RawRecommendedVideo): FeedVideo {
 interface RawVideoDetail {
   id: number;
   userId: number;
+  nickname?: string | null; // 작성자 닉네임 (백엔드가 내려줄 때만 존재)
+  profileImage?: string | null; // 작성자 프로필 이미지 signed URL
   gymId: number | null;
   title: string | null;
   description: string | null;
@@ -78,25 +80,25 @@ interface RawComment {
 }
 
 // Shared author-profile cache so comment lists don't refetch the same user.
-const userCache = new Map<string, { id: string; nickname: string; profileImageUrl: string | null }>();
+const userCache = new Map<string, { id: string; nickname: string; profileImage: string | null }>();
 
-async function resolveUser(userId: string): Promise<{ id: string; nickname: string; profileImageUrl: string | null }> {
+async function resolveUser(userId: string): Promise<{ id: string; nickname: string; profileImage: string | null }> {
   if (userCache.has(userId)) return userCache.get(userId)!;
   try {
     const { data } = await api.get<{ userId?: number; id?: number; nickname: string; profileImage?: string | null; profileImageUrl?: string | null }>(`/users/${userId}`);
     const user = {
       id: String(data.id ?? data.userId ?? userId),
       nickname: data.nickname ?? "사용자",
-      profileImageUrl: data.profileImageUrl ?? data.profileImage ?? null,
+      profileImage: data.profileImage ?? data.profileImageUrl ?? null,
     };
     userCache.set(userId, user);
     return user;
   } catch {
-    return { id: userId, nickname: "사용자", profileImageUrl: null };
+    return { id: userId, nickname: "사용자", profileImage: null };
   }
 }
 
-function toComment(raw: RawComment, user: { id: string; nickname: string; profileImageUrl: string | null }): Comment {
+function toComment(raw: RawComment, user: { id: string; nickname: string; profileImage: string | null }): Comment {
   return {
     id: String(raw.id),
     videoId: String(raw.videoId),
@@ -133,10 +135,10 @@ export const videoService = {
       userRes.status === "fulfilled"
         ? {
             id: String(userRes.value.data.id ?? userRes.value.data.userId ?? raw.userId),
-            nickname: userRes.value.data.nickname ?? "사용자",
-            profileImageUrl: userRes.value.data.profileImageUrl ?? userRes.value.data.profileImage ?? null,
+            nickname: raw.nickname ?? userRes.value.data.nickname ?? "사용자",
+            profileImage: raw.profileImage ?? userRes.value.data.profileImage ?? userRes.value.data.profileImageUrl ?? null,
           }
-        : { id: String(raw.userId), nickname: "사용자", profileImageUrl: null };
+        : { id: String(raw.userId), nickname: raw.nickname ?? "사용자", profileImage: raw.profileImage ?? null };
 
     const gym = gymRes.status === "fulfilled" ? { id: String(gymRes.value.data.id), name: gymRes.value.data.name } : null;
 
@@ -288,17 +290,24 @@ export const videoService = {
     return data.content.map((raw) => toFeedVideo({ ...raw, source: "my" }));
   },
 
-  /** 사용자 공개 영상 목록 — GET /api/users/{userId}/videos (offset).
+  /** 사용자 공개 영상 목록 — GET /api/videos?userId={id}&size={size}.
    *  VideoSummaryResponse → Video (작성자 해석, 표시용 기본값 채움). */
   getUserVideos: async (userId: string, params?: { page?: number; size?: number }): Promise<{ data: PageResponse<Video> }> => {
-    const { data } = await api.get<PageResponse<Omit<RawRecommendedVideo, "source">>>(`/users/${userId}/videos`, { params });
-    const user = await resolveUser(userId);
+    const { data } = await api.get<PageResponse<Omit<RawRecommendedVideo, "source">>>("/videos", {
+      params: { userId, size: params?.size },
+    });
+    const resolved = await resolveUser(userId);
     return {
       data: {
         ...data,
         content: data.content.map((raw) => ({
           id: String(raw.id),
-          user,
+          // 목록 응답이 작성자 프로필을 내려주면 우선 사용, 없으면 resolveUser 결과로 보강
+          user: {
+            id: resolved.id,
+            nickname: raw.nickname ?? resolved.nickname,
+            profileImage: raw.profileImage ?? resolved.profileImage,
+          },
           title: raw.title,
           gymGrade: raw.gymGrade ?? null,
           gymName: raw.gymName ?? null,
@@ -409,7 +418,7 @@ export const videoService = {
     return {
       data: {
         ...data,
-        content: data.content.map((c) => toComment(c, userMap.get(String(c.userId)) ?? { id: String(c.userId), nickname: "사용자", profileImageUrl: null })),
+        content: data.content.map((c) => toComment(c, userMap.get(String(c.userId)) ?? { id: String(c.userId), nickname: "사용자", profileImage: null })),
       },
     };
   },

@@ -31,7 +31,7 @@ export const chatService = {
       data: {
         ...data,
         content: data.content.map((m) =>
-          toChatMessage(m, userMap.get(String(m.userId)) ?? { id: String(m.userId), nickname: '사용자', profileImageUrl: null }),
+          toChatMessage(m, userMap.get(String(m.userId)) ?? { id: String(m.userId), nickname: '사용자', profileImage: null }),
         ),
       },
     }

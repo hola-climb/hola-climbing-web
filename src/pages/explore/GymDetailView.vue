@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // imports → state → computed → methods → lifecycle
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, onUnmounted } from 'vue'
 import {
   IonContent, IonIcon,
   IonSpinner, IonModal,
@@ -19,10 +19,10 @@ import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 import { gymService } from '@/services/gym'
 import { chatService } from '@/services/chat'
-import { useGymChat } from '@/composables/useGymChat'
+import { useChatStore } from '@/stores/chat'
 import { gradeColor, gradeTextColor } from '@/utils/gradeColor'
 import VideoThumbnail from '@/components/video/VideoThumbnail.vue'
-import type { GymReview, FeedVideo, ChatMessage } from '@/types/api'
+import type { GymReview, FeedVideo, ChatMessage, BusinessHours } from '@/types/api'
 
 const props = defineProps<{ gymId: string }>()
 
@@ -30,6 +30,7 @@ const router = useRouter()
 const gymStore = useGymStore()
 const authStore = useAuthStore()
 const uiStore = useUIStore()
+const chatStore = useChatStore()
 
 const gymId = props.gymId
 const isLoading = ref(true)
@@ -54,10 +55,12 @@ const avgRating = computed(() => gym.value?.ratingAvg ?? null)
 const reviewCount = computed(() => reviews.value.length || gym.value?.ratingCount || 0)
 
 // ── Chat ───────────────────────────────────────────
-const chat = useGymChat(gymId)
-const showChat = ref(false)
-const chatInput = ref('')
-const isJoining = ref(false)
+// 채팅 상태(모달 노출·메시지·소켓)는 chatStore가 보유한다. 컴포넌트가
+// 리사이즈로 언마운트/리마운트돼도 채팅이 끊기지 않게 하기 위함이다.
+// showChat은 "이 암장"의 채팅이 열려 있을 때만 true.
+const showChat = computed(() => chatStore.showChat && chatStore.activeGymId === gymId)
+// 언마운트로 인한 모달 dismiss를 사용자의 '나가기'와 구분하기 위한 플래그.
+let unmounting = false
 
 function formatTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
@@ -82,6 +85,9 @@ async function loadSections() {
 }
 
 onMounted(async () => {
+  // 이 뷰가 해당 암장 채팅의 '시청자'임을 등록 — 리마운트 핸드오프 동안
+  // 소켓이 유지되도록 한다.
+  chatStore.retainView(gymId)
   try {
     await gymStore.fetchGym(gymId)
     loadSections()
@@ -92,7 +98,10 @@ onMounted(async () => {
   }
 })
 
-onUnmounted(() => chat.disconnect())
+onBeforeUnmount(() => { unmounting = true })
+
+// 시청자 해제 — 같은 암장 뷰가 곧바로 다시 마운트되지 않으면 소켓을 정리한다.
+onUnmounted(() => chatStore.releaseView(gymId))
 
 // ── Actions ────────────────────────────────────────
 async function handleFavorite() {
@@ -139,48 +148,35 @@ async function enterChat() {
   if (!authStore.isAuthenticated) { uiStore.openLoginSheet(); return }
   const token = localStorage.getItem('access_token')
   if (!token) { uiStore.openLoginSheet(); return }
-  isJoining.value = true
   try {
-    // Joining the room is the only hard requirement to "enter".
-    await chatService.joinRoom(gymId)
-
-    // History is best-effort — a failure here shouldn't block entry.
-    try {
-      const { data } = await chatService.getMessages(gymId, { page: 0, size: 30 })
-      chat.messages.value = [...data.content].reverse()
-    } catch (e) {
-      if (import.meta.env.DEV) console.error('[chat] history load failed', e)
-      chat.messages.value = []
-    }
-
-    showChat.value = true
-    // Live WS connection is best-effort; status badge reflects connect result.
-    try {
-      chat.connect(token)
-    } catch (e) {
-      if (import.meta.env.DEV) console.error('[chat] ws connect failed', e)
-    }
+    // 입장(join)·이력·소켓 연결 오케스트레이션은 스토어가 담당한다.
+    // join 실패만 throw되며, 그 외(이력/연결)는 best-effort.
+    await chatStore.enterRoom(gymId, token)
   } catch (e: unknown) {
     if (import.meta.env.DEV) console.error('[chat] join failed', e)
     const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message
     uiStore.showToast(msg ?? '채팅방 입장에 실패했어요.', 'danger')
-  } finally {
-    isJoining.value = false
   }
 }
 
 function leaveChat() {
-  showChat.value = false
-  chat.disconnect()
+  chatStore.leaveRoom()
+}
+
+// IonModal의 did-dismiss: 사용자가 직접 닫았을 때만 '나가기'로 처리하고,
+// 컴포넌트 언마운트로 인한 dismiss는 무시한다(소켓 핸드오프 보존).
+function onChatDismiss() {
+  if (unmounting) return
+  leaveChat()
 }
 
 function sendChat(e?: KeyboardEvent | MouseEvent) {
   // Korean IME: keydown.enter fires during composition — ignore those.
   if ((e as KeyboardEvent)?.isComposing) return
-  const content = chatInput.value.trim()
+  const content = chatStore.draft.trim()
   if (!content) return
-  chat.sendMessage(content)
-  chatInput.value = ''
+  chatStore.sendMessage(content)
+  chatStore.draft = ''
 }
 
 function openVideo(id: string) {
@@ -280,10 +276,14 @@ function openVideo(id: string) {
             <IonIcon :icon="timeOutline" aria-hidden="true" />
             운영 시간
           </div>
-          <div v-if="gym.operatingHours" class="hours-grid">
+          <div v-if="gym.businessHours" class="hours-grid">
             <template v-for="(koreanLabel, dayKey) in DAY_LABELS" :key="dayKey">
               <span class="dow-label">{{ koreanLabel }}</span>
-              <span class="hours-val">{{ (gym.operatingHours as Record<string, string | null>)[dayKey] ?? '정보 없음' }}</span>
+              <span class="hours-val">
+                {{ gym.businessHours[dayKey as keyof BusinessHours]
+                  ? `${gym.businessHours[dayKey as keyof BusinessHours]!.open} - ${gym.businessHours[dayKey as keyof BusinessHours]!.close}`
+                  : '휴무' }}
+              </span>
             </template>
           </div>
           <p v-else class="no-info">정보 없음</p>
@@ -329,7 +329,7 @@ function openVideo(id: string) {
           <div class="section-head">
             <div class="section-title">실시간 채팅</div>
             <button class="see-all" @click="enterChat">
-              <IonSpinner v-if="isJoining" name="crescent" class="btn-spinner" />
+              <IonSpinner v-if="chatStore.isJoining" name="crescent" class="btn-spinner" />
               <span v-else>입장</span>
             </button>
           </div>
@@ -373,18 +373,18 @@ function openVideo(id: string) {
     </IonModal>
 
     <!-- Live chat modal -->
-    <IonModal :is-open="showChat" @did-dismiss="leaveChat">
+    <IonModal :is-open="showChat" @did-dismiss="onChatDismiss">
       <AppHeader :title="gym?.name ?? '채팅'" back-icon="close" @back="leaveChat">
         <template #action>
-          <span class="chat-status" :class="chat.status.value">
-            {{ chat.status.value === 'connected' ? '● 실시간' : chat.status.value === 'connecting' ? '연결 중' : '오프라인' }}
+          <span class="chat-status" :class="chatStore.status">
+            {{ chatStore.status === 'connected' ? '● 실시간' : chatStore.status === 'connecting' ? '연결 중' : '오프라인' }}
           </span>
         </template>
       </AppHeader>
       <IonContent>
         <div class="chat-log page-padding">
           <div
-            v-for="m in chat.messages.value"
+            v-for="m in chatStore.messages"
             :key="m.id"
             class="chat-msg"
             :class="{ mine: authStore.user && m.user.id === authStore.user.id }"
@@ -402,14 +402,14 @@ function openVideo(id: string) {
       </IonContent>
       <div class="chat-bar">
         <input
-          v-model="chatInput"
+          v-model="chatStore.draft"
           class="chat-input"
           type="text"
           placeholder="메시지 입력"
           aria-label="메시지 입력"
           @keydown.enter="sendChat($event)"
         />
-        <button class="chat-send" :disabled="!chatInput.trim()" aria-label="전송" @click="sendChat">
+        <button class="chat-send" :disabled="!chatStore.draft.trim()" aria-label="전송" @click="sendChat">
           <IonIcon :icon="sendOutline" />
         </button>
       </div>

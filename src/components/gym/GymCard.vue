@@ -25,23 +25,15 @@ const holdColor = computed(() => {
 const isOpen = computed(() => {
   const days = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
   const today = days[new Date().getDay()];
-
-  if (props.gym.businessHours) {
-    const slot = props.gym.businessHours[today];
-    if (!slot) return false;
-    const now = new Date();
-    const [oh, om] = slot.open.split(":").map(Number);
-    const [ch, cm] = slot.close.split(":").map(Number);
-    const nowMin = now.getHours() * 60 + now.getMinutes();
-    return nowMin >= oh * 60 + om && nowMin < ch * 60 + cm;
-  }
-
-  if (props.gym.operatingHours) {
-    const hours = props.gym.operatingHours[today];
-    return !!hours && hours !== "정기 휴무";
-  }
-
-  return true;
+  const bh = props.gym.businessHours;
+  if (!bh) return true;
+  const slot = bh[today];
+  if (!slot) return false;
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const [oh, om] = slot.open.split(":").map(Number);
+  const [ch, cm] = slot.close.split(":").map(Number);
+  return nowMin >= oh * 60 + om && nowMin < ch * 60 + cm;
 });
 
 // Show AI BETA for highly-rated gyms
@@ -90,13 +82,13 @@ function openDetail() {
           </span>
         </template>
       </div>
-      <div class="chip-row">
+      <!-- <div class="chip-row">
         <span v-if="source === 'style_match'" class="chip chip-cyan">맞춤</span>
         <span class="chip" :class="isOpen ? 'chip-lime' : 'chip-dark'">
           {{ isOpen ? "OPEN" : "CLOSED" }}
         </span>
-        <!-- <span v-if="showAiBeta" class="chip chip-cyan">AI BETA</span> -->
-      </div>
+        <span v-if="showAiBeta" class="chip chip-cyan">AI BETA</span>
+      </div> -->
     </div>
 
     <!-- Chevron / favorite -->

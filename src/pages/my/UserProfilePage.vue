@@ -14,7 +14,7 @@ import { videoService } from '@/services/video'
 import type { Video } from '@/types/api'
 import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
-import VideoCard from '@/components/video/VideoCard.vue'
+import VideoThumbnail from '@/components/video/VideoThumbnail.vue'
 
 interface ProfileView {
   id: string
@@ -40,6 +40,15 @@ const isBlocked = ref(false)
 const showMoreSheet = ref(false)
 
 const isSelf = computed(() => authStore.user?.id === userId)
+
+function goDetail(video: Video) {
+  router.push(`/videos/${video.id}`)
+}
+
+function formatDate(iso: string) {
+  const d = new Date(iso)
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
+}
 
 const moreButtons = computed(() => [
   isBlocked.value
@@ -211,7 +220,30 @@ async function handleFollow() {
         <template v-else>
           <div class="section-title">영상</div>
           <div v-if="videos.length" class="video-grid">
-            <VideoCard v-for="video in videos" :key="video.id" :video="video" />
+            <button v-for="video in videos" :key="video.id" class="video-item" :aria-label="`${video.title ?? '제목 없음'} 영상 보기`" @click="goDetail(video)">
+              <div class="thumb-wrap">
+                <VideoThumbnail :title="video.title" :thumbnail-url="video.thumbnailUrl" :grade="video.grade" :alt="`${video.title ?? '클라이밍 영상'} 썸네일`" />
+              </div>
+              <div class="item-info">
+                <p class="item-title">{{ video.title ?? "제목 없음" }}</p>
+                <div class="item-meta">
+                  <span class="meta-stat" aria-label="조회수">
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M1 12S5 4 12 4s11 8 11 8-4 8-11 8S1 12 1 12Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                    {{ video.viewCount }}
+                  </span>
+                  <span class="meta-stat" aria-label="좋아요수">
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78Z" />
+                    </svg>
+                    {{ video.likeCount }}
+                  </span>
+                  <span class="meta-date">{{ formatDate(video.createdAt) }}</span>
+                </div>
+              </div>
+            </button>
           </div>
           <EmptyState v-else compact hold="cyan" title="공개 영상이 없어요" />
         </template>
@@ -268,6 +300,57 @@ async function handleFollow() {
 .blocked-sub { font-size: var(--fs-caption); color: var(--fg-muted); margin: 0; line-height: 1.5; }
 
 .section-title { font-size: var(--fs-h3); font-weight: var(--w-semibold); }
+
 .video-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-.empty { color: var(--fg-muted); font-size: var(--fs-caption); grid-column: 1/-1; text-align: center; padding: 40px 0; }
+@media (min-width: 600px) {
+  .video-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+.video-item {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform var(--dur-fast) var(--ease-state);
+}
+.video-item:active { transform: scale(0.97); }
+
+.thumb-wrap {
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--r-card);
+  background: var(--surface-soft);
+}
+
+.item-info { padding: 8px 2px 4px; }
+
+.item-title {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--fg);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.item-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.meta-stat {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+
+.meta-date { font-size: 11px; color: var(--fg-muted); margin-left: auto; }
 </style>

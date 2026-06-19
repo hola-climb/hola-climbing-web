@@ -6,6 +6,11 @@
 @import url("https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;700;900&display=swap");
 
 :root {
+  /* Hola is a light-only design system (no dark tokens defined). Lock the
+     color-scheme so an OS dark preference can't make the browser flip native
+     controls/UA defaults to light text on our light surfaces (white-on-white). */
+  color-scheme: light;
+
   /* ── Hola base tokens ─────────────────────────── */
   --bg: #f7f7f5;
   --surface: #ffffff;

@@ -1,7 +1,8 @@
 import { defineStore } from "pinia";
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import type { User } from "@/types/api";
 import { authService } from "@/services/auth";
+import { setObservabilityUser } from "@/services/observability";
 
 export const useAuthStore = defineStore("auth", () => {
   // state
@@ -12,6 +13,13 @@ export const useAuthStore = defineStore("auth", () => {
 
   // computed
   const isAuthenticated = computed(() => !!user.value);
+
+  // 관측 유저 컨텍스트 동기화 — 로그인/로그아웃/세션복원 모두 한 곳에서 처리.
+  // id만 전달(이메일·닉네임 등 PII 금지).
+  watch(
+    () => user.value?.id,
+    (id) => setObservabilityUser(id || undefined),
+  );
 
   // actions
   async function login(email: string, password: string) {

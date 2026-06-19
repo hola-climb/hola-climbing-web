@@ -1,6 +1,7 @@
 import axios from "axios";
 import type { AxiosInstance, InternalAxiosRequestConfig } from "axios";
 import { Capacitor } from "@capacitor/core";
+import { reportError } from "./observability";
 
 // 모든 요청과 토큰 재발급이 같은 베이스를 쓰도록 단일 상수로 관리.
 const API_BASE = Capacitor.isNativePlatform() ? import.meta.env.VITE_API_BASE_URL : "/api";
@@ -20,7 +21,14 @@ api.interceptors.response.use(
     }
     return res;
   },
-  (error) => Promise.reject(error),
+  (error) => {
+    // 4xx/5xx 추적. 헤더/바디의 토큰·개인정보는 observability beforeSend가 마스킹.
+    const status = error.response?.status;
+    if (status && status >= 400) {
+      reportError(error, { url: error.config?.url ?? "unknown", status: String(status) });
+    }
+    return Promise.reject(error);
+  },
 );
 
 // 인증이 불필요한(오히려 토큰을 붙이면 안 되는) 엔드포인트.

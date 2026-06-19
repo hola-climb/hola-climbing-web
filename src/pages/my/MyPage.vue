@@ -385,6 +385,7 @@ onMounted(load);
 
 .profile-bio {
   font-size: small;
+  font-weight: 450;
   color: #444;
   line-height: 1.5;
   margin: 4px 0 0;

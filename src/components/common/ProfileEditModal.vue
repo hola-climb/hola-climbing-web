@@ -15,10 +15,10 @@ const emit = defineEmits<{
 const authStore = useAuthStore();
 const uiStore = useUIStore();
 
-// 명세 제약 — nickname 2~20자, bio 최대 1000자, 이미지 jpg/png ≤5MB
+// 명세 제약 — nickname 2~20자, bio 최대 50자, 이미지 jpg/png ≤5MB
 const NICKNAME_MIN = 2;
 const NICKNAME_MAX = 20;
-const BIO_MAX = 1000;
+const BIO_MAX = 50;
 const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png"];
 
@@ -178,50 +178,22 @@ function onCancel() {
           <button type="button" class="ava-btn" :disabled="isSaving" @click="onPickClick">
             {{ canRemove ? "사진 변경" : "사진 추가" }}
           </button>
-          <button v-if="canRemove" type="button" class="ava-btn ava-btn--danger" :disabled="isSaving" @click="onRemoveImage">
-            삭제
-          </button>
+          <button v-if="canRemove" type="button" class="ava-btn ava-btn--danger" :disabled="isSaving" @click="onRemoveImage">삭제</button>
         </div>
-        <input
-          ref="fileInput"
-          type="file"
-          accept="image/jpeg,image/png"
-          class="file-hidden"
-          tabindex="-1"
-          aria-hidden="true"
-          @change="onFileChange"
-        />
+        <input ref="fileInput" type="file" accept="image/jpeg,image/png" class="file-hidden" tabindex="-1" aria-hidden="true" @change="onFileChange" />
       </div>
 
       <div class="field-list">
         <!-- 닉네임 -->
         <div class="field-block">
           <label class="field-label" for="profile-nickname">닉네임</label>
-          <input
-            id="profile-nickname"
-            v-model="nickname"
-            class="field-input"
-            type="text"
-            placeholder="닉네임"
-            :maxlength="NICKNAME_MAX"
-            :disabled="isSaving"
-            aria-label="닉네임"
-          />
+          <input id="profile-nickname" v-model="nickname" class="field-input" type="text" placeholder="닉네임" :maxlength="NICKNAME_MAX" :disabled="isSaving" aria-label="닉네임" />
         </div>
 
         <!-- 한줄소개 -->
         <div class="field-block">
           <label class="field-label" for="profile-bio">소개</label>
-          <textarea
-            id="profile-bio"
-            v-model="bio"
-            class="field-input field-textarea"
-            placeholder="클라이머 소개 (선택)"
-            :maxlength="BIO_MAX"
-            :disabled="isSaving"
-            aria-label="소개"
-            rows="3"
-          />
+          <textarea id="profile-bio" v-model="bio" class="field-input field-textarea" placeholder="클라이머 소개 (선택)" :maxlength="BIO_MAX" :disabled="isSaving" aria-label="소개" rows="3" />
           <span class="field-count">{{ bio.length }}/{{ BIO_MAX }}</span>
         </div>
       </div>

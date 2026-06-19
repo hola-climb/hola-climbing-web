@@ -49,7 +49,8 @@ function openProfile() {
       <div class="author-row">
         <button class="author-link" @click.stop="openProfile" :aria-label="`${video.user.nickname} 프로필 보기`">
           <div class="avatar" :aria-hidden="true">
-            {{ video.user.nickname.charAt(0).toUpperCase() }}
+            <!-- {{ video.user.nickname.charAt(0).toUpperCase() }} -->
+            <img v-if="video.user.profileImage" :src="video.user.profileImage" :alt="`${video.user.nickname ?? ''} 프로필`" class="avatar-img" />
           </div>
           <div class="author-info">
             <span class="author-name">{{ video.user.nickname }}</span>
@@ -130,6 +131,13 @@ function openProfile() {
   font-weight: 700;
   flex-shrink: 0;
 }
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .author-info {
   flex: 1;
   font-size: var(--fs-caption);

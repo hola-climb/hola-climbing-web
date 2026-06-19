@@ -25,6 +25,8 @@
     "@ffmpeg/core": "^0.12.10",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
+    "@grafana/faro-web-sdk": "^2.7.1",
+    "@grafana/faro-web-tracing": "^2.7.1",
     "@ionic/vue": "^8.0.0",
     "@ionic/vue-router": "^8.0.0",
     "@stomp/stompjs": "^7.3.0",

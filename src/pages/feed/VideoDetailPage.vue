@@ -238,7 +238,8 @@ onMounted(async () => {
               <div v-if="!isOwner" class="author-row">
                 <button class="author-link" :aria-label="`${video.user.nickname} 프로필 보기`" @click="openProfile(video.user.id)">
                   <div class="avatar" aria-hidden="true">
-                    {{ video.user.nickname.charAt(0).toUpperCase() }}
+                    <img v-if="video.user.profileImage" :src="video.user.profileImage" :alt="`${video.user.nickname} 프로필`" class="avatar-img" />
+                    <template v-else>{{ video.user.nickname.charAt(0).toUpperCase() }}</template>
                   </div>
                   <div class="author-meta">
                     <div class="author-name">{{ video.user.nickname }}</div>
@@ -569,6 +570,12 @@ onMounted(async () => {
   font-size: 15px;
   font-weight: 700;
   flex-shrink: 0;
+  overflow: hidden;
+}
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .author-meta {
   min-width: 0;

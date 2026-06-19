@@ -55,6 +55,8 @@ export interface Term {
   version: string;
   required: boolean;
   title: string;
+  /** 약관 전문 — '보기'에서 렌더링. 줄바꿈은 \n 으로 내려온다. */
+  content: string;
 }
 
 // ── Video ─────────────────────────────────────────────────────────────────────
@@ -64,7 +66,7 @@ export type AnalysisStatus = "pending" | "analyzing" | "done" | "failed";
 export interface VideoUser {
   id: string;
   nickname: string;
-  profileImageUrl: string | null;
+  profileImage: string | null;
 }
 
 export interface VideoGym {
@@ -99,6 +101,8 @@ export interface Video {
 export interface RawRecommendedVideo {
   id: number;
   userId: number;
+  nickname?: string | null; // 작성자 닉네임 (목록 응답이 내려줄 때만 존재)
+  profileImage?: string | null; // 작성자 프로필 이미지 signed URL
   gymId: number | null;
   title: string | null;
   grade?: string | null; // legacy string (older backend)
@@ -402,7 +406,6 @@ export interface RecommendedGym extends Gym {
   source: "style_match" | "nearby";
   rankingDistance: number | null; // pgvector cosine distance, style ranking 불가 시 null
 }
-
 
 /** GET /api/gyms/{id}/reviews — backend GymReviewResponse (+ resolved user) */
 export interface GymReview {

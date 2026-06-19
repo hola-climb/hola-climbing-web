@@ -22,6 +22,10 @@ import './theme/variables.css'
 import './assets/global.css'
 
 import { useAuthStore } from './stores/auth'
+import { initObservability } from './services/observability'
+
+// 부팅 단계 에러까지 잡도록 앱 생성 전에 가장 먼저 초기화 (PROD 전용)
+initObservability()
 
 const pinia = createPinia()
 const app = createApp(App).use(IonicVue).use(pinia).use(router)

@@ -18,12 +18,12 @@ export async function resolveUser(userId: string): Promise<VideoUser> {
     const user: VideoUser = {
       id: String(data.id ?? data.userId ?? userId),
       nickname: data.nickname ?? '사용자',
-      profileImageUrl: data.profileImageUrl ?? data.profileImage ?? null,
+      profileImage: data.profileImage ?? data.profileImageUrl ?? null,
     }
     userCache.set(userId, user)
     return user
   } catch {
-    return { id: userId, nickname: '사용자', profileImageUrl: null }
+    return { id: userId, nickname: '사용자', profileImage: null }
   }
 }
 
