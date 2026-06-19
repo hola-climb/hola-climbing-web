@@ -98,7 +98,7 @@ const routes: Array<RouteRecordRaw> = [
   // ── My video detail (내 영상 + AI 분석) ──────────────────────────────────
   {
     path: '/my/videos/:id',
-    component: () => import('@/pages/my/MyVideoDetailPage.vue'),
+    component: () => import('@/pages/feed/VideoDetailPage.vue'),
     meta: { requiresAuth: true },
   },
 

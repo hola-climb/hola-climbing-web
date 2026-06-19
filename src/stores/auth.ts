@@ -67,38 +67,44 @@ export const useAuthStore = defineStore("auth", () => {
     initPromise = null; // allow re-init on next login
   }
 
+  // Backend MyProfileResponse uses userId/profileImage; map to client User.
+  // Shared by fetchMe / updateProfile / profile-image actions so every write
+  // goes through the same shape (otherwise id·profileImageUrl get dropped).
+  function _mapMyProfile(data: unknown): User {
+    const raw = data as {
+      userId?: string | number;
+      id?: string;
+      email: string;
+      nickname: string;
+      profileImage?: string | null;
+      profileImageUrl?: string | null;
+      bio?: string | null;
+      emailVerified?: boolean;
+      followerCount?: number;
+      followingCount?: number;
+      videoCount?: number;
+      createdAt: string;
+      role?: "USER" | "ADMIN";
+    };
+    return {
+      id: String(raw.id ?? raw.userId ?? ""),
+      email: raw.email,
+      nickname: raw.nickname,
+      profileImageUrl: raw.profileImageUrl ?? raw.profileImage ?? null,
+      bio: raw.bio ?? null,
+      emailVerified: raw.emailVerified ?? false,
+      followerCount: raw.followerCount ?? 0,
+      followingCount: raw.followingCount ?? 0,
+      videoCount: raw.videoCount ?? 0,
+      createdAt: raw.createdAt,
+      role: raw.role,
+    };
+  }
+
   async function fetchMe() {
     try {
       const { data } = await authService.getMe();
-      // Backend MyProfileResponse uses userId/profileImage; map to client User
-      const raw = data as unknown as {
-        userId?: string | number;
-        id?: string;
-        email: string;
-        nickname: string;
-        profileImage?: string | null;
-        profileImageUrl?: string | null;
-        bio?: string | null;
-        emailVerified?: boolean;
-        followerCount?: number;
-        followingCount?: number;
-        videoCount?: number;
-        createdAt: string;
-        role?: "USER" | "ADMIN";
-      };
-      user.value = {
-        id: String(raw.id ?? raw.userId ?? ""),
-        email: raw.email,
-        nickname: raw.nickname,
-        profileImageUrl: raw.profileImageUrl ?? raw.profileImage ?? null,
-        bio: raw.bio ?? null,
-        emailVerified: raw.emailVerified ?? false,
-        followerCount: raw.followerCount ?? 0,
-        followingCount: raw.followingCount ?? 0,
-        videoCount: raw.videoCount ?? 0,
-        createdAt: raw.createdAt,
-        role: raw.role,
-      };
+      user.value = _mapMyProfile(data);
     } catch {
       // Only clear auth state if there's no existing user (standalone refresh)
       if (!user.value) {
@@ -107,9 +113,22 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
-  async function updateProfile(payload: Partial<Pick<User, "nickname" | "profileImageUrl" | "bio">>) {
+  /** 닉네임/소개 수정. bio: "" 는 소개 비우기, undefined 는 변경 안 함. */
+  async function updateProfile(payload: { nickname?: string; bio?: string }) {
     const { data } = await authService.updateProfile(payload);
-    user.value = data;
+    user.value = _mapMyProfile(data);
+  }
+
+  /** 프로필 이미지 업로드/교체 (multipart). */
+  async function uploadProfileImage(image: File) {
+    const { data } = await authService.uploadProfileImage(image);
+    user.value = _mapMyProfile(data);
+  }
+
+  /** 프로필 이미지 삭제 (백엔드 추가 예정). */
+  async function removeProfileImage() {
+    const { data } = await authService.deleteProfileImage();
+    user.value = _mapMyProfile(data);
   }
 
   function saveClimbingInfo(climbingExperienceMonths: number) {
@@ -153,6 +172,8 @@ export const useAuthStore = defineStore("auth", () => {
     logout,
     fetchMe,
     updateProfile,
+    uploadProfileImage,
+    removeProfileImage,
     saveClimbingInfo,
     deleteAccount,
     initFromStorage,

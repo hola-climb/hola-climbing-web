@@ -212,7 +212,7 @@ onMounted(() => {
 }
 .icon-wrap.success {
   background: color-mix(in srgb, var(--hold-lime) 18%, transparent);
-  color: var(--hold-lime);
+  color: var(--on-tint-lime);
 }
 .icon-wrap.failed {
   background: color-mix(in srgb, var(--hold-pink) 18%, transparent);
@@ -266,7 +266,7 @@ onMounted(() => {
   transition: border-color var(--dur-fast) var(--ease-state);
 }
 .hola-input-native:focus {
-  border-color: var(--hold-lime);
+  border-color: var(--hold-lime-ink);
 }
 .hola-input-native::placeholder {
   color: var(--fg-subtle);

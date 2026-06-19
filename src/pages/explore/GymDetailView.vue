@@ -11,7 +11,7 @@ import BaseButton from '@/components/common/BaseButton.vue'
 import AppIcon from '@/components/common/AppIcon.vue'
 import {
   bookmarkOutline, bookmark, locationOutline,
-  timeOutline, closeOutline, sendOutline, star, starOutline,
+  timeOutline, sendOutline, star, starOutline,
 } from 'ionicons/icons'
 import { useRouter } from 'vue-router'
 import { useGymStore } from '@/stores/gym'
@@ -22,7 +22,7 @@ import { chatService } from '@/services/chat'
 import { useGymChat } from '@/composables/useGymChat'
 import { gradeColor, gradeTextColor } from '@/utils/gradeColor'
 import VideoThumbnail from '@/components/video/VideoThumbnail.vue'
-import type { GymPhoto, GymReview, FeedVideo, ChatMessage } from '@/types/api'
+import type { GymReview, FeedVideo, ChatMessage } from '@/types/api'
 
 const props = defineProps<{ gymId: string }>()
 
@@ -40,14 +40,9 @@ const DAY_LABELS: Record<string, string> = {
 }
 
 // ── Section data ───────────────────────────────────
-const photos = ref<GymPhoto[]>([])
 const videos = ref<FeedVideo[]>([])
 const reviews = ref<GymReview[]>([])
 const chatPreview = ref<ChatMessage[]>([])
-
-// ── Gallery lightbox ───────────────────────────────
-const showGallery = ref(false)
-const galleryIndex = ref(0)
 
 // ── Review form ────────────────────────────────────
 const showReviewForm = ref(false)
@@ -76,13 +71,11 @@ function formatTime(iso: string): string {
 
 // ── Loaders ────────────────────────────────────────
 async function loadSections() {
-  const [pRes, vRes, rRes, cRes] = await Promise.allSettled([
-    gymService.getPhotos(gymId),
+  const [vRes, rRes, cRes] = await Promise.allSettled([
     gymService.getGymVideos(gymId, { page: 0, size: 10 }),
     gymService.getReviews(gymId, { page: 0, size: 20 }),
     chatService.getMessages(gymId, { page: 0, size: 5 }),
   ])
-  if (pRes.status === 'fulfilled') photos.value = pRes.value.data
   if (vRes.status === 'fulfilled') videos.value = vRes.value.data.content
   if (rRes.status === 'fulfilled') reviews.value = rRes.value.data.content
   if (cRes.status === 'fulfilled') chatPreview.value = cRes.value.data.content.slice(-3)
@@ -109,11 +102,6 @@ async function handleFavorite() {
   } catch {
     uiStore.showToast('즐겨찾기 처리 중 오류가 발생했어요.', 'danger')
   }
-}
-
-function openGallery(index: number) {
-  galleryIndex.value = index
-  showGallery.value = true
 }
 
 function openReviewForm() {
@@ -217,14 +205,6 @@ function openVideo(id: string) {
           </div>
         </div>
 
-        <!-- Photos section: title + horizontal strip of squares -->
-        <div class="sk-section">
-          <div class="sk sk-section-title" />
-          <div class="sk-photo-row">
-            <div v-for="i in 4" :key="i" class="sk sk-photo" />
-          </div>
-        </div>
-
         <!-- Hours card: title + 7 day rows -->
         <div class="sk-hours hola-card">
           <div class="sk sk-section-title" style="width:80px;margin-bottom:12px;" />
@@ -274,25 +254,6 @@ function openVideo(id: string) {
           >
             <IonIcon :icon="gym.isFavorited ? bookmark : bookmarkOutline" :class="{ favorited: gym.isFavorited }" />
           </button>
-        </div>
-
-        <!-- Photo gallery -->
-        <div v-if="photos.length" class="section">
-          <div class="section-head">
-            <div class="section-title">사진</div>
-            <button class="see-all" @click="openGallery(0)">전체보기</button>
-          </div>
-          <div class="photo-row">
-            <button
-              v-for="(p, i) in photos.slice(0, 6)"
-              :key="p.id"
-              class="photo-thumb"
-              @click="openGallery(i)"
-              :aria-label="p.caption ?? '암장 사진'"
-            >
-              <img :src="p.url" :alt="p.caption ?? '암장 사진'" loading="lazy" />
-            </button>
-          </div>
         </div>
 
         <!-- Gym videos -->
@@ -383,21 +344,6 @@ function openVideo(id: string) {
           </div>
         </div>
       </div>
-
-    <!-- Photo lightbox modal -->
-    <IonModal :is-open="showGallery" @did-dismiss="showGallery = false">
-      <div class="lightbox">
-        <button class="lb-close" @click="showGallery = false" aria-label="닫기">
-          <IonIcon :icon="closeOutline" />
-        </button>
-        <div class="lb-scroll">
-          <figure v-for="p in photos" :key="p.id" class="lb-fig">
-            <img :src="p.url" :alt="p.caption ?? '암장 사진'" />
-            <figcaption v-if="p.caption">{{ p.caption }}</figcaption>
-          </figure>
-        </div>
-      </div>
-    </IonModal>
 
     <!-- Review write modal -->
     <IonModal :is-open="showReviewForm" :initial-breakpoint="0.6" :breakpoints="[0, 0.6, 0.95]" @did-dismiss="showReviewForm = false">
@@ -535,14 +481,6 @@ function openVideo(id: string) {
 .sk-section-title { height: 14px; width: 64px; }
 .sk-line { border-radius: var(--r-chip); }
 
-/* Photo row */
-.sk-photo-row { display: flex; gap: 8px; }
-.sk-photo {
-  flex: 0 0 auto;
-  width: 96px; height: 96px;
-  border-radius: var(--r-button);
-}
-
 /* Hours card */
 .sk-hours { display: flex; flex-direction: column; }
 .sk-hours-row {
@@ -606,22 +544,6 @@ function openVideo(id: string) {
   min-height: 20px;
 }
 
-/* Photos */
-.photo-row { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
-.photo-row::-webkit-scrollbar { display: none; }
-.photo-thumb {
-  flex: 0 0 auto;
-  width: 96px;
-  height: 96px;
-  border-radius: var(--r-button);
-  overflow: hidden;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  background: var(--surface-soft);
-}
-.photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-
 /* Videos */
 .video-row { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; }
 .video-row::-webkit-scrollbar { display: none; }
@@ -665,18 +587,6 @@ function openVideo(id: string) {
 .cp-line { display: flex; gap: 8px; font-size: 13px; min-width: 0; }
 .cp-name { font-weight: 700; flex-shrink: 0; }
 .cp-text { color: var(--fg-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-/* Lightbox */
-.lightbox { height: 100%; background: #000; position: relative; }
-.lb-close {
-  position: absolute; top: 14px; right: 14px; z-index: 2;
-  background: rgba(0,0,0,0.5); border: none; color: #fff; font-size: 22px;
-  width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; cursor: pointer;
-}
-.lb-scroll { height: 100%; overflow-y: auto; display: flex; flex-direction: column; }
-.lb-fig { margin: 0; }
-.lb-fig img { width: 100%; display: block; }
-.lb-fig figcaption { color: #fff; font-size: 13px; padding: 8px 16px 20px; }
 
 /* Review sheet */
 .sheet { padding: 24px 20px; display: flex; flex-direction: column; gap: 16px; }

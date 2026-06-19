@@ -394,7 +394,6 @@ export interface Gym {
 export interface GymDetail extends Gym {
   phone: string | null;
   description: string | null;
-  photos: string[];
   videoCount: number;
 }
 
@@ -404,12 +403,6 @@ export interface RecommendedGym extends Gym {
   rankingDistance: number | null; // pgvector cosine distance, style ranking 불가 시 null
 }
 
-/** GET /api/gyms/{id}/photos — backend GymPhotoResponse */
-export interface GymPhoto {
-  id: string;
-  url: string;
-  caption: string | null;
-}
 
 /** GET /api/gyms/{id}/reviews — backend GymReviewResponse (+ resolved user) */
 export interface GymReview {

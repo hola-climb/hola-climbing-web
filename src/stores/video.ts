@@ -168,19 +168,15 @@ export const useVideoStore = defineStore('video', () => {
 
   async function submitFeedback(
     videoId: string,
-    techniqueKey: string,
-    isCorrect: boolean,
-    context: { isDynamic: boolean; techniques: string[] },
+    payload: { isDynamic: boolean; techniques: string[] },
+    verdicts?: Record<string, 'correct' | 'incorrect'>,
   ) {
-    await videoService.submitFeedback(videoId, {
-      techniqueLabel: techniqueKey,
-      isCorrect,
-      isDynamic: context.isDynamic,
-      techniques: context.techniques,
-    })
-    if (currentVideo.value?.id === videoId && currentVideo.value.analysis) {
-      const tag = currentVideo.value.analysis.techniques.find((t) => t.key === techniqueKey)
-      if (tag) tag.userFeedback = isCorrect ? 'correct' : 'incorrect'
+    await videoService.submitFeedback(videoId, payload)
+    if (verdicts && currentVideo.value?.id === videoId && currentVideo.value.analysis) {
+      for (const [key, verdict] of Object.entries(verdicts)) {
+        const tag = currentVideo.value.analysis.techniques.find((t) => t.key === key)
+        if (tag) tag.userFeedback = verdict
+      }
     }
   }
 

@@ -27,6 +27,7 @@ const ICONS: Record<string, IconDef> = {
     d: "M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm0 2.2V18h16V7.2l-8 5.3-8-5.3z",
     fill: true,
   },
+  zap: { d: "M13 2 4.5 13.5H11l-1 8.5L18.5 10H12l1-8z", fill: true },
 };
 
 const props = withDefaults(

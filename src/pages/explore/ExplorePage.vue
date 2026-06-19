@@ -136,19 +136,9 @@ async function handleLocate() {
         <div class="toolbar-inner">
           <span class="brand-label">EXPLORE</span>
           <!-- Pin icon -->
-          <button class="icon-btn" :class="{ locating: isLocating }" aria-label="내 위치" @click="handleLocate">
+          <button class="icon-btn" :class="{ locating: isLocating, active: isNearbyMode }" :aria-label="isNearbyMode ? '내 위치 (켜짐)' : '내 위치'" :aria-pressed="isNearbyMode" @click="handleLocate">
             <IonSpinner v-if="isLocating" name="crescent" class="btn-spinner" />
-            <svg
-              v-else
-              viewBox="0 0 24 24"
-              width="20"
-              height="20"
-              fill="none"
-              :stroke="isNearbyMode ? 'var(--hold-lime)' : 'currentColor'"
-              stroke-width="1.75"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
+            <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="none" :stroke="isNearbyMode ? '#AAEA00' : 'currentColor'" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1 1 18 0Z M12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
             </svg>
           </button>
@@ -194,7 +184,7 @@ async function handleLocate() {
           </div>
 
           <!-- Map preview card -->
-          <div class="map-section page-padding">
+          <div class="map-section page-padding" :class="{ 'nearby-active': isNearbyMode }">
             <div class="map-card hola-card">
               <!-- SVG map backdrop -->
               <svg viewBox="0 0 400 180" class="map-svg" aria-hidden="true" preserveAspectRatio="none">
@@ -379,6 +369,7 @@ async function handleLocate() {
   color: var(--fg-muted);
 }
 .icon-btn {
+  position: relative;
   background: none;
   border: none;
   padding: 6px;
@@ -386,6 +377,39 @@ async function handleLocate() {
   color: var(--fg);
   display: grid;
   place-items: center;
+  border-radius: 999px;
+  transition: background var(--dur-base) var(--ease-state);
+}
+/* Active (nearby mode): soft orange tint + pulsing halo to emphasize the on-state */
+.icon-btn.active {
+  /* background: color-mix(in srgb, var(--hold-orange) 16%, transparent); */
+}
+.icon-btn.active::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 999px;
+  background: radial-gradient(circle, color-mix(in srgb, #aff100 55%, transparent) 0%, transparent 70%);
+  filter: blur(5px);
+  pointer-events: none;
+  animation: locate-pulse 2.4s var(--ease-state) infinite;
+}
+@keyframes locate-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.2);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .icon-btn.active::before {
+    animation: none;
+    opacity: 0.6;
+  }
 }
 
 /* ── Hero ───────────────────────────────────────── */
@@ -439,7 +463,22 @@ async function handleLocate() {
 
 /* ── Map card ───────────────────────────────────── */
 .map-section {
+  position: relative;
   padding-top: 16px;
+}
+/* Soft orange ambient glow behind the map when nearby mode is active */
+.map-section.nearby-active::before {
+  content: "";
+  position: absolute;
+  left: 26px;
+  right: 26px;
+  top: 28px;
+  bottom: 0;
+  border-radius: var(--r-card);
+  background: var(--hold-lime);
+  filter: blur(28px);
+  opacity: 0.22;
+  pointer-events: none;
 }
 .map-card {
   padding: 0;

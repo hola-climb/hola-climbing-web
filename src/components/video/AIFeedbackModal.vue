@@ -17,52 +17,92 @@ const emit = defineEmits<{ (e: "close"): void }>();
 
 const videoStore = useVideoStore();
 const uiStore = useUIStore();
-const submitting = ref<string | null>(null);
-const dynamicFeedback = ref<"correct" | "incorrect" | null>(null);
+const submitting = ref(false);
 
-function feedbackContext() {
-  return {
-    isDynamic: props.isDynamic ?? false,
-    techniques: props.techniques
-      .map((t) => (typeof t === "string" ? t : t?.key))
-      .filter((k): k is string => typeof k === "string" && k.trim() !== ""),
-  };
+// 로컬 선택 상태 — API 호출 없이 누적
+const pendingFeedback = ref<Record<string, "correct" | "incorrect">>({});
+const pendingDynamic = ref<"correct" | "incorrect" | null>(null);
+
+function selectFeedback(tag: TechniqueTag, feedback: "correct" | "incorrect") {
+  pendingFeedback.value[tag.key] = feedback;
 }
 
-async function submitFeedback(tag: TechniqueTag, feedback: "correct" | "incorrect") {
+function selectDynamicFeedback(feedback: "correct" | "incorrect") {
+  pendingDynamic.value = feedback;
+}
+
+function allTechniqueKeys() {
+  return props.techniques
+    .map((t) => (typeof t === "string" ? t : t?.key))
+    .filter((k): k is string => typeof k === "string" && k.trim() !== "");
+}
+
+// isDynamic: 유저 피드백 반영 (incorrect → 반전, correct → 원값 유지)
+function resolvedIsDynamic() {
+  if (pendingDynamic.value === "incorrect") return !(props.isDynamic ?? false);
+  return props.isDynamic ?? false;
+}
+
+async function flushPending(): Promise<boolean> {
+  const verdicts = { ...pendingFeedback.value };
+  const hasDynamic = pendingDynamic.value !== null;
+  if (Object.keys(verdicts).length === 0 && !hasDynamic) return false;
+
+  // 사용자가 "틀렸다"고 한 기술만 제외 — 미피드백은 맞은 것으로 간주
+  const techniques = allTechniqueKeys().filter((key) => verdicts[key] !== "incorrect");
+
+  // 최종 한 번만 전송 ({ isDynamic, techniques })
+  await videoStore.submitFeedback(
+    props.videoId,
+    { isDynamic: resolvedIsDynamic(), techniques },
+    verdicts,
+  );
+
+  pendingFeedback.value = {};
+  pendingDynamic.value = null;
+  return true;
+}
+
+// X 버튼 또는 외부 탭으로 닫힐 때 공통 처리
+let flushedBeforeClose = false;
+
+async function handleClose() {
   if (submitting.value) return;
-  submitting.value = tag.key;
+  submitting.value = true;
   try {
-    await videoStore.submitFeedback(props.videoId, tag.key, feedback === "correct", feedbackContext());
-    uiStore.showToast("피드백 감사해요!", "success");
+    const hadPending = await flushPending();
+    if (hadPending) uiStore.showToast("피드백 감사해요!", "success");
+    flushedBeforeClose = true;
   } catch {
     uiStore.showToast("피드백 처리에 실패했어요.", "danger");
+    flushedBeforeClose = true;
   } finally {
-    submitting.value = null;
+    submitting.value = false;
+    emit("close");
   }
 }
 
-async function submitDynamicFeedback(feedback: "correct" | "incorrect") {
-  if (submitting.value) return;
-  submitting.value = "is_dynamic";
-  try {
-    await videoStore.submitFeedback(props.videoId, "is_dynamic", feedback === "correct", feedbackContext());
-    dynamicFeedback.value = feedback;
-    uiStore.showToast("피드백 감사해요!", "success");
-  } catch {
-    uiStore.showToast("피드백 처리에 실패했어요.", "danger");
-  } finally {
-    submitting.value = null;
+async function handleDidDismiss() {
+  if (!flushedBeforeClose) {
+    // 외부 탭·스와이프로 닫힌 경우
+    try {
+      const hadPending = await flushPending();
+      if (hadPending) uiStore.showToast("피드백 감사해요!", "success");
+    } catch {
+      uiStore.showToast("피드백 처리에 실패했어요.", "danger");
+    }
   }
+  flushedBeforeClose = false;
+  emit("close");
 }
 </script>
 
 <template>
-  <IonModal :is-open="isOpen" :initial-breakpoint="0.75" :breakpoints="[0, 0.75, 1]" @did-dismiss="emit('close')">
+  <IonModal :is-open="isOpen" :initial-breakpoint="0.75" :breakpoints="[0, 0.75, 1]" @did-dismiss="handleDidDismiss">
     <div class="modal-content">
       <div class="modal-header">
         <span class="modal-title">AI 분석 피드백</span>
-        <button class="sheet-close" @click="emit('close')" aria-label="닫기">
+        <button class="sheet-close" :class="{ loading: submitting }" @click="handleClose" aria-label="닫기">
           <IonIcon :icon="closeOutline" />
         </button>
       </div>
@@ -83,18 +123,18 @@ async function submitDynamicFeedback(feedback: "correct" | "incorrect") {
           <div class="feedback-btns">
             <button
               class="fb-btn"
-              :class="{ active: dynamicFeedback === 'correct', loading: submitting === 'is_dynamic' }"
+              :class="{ active: pendingDynamic === 'correct' }"
               aria-label="맞아요"
-              @click="submitDynamicFeedback('correct')"
+              @click="selectDynamicFeedback('correct')"
             >
               <IonIcon :icon="checkmarkOutline" />
               맞아요
             </button>
             <button
               class="fb-btn wrong"
-              :class="{ active: dynamicFeedback === 'incorrect', loading: submitting === 'is_dynamic' }"
+              :class="{ active: pendingDynamic === 'incorrect' }"
               aria-label="틀렸어요"
-              @click="submitDynamicFeedback('incorrect')"
+              @click="selectDynamicFeedback('incorrect')"
             >
               <IonIcon :icon="closeCircleOutline" />
               틀렸어요
@@ -104,14 +144,23 @@ async function submitDynamicFeedback(feedback: "correct" | "incorrect") {
 
         <div v-for="tag in techniques" :key="tag.key" class="tag-row">
           <span class="tag-label">{{ getTagLabel(tag.key) }}</span>
-          <!-- <span class="confidence">{{ Math.round(tag.confidence * 100) }}%</span> -->
 
           <div class="feedback-btns">
-            <button class="fb-btn" :class="{ active: tag.userFeedback === 'correct', loading: submitting === tag.key }" @click="submitFeedback(tag, 'correct')" aria-label="맞아요">
+            <button
+              class="fb-btn"
+              :class="{ active: pendingFeedback[tag.key] === 'correct' }"
+              aria-label="맞아요"
+              @click="selectFeedback(tag, 'correct')"
+            >
               <IonIcon :icon="checkmarkOutline" />
               맞아요
             </button>
-            <button class="fb-btn wrong" :class="{ active: tag.userFeedback === 'incorrect', loading: submitting === tag.key }" @click="submitFeedback(tag, 'incorrect')" aria-label="틀렸어요">
+            <button
+              class="fb-btn wrong"
+              :class="{ active: pendingFeedback[tag.key] === 'incorrect' }"
+              aria-label="틀렸어요"
+              @click="selectFeedback(tag, 'incorrect')"
+            >
               <IonIcon :icon="closeCircleOutline" />
               틀렸어요
             </button>
@@ -203,7 +252,7 @@ async function submitDynamicFeedback(feedback: "correct" | "incorrect") {
 }
 .fb-btn.active {
   background: var(--tint-lime);
-  border-color: var(--hold-lime);
+  border-color: var(--hold-lime-ink);
   color: var(--on-tint-lime);
 }
 .fb-btn.wrong.active {

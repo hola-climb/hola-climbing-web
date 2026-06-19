@@ -1,5 +1,5 @@
 import api from "./client";
-import type { FeedVideo, Gym, GymDetail, GymGrade, GymPhoto, GymReview, OperatingHours, PageResponse, RawRecommendedVideo, RecommendedGym, Video } from "@/types/api";
+import type { FeedVideo, Gym, GymDetail, GymGrade, GymReview, OperatingHours, PageResponse, RawRecommendedVideo, RecommendedGym, Video } from "@/types/api";
 import { resolveUser, resolveUsers } from "./userResolver";
 
 export interface BoardPost {
@@ -10,12 +10,6 @@ export interface BoardPost {
   createdAt: string;
 }
 
-interface RawGymPhoto {
-  id: number;
-  gcsPath: string;
-  caption: string | null;
-  displayOrder: number;
-}
 interface RawGymReview {
   id: number;
   gymId: number;
@@ -24,10 +18,6 @@ interface RawGymReview {
   content: string | null;
   createdAt: string;
   updatedAt: string | null;
-}
-
-function toGymPhoto(raw: RawGymPhoto): GymPhoto {
-  return { id: String(raw.id), url: raw.gcsPath, caption: raw.caption };
 }
 
 /** Map backend VideoSummaryResponse → FeedVideo (same shape, no `source`) */
@@ -40,7 +30,7 @@ function toGymVideo(raw: Omit<RawRecommendedVideo, "source">): FeedVideo {
     title: raw.title,
     gymGrade: raw.gymGrade ?? null,
     grade: raw.gymGrade?.label ?? raw.grade ?? null,
-    thumbnailUrl: raw.thumbnailPath,
+    thumbnailUrl: raw.thumbnailUrl ?? raw.thumbnailPath,
     streamUrl: raw.streamUrl,
     durationSeconds: raw.durationSeconds,
     viewCount: raw.viewCount,
@@ -84,7 +74,6 @@ interface RawGymDetail extends RawGymSummary {
   website: string | null;
   businessHours: Record<string, RawDayHours | null> | null;
   status: string | null;
-  photos: Array<{ id: number; gcsPath: string; caption: string | null; displayOrder: number }> | null;
 }
 
 /** Map backend Long id + lat/lng → client Gym (string id, latitude/longitude) */
@@ -135,7 +124,6 @@ function toGymDetail(raw: RawGymDetail): GymDetail {
     ...toGym(raw),
     phone: raw.phone ?? null,
     description: raw.description ?? null,
-    photos: (raw.photos ?? []).map((p) => p.gcsPath),
     videoCount: 0,
     businessHours: null,
     operatingHours: toOperatingHours(raw.businessHours),
@@ -165,10 +153,6 @@ export const gymService = {
   // ── Grades (영상 등록용 활성 난이도) ────────────────────────────────────────
 
   getGrades: (gymId: string) => api.get<GymGrade[]>(`/gyms/${gymId}/grades`),
-
-  // ── Photos ─────────────────────────────────────────────────────────────────
-
-  getPhotos: (gymId: string) => api.get<RawGymPhoto[]>(`/gyms/${gymId}/photos`).then((res) => ({ ...res, data: res.data.map(toGymPhoto) })) as Promise<{ data: GymPhoto[] }>,
 
   // ── Reviews ────────────────────────────────────────────────────────────────
 

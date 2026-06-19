@@ -35,6 +35,12 @@
   --on-tint-cyan: #066a78;
   --on-tint-dark: var(--fg);
 
+  /* ── Foreground lime ───────────────────────────
+     --hold-lime is a FILL accent (dark text sits on it). On the light
+     canvas it has far too little contrast as a foreground, so use this
+     readable "ink" lime for text, icons, dots, and thin bars. */
+  --hold-lime-ink: #8bd100;
+
   /* ── Social brand (off-palette, fixed by each provider) ── */
   --brand-kakao: #fee500;
   --brand-kakao-fg: #3a1d1d;

@@ -1,9 +1,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import { IonPage, IonContent, IonIcon, IonSpinner } from "@ionic/vue";
-import { heartOutline, heart, shareOutline, chatbubbleOutline, refreshOutline } from "ionicons/icons";
+import { IonPage, IonContent, IonIcon, IonSpinner, IonModal, toastController } from "@ionic/vue";
+import { heartOutline, heart, shareOutline, chatbubbleOutline, refreshOutline, checkmarkCircle, ellipsisVertical, createOutline, trashOutline } from "ionicons/icons";
 import AppHeader from "@/components/common/AppHeader.vue";
 import LoadingState from "@/components/common/LoadingState.vue";
+import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
+import AIResultBadge from "@/components/video/AIResultBadge.vue";
+import AIFeedbackModal from "@/components/video/AIFeedbackModal.vue";
+import VideoPlayer from "@/components/video/VideoPlayer.vue";
+import VideoEditModal from "@/components/video/VideoEditModal.vue";
 import { useRoute, useRouter } from "vue-router";
 import { useVideoStore } from "@/stores/video";
 import { useAuthStore } from "@/stores/auth";
@@ -12,31 +17,52 @@ import { useMediaQuery } from "@/composables/useMediaQuery";
 import { videoService } from "@/services/video";
 import { gradeColor, gradeTextColor } from "@/utils/gradeColor";
 import type { Comment } from "@/types/api";
-import AIResultBadge from "@/components/video/AIResultBadge.vue";
-import AIFeedbackModal from "@/components/video/AIFeedbackModal.vue";
-import VideoPlayer from "@/components/video/VideoPlayer.vue";
+import { useShare } from "@/composables/useShare";
 
 const route = useRoute();
 const router = useRouter();
 const videoStore = useVideoStore();
 const authStore = useAuthStore();
 const uiStore = useUIStore();
-
 const isDesktop = useMediaQuery("(min-width: 1024px)");
 
 const videoId = route.params.id as string;
 const isLoading = ref(true);
 const showFeedbackModal = ref(false);
+const showActionSheet = ref(false);
+const showDeleteDialog = ref(false);
+const showEditModal = ref(false);
+const isDeleting = ref(false);
 
 const video = computed(() => videoStore.currentVideo);
 const isOwner = computed(() => authStore.user && video.value?.user.id === authStore.user.id);
 const showAIResult = computed(() => isOwner.value && video.value?.status === "done" && video.value.analysis);
+const isAnalyzing = computed(() => video.value?.status === "analyzing" || video.value?.status === "pending");
+const analysisFailed = computed(() => video.value?.status === "failed");
+
+const ANALYSIS_STEPS = [
+  { stage: "started", label: "분석 시작" },
+  { stage: "downloaded", label: "영상 다운로드" },
+  { stage: "pose_estimation", label: "포즈 추정" },
+  { stage: "classification", label: "기술 분류" },
+  { stage: "completed", label: "분석 완료" },
+] as const;
+const STAGE_ORDER = ANALYSIS_STEPS.map((s) => s.stage);
+
+function stepState(stage: string): "done" | "active" | "pending" {
+  const currentIdx = STAGE_ORDER.indexOf(videoStore.analysisStage as (typeof STAGE_ORDER)[number]);
+  const stepIdx = STAGE_ORDER.indexOf(stage as (typeof STAGE_ORDER)[number]);
+  if (currentIdx === -1) return "pending";
+  if (stepIdx < currentIdx) return "done";
+  if (stepIdx === currentIdx) return "active";
+  return "pending";
+}
 
 function openProfile(userId: string | undefined) {
   if (userId) router.push(`/users/${userId}`);
 }
 
-// ── Comments ───────────────────────────────────────
+// ── Comments ──────────────────────────────────────────
 const comments = ref<Comment[]>([]);
 const commentsLoading = ref(false);
 const commentInput = ref("");
@@ -56,7 +82,7 @@ async function loadComments() {
 }
 
 async function postComment(e?: KeyboardEvent | MouseEvent) {
-  if ((e as KeyboardEvent)?.isComposing) return; // Korean IME: ignore mid-composition Enter
+  if ((e as KeyboardEvent)?.isComposing) return;
   if (!authStore.isAuthenticated) {
     uiStore.openLoginSheet();
     return;
@@ -86,6 +112,60 @@ async function deleteComment(comment: Comment) {
   }
 }
 
+async function handleLike() {
+  if (!authStore.isAuthenticated) {
+    uiStore.openLoginSheet();
+    return;
+  }
+  await videoStore.toggleLike(videoId);
+}
+
+// 공유
+const { copyShareLink } = useShare();
+async function handleShare() {
+  try {
+    await copyShareLink(videoId);
+    uiStore.showToast("링크 복사 완료! 영상을 공유해 보세요.");
+  } catch {
+    uiStore.showToast("복사에 실패했어요.");
+  }
+}
+
+async function retryAnalysis() {
+  try {
+    await videoStore.retryAnalysis(videoId);
+    videoStore.pollAnalysis(videoId);
+    uiStore.showToast("AI 분석을 다시 시작했어요.");
+  } catch {
+    uiStore.showToast("재시도에 실패했어요.", "danger");
+  }
+}
+
+async function onEditSave(payload: { title: string | null; description: string | null; isPublic: boolean }) {
+  try {
+    await videoStore.updateVideo(videoId, payload);
+    showEditModal.value = false;
+    uiStore.showToast("영상 정보를 수정했어요.");
+  } catch (err) {
+    if (import.meta.env.DEV) console.error("[onEditSave]", err);
+    uiStore.showToast("수정에 실패했어요.", "danger");
+  }
+}
+
+async function onDeleteConfirm() {
+  if (isDeleting.value) return;
+  isDeleting.value = true;
+  try {
+    await videoStore.deleteVideo(videoId);
+    uiStore.showToast("영상을 삭제했어요.");
+    router.replace("/my");
+  } catch {
+    uiStore.showToast("삭제에 실패했어요.", "danger");
+  } finally {
+    isDeleting.value = false;
+  }
+}
+
 function formatTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const min = Math.floor(diff / 60000);
@@ -101,7 +181,7 @@ function formatTime(iso: string): string {
 onMounted(async () => {
   try {
     await videoStore.fetchVideo(videoId);
-    if (video.value?.status === "analyzing" || video.value?.status === "pending") {
+    if (isAnalyzing.value) {
       videoStore.pollAnalysis(videoId);
     }
     loadComments();
@@ -112,29 +192,17 @@ onMounted(async () => {
     isLoading.value = false;
   }
 });
-
-async function handleLike() {
-  if (!authStore.isAuthenticated) {
-    uiStore.openLoginSheet();
-    return;
-  }
-  await videoStore.toggleLike(videoId);
-}
-
-async function retryAnalysis() {
-  try {
-    await videoStore.retryAnalysis(videoId);
-    videoStore.pollAnalysis(videoId);
-    uiStore.showToast("AI 분석을 다시 시작했어요.");
-  } catch {
-    uiStore.showToast("재시도에 실패했어요.", "danger");
-  }
-}
 </script>
 
 <template>
   <IonPage>
-    <AppHeader title="영상" />
+    <AppHeader :title="isOwner ? '내 영상' : '영상'">
+      <template v-if="isOwner" #action>
+        <button class="more-btn" aria-label="더보기" @click="showActionSheet = true">
+          <IonIcon :icon="ellipsisVertical" />
+        </button>
+      </template>
+    </AppHeader>
 
     <IonContent>
       <div v-if="isLoading" class="page-skeleton page-padding">
@@ -143,34 +211,33 @@ async function retryAnalysis() {
       </div>
 
       <div v-else-if="video" class="video-detail-layout reveal-on-load">
-        <!-- ── Left: video pane ───────────────────── -->
+        <!-- ── 영상 플레이어 ───────────────────────── -->
         <div class="video-pane">
           <div class="video-wrap">
             <VideoPlayer v-if="video.streamingUrl" :src="video.streamingUrl" :ariaLabel="`${video.user.nickname}의 클라이밍 영상`" />
             <div v-else class="video-placeholder">
               <span class="placeholder-text">
-                <span v-if="video.status === 'analyzing'" class="ai-dot" />
-                {{ video.status === "analyzing" ? "AI 분석 중..." : "영상 준비 중" }}
+                <span v-if="isAnalyzing" class="ai-dot" aria-hidden="true" />
+                {{ isAnalyzing ? "AI 분석 중..." : "영상 준비 중" }}
               </span>
             </div>
           </div>
         </div>
 
-        <!-- ── Right: sidebar pane ───────────────── -->
+        <!-- ── 사이드바 ───────────────────────────── -->
         <div class="sidebar-pane">
           <div class="sidebar-scroll">
-            <!-- Content -->
             <div class="detail-content page-padding">
-              <!-- Title + grade -->
+              <!-- 제목 + 난이도 -->
               <div class="title-row">
                 <h1 class="video-title">{{ video.title || "클라이밍 클립" }}</h1>
                 <span v-if="video.grade" class="chip grade-chip" :style="{ background: gradeColor(video.grade), color: gradeTextColor(gradeColor(video.grade)) }">{{ video.grade }}</span>
               </div>
 
-              <!-- Author row -->
-              <div class="author-row">
-                <button class="author-link" @click="openProfile(video.user.id)" :aria-label="`${video.user.nickname} 프로필 보기`">
-                  <div class="avatar" :aria-hidden="true">
+              <!-- 작성자 (남의 영상일 때만) -->
+              <div v-if="!isOwner" class="author-row">
+                <button class="author-link" :aria-label="`${video.user.nickname} 프로필 보기`" @click="openProfile(video.user.id)">
+                  <div class="avatar" aria-hidden="true">
                     {{ video.user.nickname.charAt(0).toUpperCase() }}
                   </div>
                   <div class="author-meta">
@@ -183,30 +250,57 @@ async function retryAnalysis() {
                 </button>
               </div>
 
-              <!-- AI Analysis (owner only) -->
+              <!-- 암장 + 조회수 (내 영상일 때) -->
+              <div v-else class="meta-row">
+                <template v-if="video.gym">{{ video.gym.name }} ·</template>
+                조회 {{ video.viewCount }}
+              </div>
+
+              <!-- ── AI 분석 (내 영상 전용) ─────────── -->
+              <!-- done: 결과 카드 -->
               <div v-if="showAIResult" class="ai-section hola-card">
+                <div class="ai-header">
+                  <span class="ai-label">AI 분석</span>
+                </div>
                 <AIResultBadge :techniques="video.analysis!.techniques" :problem-type="video.analysis!.problemType ?? null" :is-dynamic="video.analysis!.isDynamic ?? null" />
                 <button class="feedback-link" @click="showFeedbackModal = true">AI 결과가 맞나요? 피드백 남기기</button>
               </div>
 
-              <!-- Analyzing state (owner only) -->
-              <div v-else-if="isOwner && (video.status === 'analyzing' || video.status === 'pending')" class="ai-section hola-card ai-pending">
-                <span class="ai-dot" />
-                <span class="analyzing-text">AI가 영상을 분석하고 있어요...</span>
+              <!-- analyzing / pending (내 영상 전용) -->
+              <div v-else-if="isOwner && isAnalyzing" class="ai-section hola-card ai-pending">
+                <div class="progress-header">
+                  <div class="progress-label-row">
+                    <span class="ai-dot" aria-hidden="true" />
+                    <span class="analyzing-text">{{ videoStore.analysisProgressMessage || "AI가 영상을 분석하고 있어요..." }}</span>
+                  </div>
+                  <span class="progress-pct">{{ videoStore.analysisProgress }}%</span>
+                </div>
+                <div class="progress-bar-wrap" role="progressbar" :aria-valuenow="videoStore.analysisProgress" aria-valuemin="0" aria-valuemax="100">
+                  <div class="progress-bar-fill" :style="{ width: videoStore.analysisProgress + '%' }" />
+                </div>
+                <div class="analysis-steps">
+                  <div v-for="step in ANALYSIS_STEPS" :key="step.stage" class="analysis-step" :class="stepState(step.stage)">
+                    <div class="step-icon-wrap">
+                      <IonIcon v-if="stepState(step.stage) === 'done'" :icon="checkmarkCircle" class="step-icon step-icon--done" aria-hidden="true" />
+                      <span v-else class="step-dot" aria-hidden="true" />
+                    </div>
+                    <span class="step-label">{{ step.label }}</span>
+                  </div>
+                </div>
               </div>
 
-              <!-- Analysis failed (owner only) -->
-              <div v-else-if="isOwner && video.status === 'failed'" class="ai-section hola-card ai-failed">
+              <!-- failed (내 영상 전용) -->
+              <div v-else-if="isOwner && analysisFailed" class="ai-section hola-card ai-failed">
                 <span class="fail-text">AI 분석에 실패했어요.</span>
-                <button class="retry-btn" @click="retryAnalysis" aria-label="분석 재시도">
+                <button class="retry-btn" aria-label="분석 재시도" @click="retryAnalysis">
                   <IonIcon :icon="refreshOutline" />
                   재시도
                 </button>
               </div>
 
-              <!-- Actions -->
+              <!-- 액션 -->
               <div class="actions actions-divided">
-                <button class="action-btn" @click="handleLike" :aria-label="video.isLiked ? '좋아요 취소' : '좋아요'">
+                <button class="action-btn" :aria-label="video.isLiked ? '좋아요 취소' : '좋아요'" @click="handleLike">
                   <IonIcon :icon="video.isLiked ? heart : heartOutline" :class="{ liked: video.isLiked }" />
                   <span>{{ video.likeCount }}</span>
                 </button>
@@ -214,12 +308,12 @@ async function retryAnalysis() {
                   <IonIcon :icon="chatbubbleOutline" />
                   <span>{{ commentCount }}</span>
                 </button>
-                <button class="action-btn" aria-label="공유">
+                <button class="action-btn" aria-label="공유" @click="handleShare">
                   <IonIcon :icon="shareOutline" />
                 </button>
               </div>
 
-              <!-- Comments -->
+              <!-- 댓글 -->
               <section class="comments-section">
                 <h2 class="comments-title">댓글 {{ commentCount }}</h2>
 
@@ -246,7 +340,7 @@ async function retryAnalysis() {
             </div>
           </div>
 
-          <!-- Desktop comment bar (inside sidebar, sticky at bottom) -->
+          <!-- 데스크탑 댓글 입력 -->
           <div v-if="isDesktop" class="comment-bar comment-bar--desktop">
             <input v-model="commentInput" class="comment-input" type="text" placeholder="댓글을 입력하세요" :disabled="isPosting" aria-label="댓글 입력" @keydown.enter="postComment($event)" />
             <button class="comment-send" :disabled="!commentInput.trim() || isPosting" aria-label="댓글 등록" @click="postComment">
@@ -258,7 +352,7 @@ async function retryAnalysis() {
       </div>
     </IonContent>
 
-    <!-- Mobile comment bar (outside IonContent, fixed at screen bottom) -->
+    <!-- 모바일 댓글 입력 (fixed) -->
     <div v-if="video && !isDesktop" class="comment-bar">
       <input v-model="commentInput" class="comment-input" type="text" placeholder="댓글을 입력하세요" :disabled="isPosting" aria-label="댓글 입력" @keydown.enter="postComment($event)" />
       <button class="comment-send" :disabled="!commentInput.trim() || isPosting" aria-label="댓글 등록" @click="postComment">
@@ -267,11 +361,80 @@ async function retryAnalysis() {
       </button>
     </div>
 
-    <AIFeedbackModal v-if="showFeedbackModal && video?.analysis" :is-open="showFeedbackModal" :video-id="videoId" :techniques="video.analysis.techniques" :is-dynamic="video.analysis.isDynamic ?? null" @close="showFeedbackModal = false" />
+    <AIFeedbackModal
+      v-if="showFeedbackModal && video?.analysis"
+      :is-open="showFeedbackModal"
+      :video-id="videoId"
+      :techniques="video.analysis.techniques"
+      :is-dynamic="video.analysis.isDynamic ?? null"
+      @close="showFeedbackModal = false"
+    />
+
+    <!-- 수정 / 삭제 선택 (내 영상 전용) -->
+    <IonModal v-if="isOwner" class="options-modal" :is-open="showActionSheet" :initial-breakpoint="1" :breakpoints="[0, 1]" @did-dismiss="showActionSheet = false">
+      <div class="options-sheet">
+        <div class="options-grabber" aria-hidden="true" />
+        <p class="options-label micro-label">영상 관리</p>
+        <button
+          class="option-row"
+          aria-label="영상 수정"
+          @click="
+            showActionSheet = false;
+            showEditModal = true;
+          "
+        >
+          <IonIcon :icon="createOutline" aria-hidden="true" />
+          <span>수정</span>
+        </button>
+        <button
+          class="option-row option-row--danger"
+          aria-label="영상 삭제"
+          @click="
+            showActionSheet = false;
+            showDeleteDialog = true;
+          "
+        >
+          <IonIcon :icon="trashOutline" aria-hidden="true" />
+          <span>삭제</span>
+        </button>
+      </div>
+    </IonModal>
+
+    <!-- 삭제 확인 (내 영상 전용) -->
+    <ConfirmDialog
+      v-if="isOwner"
+      :open="showDeleteDialog"
+      title="영상 삭제"
+      message="삭제하면 복구할 수 없어요."
+      confirm-text="삭제"
+      cancel-text="취소"
+      danger
+      @confirm="
+        showDeleteDialog = false;
+        onDeleteConfirm();
+      "
+      @cancel="showDeleteDialog = false"
+    />
+
+    <!-- 수정 모달 (내 영상 전용) -->
+    <VideoEditModal v-if="isOwner" :open="showEditModal" :video="video" @save="onEditSave" @cancel="showEditModal = false" />
   </IonPage>
 </template>
 
 <style scoped>
+.more-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--fg);
+  font-size: 22px;
+  display: grid;
+  place-items: center;
+  padding: 6px;
+  width: 44px;
+  height: 44px;
+}
+
 .page-skeleton {
   display: flex;
   flex-direction: column;
@@ -279,7 +442,7 @@ async function retryAnalysis() {
   padding-top: 16px;
 }
 
-/* ── Desktop 2-pane layout ────────────────────────── */
+/* ── Desktop 2-pane layout ───────────────────────── */
 @media (min-width: 1024px) {
   .video-detail-layout {
     display: flex;
@@ -309,14 +472,13 @@ async function retryAnalysis() {
     overflow-y: auto;
   }
   .sidebar-scroll .comments-section {
-    padding-bottom: 24px; /* override mobile safe-area padding via higher specificity */
+    padding-bottom: 24px;
   }
   .comment-bar--desktop {
     position: static;
     padding-bottom: 12px;
     flex-shrink: 0;
   }
-  /* Video fill the pane height */
   .video-pane .video-wrap {
     width: 100%;
     height: 100%;
@@ -355,7 +517,7 @@ async function retryAnalysis() {
   gap: 16px;
 }
 
-/* Title */
+/* 제목 */
 .title-row {
   display: flex;
   align-items: flex-start;
@@ -376,6 +538,7 @@ async function retryAnalysis() {
   margin-top: 2px;
 }
 
+/* 작성자 (남의 영상) */
 .author-row {
   display: flex;
   align-items: center;
@@ -392,7 +555,9 @@ async function retryAnalysis() {
   text-align: left;
   min-width: 0;
 }
-.author-link:active { opacity: 0.6; }
+.author-link:active {
+  opacity: 0.6;
+}
 .avatar {
   width: 40px;
   height: 40px;
@@ -420,20 +585,150 @@ async function retryAnalysis() {
   text-overflow: ellipsis;
 }
 
+/* 메타 (내 영상) */
+.meta-row {
+  font-size: var(--fs-caption);
+  color: var(--fg-muted);
+  margin-top: -8px;
+}
+
+/* ── AI 분석 섹션 ────────────────────────────────── */
 .ai-section {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
-.ai-pending {
-  flex-direction: row;
+.ai-header {
+  display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
+}
+.ai-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   color: var(--fg-muted);
+}
+.ai-pending {
+  gap: 10px;
+}
+
+.progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.progress-label-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .analyzing-text {
   font-size: var(--fs-caption);
+  color: var(--fg);
+  font-weight: 600;
 }
+.progress-pct {
+  font-size: var(--fs-caption);
+  font-weight: 700;
+  color: var(--fg-muted);
+  min-width: 36px;
+  text-align: right;
+}
+.ai-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--hold-lime);
+  flex-shrink: 0;
+  animation: blink 1.2s ease-in-out infinite;
+}
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.progress-bar-wrap {
+  height: 3px;
+  background: var(--border);
+  border-radius: var(--r-chip);
+  overflow: hidden;
+}
+.progress-bar-fill {
+  height: 100%;
+  background: var(--hold-lime);
+  border-radius: var(--r-chip);
+  transition: width 0.5s ease;
+}
+
+.analysis-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 4px;
+}
+.analysis-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+  position: relative;
+}
+.analysis-step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: 26px;
+  width: 1.5px;
+  height: calc(100% - 6px);
+  background: var(--border);
+}
+.analysis-step.done::after {
+  background: var(--hold-lime);
+  opacity: 0.4;
+}
+
+.step-icon-wrap {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  z-index: 1;
+}
+.step-icon {
+  font-size: 18px;
+  color: var(--hold-lime);
+}
+.step-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--border);
+  display: block;
+  margin: auto;
+}
+.analysis-step.active .step-dot {
+  background: var(--hold-lime);
+  animation: blink 1.2s ease-in-out infinite;
+}
+.step-label {
+  font-size: 12px;
+  color: var(--fg-muted);
+  font-weight: 500;
+}
+.analysis-step.done .step-label,
+.analysis-step.active .step-label {
+  color: var(--fg);
+}
+
 .ai-failed {
   flex-direction: row;
   align-items: center;
@@ -468,6 +763,7 @@ async function retryAnalysis() {
   padding: 0;
 }
 
+/* 액션 */
 .actions {
   display: flex;
   gap: 24px;
@@ -478,13 +774,29 @@ async function retryAnalysis() {
   padding-top: 18px;
   border-top: 1px solid var(--border);
 }
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: var(--fs-body);
+  color: var(--fg-muted);
+}
+.action-btn ion-icon {
+  font-size: 22px;
+}
+.liked {
+  color: var(--hold-pink);
+}
 
-/* ── Comments ───────────────────────────────────── */
+/* ── 댓글 ────────────────────────────────────────── */
 .comments-section {
   margin-top: 24px;
   padding-top: 20px;
   border-top: 1px solid var(--border);
-  padding-bottom: 96px; /* clear fixed input bar */
+  padding-bottom: 96px;
 }
 .comments-title {
   font-size: 16px;
@@ -529,6 +841,14 @@ async function retryAnalysis() {
   font-weight: 700;
   flex-shrink: 0;
 }
+.c-avatar-btn {
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+.c-avatar-btn:active {
+  opacity: 0.6;
+}
 .c-body {
   flex: 1;
   min-width: 0;
@@ -542,12 +862,6 @@ async function retryAnalysis() {
   font-size: 13px;
   font-weight: 700;
 }
-.c-avatar-btn {
-  border: none;
-  cursor: pointer;
-  font-family: inherit;
-}
-.c-avatar-btn:active { opacity: 0.6; }
 .c-name-btn {
   background: none;
   border: none;
@@ -556,7 +870,9 @@ async function retryAnalysis() {
   color: var(--fg);
   font-family: inherit;
 }
-.c-name-btn:active { opacity: 0.6; }
+.c-name-btn:active {
+  opacity: 0.6;
+}
 .c-time {
   font-size: 11px;
   color: var(--fg-muted);
@@ -577,7 +893,7 @@ async function retryAnalysis() {
   padding: 2px 4px;
 }
 
-/* ── Comment input bar (fixed) ──────────────────── */
+/* ── 댓글 입력바 ─────────────────────────────────── */
 .comment-bar {
   position: absolute;
   left: 0;
@@ -629,23 +945,47 @@ async function retryAnalysis() {
   height: 18px;
   --color: #fff;
 }
-.action-btn {
+
+/* ── 영상 관리 옵션 시트 ─────────────────────────── */
+.options-modal {
+  --border-radius: var(--r-sheet);
+  --height: auto;
+}
+.options-sheet {
+  background: var(--bg);
+  padding: 10px 0 calc(20px + env(safe-area-inset-bottom));
+}
+.options-grabber {
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border);
+  margin: 0 auto 16px;
+}
+.options-label {
+  padding: 0 22px 8px;
+  margin: 0;
+}
+.option-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 14px;
+  width: 100%;
+  padding: 16px 22px;
   background: none;
   border: none;
-  cursor: pointer;
+  font-family: var(--font-sans);
   font-size: var(--fs-body);
-  color: var(--fg-muted);
-}
-.action-btn ion-icon {
-  font-size: 22px;
-}
-.liked {
-  color: var(--hold-pink);
-}
-.saved {
+  font-weight: var(--w-semibold);
   color: var(--fg);
+  cursor: pointer;
+  text-align: left;
+}
+.option-row ion-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.option-row--danger {
+  color: var(--hold-pink);
 }
 </style>

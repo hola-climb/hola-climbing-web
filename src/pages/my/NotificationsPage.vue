@@ -199,6 +199,6 @@ onMounted(() => load(true))
 
 .unread-dot {
   width: 8px; height: 8px; border-radius: 50%;
-  background: var(--hold-lime); flex-shrink: 0; margin-top: 6px;
+  background: var(--hold-lime-ink); flex-shrink: 0; margin-top: 6px;
 }
 </style>

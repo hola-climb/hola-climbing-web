@@ -373,9 +373,7 @@ export const videoService = {
           // API may return techniques as string[] — convert to TechniqueTag[]
           const rawTechs = res.data.techniques as unknown as Array<string | TechniqueTag>;
           if (Array.isArray(rawTechs) && rawTechs.length > 0 && typeof rawTechs[0] === "string") {
-            res.data.techniques = (rawTechs as string[])
-              .filter((k) => k.trim() !== "")
-              .map((key) => ({ key, confidence: 0.8, userFeedback: null }));
+            res.data.techniques = (rawTechs as string[]).filter((k) => k.trim() !== "").map((key) => ({ key, confidence: 0.8, userFeedback: null }));
           } else if (!Array.isArray(rawTechs)) {
             res.data.techniques = [];
           }
@@ -389,13 +387,8 @@ export const videoService = {
   submitFeedback: (
     videoId: string,
     payload: {
-      techniqueLabel: string;
-      isCorrect: boolean;
       isDynamic: boolean;
       techniques: string[];
-      timestampSec?: number;
-      correctLabel?: string;
-      note?: string;
     },
   ) => api.post(`/videos/${videoId}/analysis/feedback`, payload),
 
@@ -430,6 +423,9 @@ export const videoService = {
   updateComment: (commentId: string, content: string) => api.patch<Comment>(`/comments/${commentId}`, { content }),
 
   deleteComment: (commentId: string) => api.delete(`/comments/${commentId}`),
+
+  // 공유
+  getShareUrl: (videoId: string) => api.get<{ shareUrl: string }>(`/videos/${videoId}/share`),
 
   // ── Reports ───────────────────────────────────────────────────────────────
 

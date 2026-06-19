@@ -51,6 +51,10 @@ export default defineConfig({
         target: "https://www.hola-climb.app",
         changeOrigin: true,
       },
+      "/videos": {
+        target: "https://www.hola-climb.app",
+        changeOrigin: true,
+      },
     },
   },
 });

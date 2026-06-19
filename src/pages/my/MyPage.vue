@@ -5,7 +5,7 @@ import { IonPage, IonHeader, IonToolbar, IonContent } from "@ionic/vue";
 import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
 import LoadingState from "@/components/common/LoadingState.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
-import BaseButton from "@/components/common/BaseButton.vue";
+import ProfileEditModal from "@/components/common/ProfileEditModal.vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useUIStore } from "@/stores/ui";
@@ -25,46 +25,12 @@ const hasScrolled = ref(false);
 
 const avatarInitial = computed(() => authStore.user?.nickname?.charAt(0).toUpperCase() ?? "J");
 
-const profileSub = computed(() => {
-  const most = techniqueStats.value?.mostUsed;
-  if (most) return `주력 기술 · ${getTagLabel(most)}`;
-  if (authStore.user?.createdAt) {
-    const d = new Date(authStore.user.createdAt);
-    return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")} 가입`;
-  }
-  return "클라이머";
-});
+// ── Profile edit modal ─────────────────────────────
+const showEditModal = ref(false);
 
-// ── Inline profile edit ────────────────────────────
-const isEditing = ref(false);
-const editNickname = ref("");
-const editBio = ref("");
-const isSavingProfile = ref(false);
-
-function startEdit() {
-  editNickname.value = authStore.user?.nickname ?? "";
-  editBio.value = authStore.user?.bio ?? "";
-  isEditing.value = true;
-}
-function cancelEdit() {
-  isEditing.value = false;
-}
-async function saveProfile() {
-  if (!editNickname.value.trim()) {
-    uiStore.showToast("닉네임을 입력해주세요.", "warning");
-    return;
-  }
-  isSavingProfile.value = true;
-  try {
-    await authStore.updateProfile({ nickname: editNickname.value.trim(), bio: editBio.value.trim() || null });
-    isEditing.value = false;
-    uiStore.showToast("프로필이 저장됐어요.");
-  } catch (err: unknown) {
-    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-    uiStore.showToast(msg ?? "저장에 실패했어요.", "danger");
-  } finally {
-    isSavingProfile.value = false;
-  }
+function onProfileSaved() {
+  showEditModal.value = false;
+  uiStore.showToast("프로필이 저장됐어요.");
 }
 
 function goFollows(tab: "followers" | "following") {
@@ -170,56 +136,37 @@ onMounted(load);
           <div class="glow glow-pink" aria-hidden="true" />
           <div class="glow glow-lime" aria-hidden="true" />
 
-          <!-- View mode -->
-          <template v-if="!isEditing">
-            <div class="hero-top">
-              <div class="avatar-dark" :aria-label="`${authStore.user?.nickname ?? ''} 아바타`">
-                <img v-if="authStore.user?.profileImageUrl" :src="authStore.user.profileImageUrl" :alt="`${authStore.user?.nickname ?? ''} 프로필`" class="avatar-img" />
-                <template v-else>{{ avatarInitial }}</template>
-              </div>
-              <div class="profile-info">
-                <div class="profile-name">{{ authStore.user?.nickname ?? "—" }}</div>
-                <!-- <div class="profile-sub">{{ profileSub }}</div> -->
-                <p v-if="authStore.user?.bio" class="profile-bio">{{ authStore.user.bio }}</p>
-              </div>
-              <button class="edit-btn" aria-label="프로필 편집" @click="startEdit">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                </svg>
-              </button>
+          <div class="hero-top">
+            <div class="avatar-dark" :aria-label="`${authStore.user?.nickname ?? ''} 아바타`">
+              <img v-if="authStore.user?.profileImageUrl" :src="authStore.user.profileImageUrl" :alt="`${authStore.user?.nickname ?? ''} 프로필`" class="avatar-img" />
+              <template v-else>{{ avatarInitial }}</template>
             </div>
+            <div class="profile-info">
+              <div class="profile-name">{{ authStore.user?.nickname ?? "—" }}</div>
+              <!-- <div class="profile-sub">{{ profileSub }}</div> -->
+              <p v-if="authStore.user?.bio" class="profile-bio">{{ authStore.user.bio }}</p>
+            </div>
+            <button class="edit-btn" aria-label="프로필 편집" @click="showEditModal = true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+              </svg>
+            </button>
+          </div>
 
-            <!-- Social / activity stats -->
-            <div class="hero-stats">
-              <button class="hero-stat" @click="goFollows('followers')">
-                <span class="hs-val">{{ authStore.user?.followerCount ?? 0 }}</span>
-                <span class="hs-lbl">팔로워</span>
-              </button>
-              <button class="hero-stat" @click="goFollows('following')">
-                <span class="hs-val">{{ authStore.user?.followingCount ?? 0 }}</span>
-                <span class="hs-lbl">팔로잉</span>
-              </button>
-              <button class="hero-stat" @click="router.push('/my/videos')">
-                <span class="hs-val">{{ stats?.totalVideos ?? authStore.user?.videoCount ?? 0 }}</span>
-                <span class="hs-lbl">영상</span>
-              </button>
-            </div>
-          </template>
-
-          <!-- Edit mode -->
-          <div v-else class="profile-edit">
-            <div class="edit-field">
-              <label class="edit-label" for="edit-nickname">닉네임</label>
-              <input id="edit-nickname" v-model="editNickname" class="edit-input" type="text" maxlength="20" placeholder="닉네임" aria-label="닉네임" />
-            </div>
-            <div class="edit-field">
-              <label class="edit-label" for="edit-bio">소개</label>
-              <textarea id="edit-bio" v-model="editBio" class="edit-input edit-textarea" rows="3" maxlength="200" placeholder="클라이머 소개 (선택)" aria-label="소개" />
-            </div>
-            <div class="edit-actions">
-              <BaseButton variant="secondary" class="edit-btn-flex" :disabled="isSavingProfile" @click="cancelEdit">취소</BaseButton>
-              <BaseButton variant="primary" class="edit-btn-flex" :loading="isSavingProfile" @click="saveProfile">저장</BaseButton>
-            </div>
+          <!-- Social / activity stats -->
+          <div class="hero-stats">
+            <button class="hero-stat" @click="goFollows('followers')">
+              <span class="hs-val">{{ authStore.user?.followerCount ?? 0 }}</span>
+              <span class="hs-lbl">팔로워</span>
+            </button>
+            <button class="hero-stat" @click="goFollows('following')">
+              <span class="hs-val">{{ authStore.user?.followingCount ?? 0 }}</span>
+              <span class="hs-lbl">팔로잉</span>
+            </button>
+            <button class="hero-stat" @click="router.push('/my/videos')">
+              <span class="hs-val">{{ stats?.totalVideos ?? authStore.user?.videoCount ?? 0 }}</span>
+              <span class="hs-lbl">영상</span>
+            </button>
           </div>
         </div>
 
@@ -273,6 +220,8 @@ onMounted(load);
       </div>
 
       <ConfirmDialog :open="showLogoutAlert" title="로그아웃" message="정말 로그아웃하시겠어요?" confirm-text="로그아웃" @confirm="handleLogout" @cancel="showLogoutAlert = false" />
+
+      <ProfileEditModal :open="showEditModal" @saved="onProfileSaved" @cancel="showEditModal = false" />
     </IonContent>
   </IonPage>
 </template>
@@ -481,52 +430,6 @@ onMounted(load);
   letter-spacing: 0.04em;
   /* color: var(--fg-muted); */
   color: gray;
-}
-
-/* Inline edit */
-.profile-edit {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  position: relative;
-  z-index: 1;
-}
-.edit-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.edit-label {
-  font-size: var(--fs-micro);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--fg-muted);
-}
-.edit-input {
-  width: 100%;
-  border: 1px solid var(--border);
-  border-radius: var(--r-input);
-  background: var(--surface);
-  padding: 12px 14px;
-  font-family: var(--font-sans);
-  font-size: var(--fs-body);
-  color: var(--fg);
-  outline: none;
-}
-.edit-input:focus {
-  border-color: var(--fg);
-}
-.edit-textarea {
-  resize: none;
-  line-height: 1.45;
-}
-.edit-actions {
-  display: flex;
-  gap: 8px;
-}
-.edit-btn-flex {
-  flex: 1;
 }
 
 /* ── Headline stats ─────────────────────────────── */

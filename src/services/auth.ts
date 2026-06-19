@@ -55,8 +55,26 @@ export const authService = {
   getMe: () =>
     api.get<User>('/users/me'),
 
-  updateProfile: (payload: Partial<Pick<User, 'nickname' | 'profileImageUrl' | 'bio'>>) =>
+  /** 내 정보 수정 — PATCH /api/users/me (닉네임/소개만)
+   *  주의: profileImage 를 body 에 넣으면 400 C001. 이미지는 별도 multipart API.
+   *  bio 를 빈 문자열("")로 보내면 소개가 지워진다. null 은 "변경 안 함" 시맨틱. */
+  updateProfile: (payload: { nickname?: string; bio?: string }) =>
     api.patch<User>('/users/me', payload),
+
+  /** 프로필 이미지 업로드/교체 — POST /api/users/me/profile-image (multipart)
+   *  허용: jpg/jpeg/png, 최대 5MB. 응답은 갱신된 MyProfileResponse. */
+  uploadProfileImage: (image: File) => {
+    const form = new FormData()
+    form.append('image', image)
+    return api.post<User>('/users/me/profile-image', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+
+  /** 프로필 이미지 삭제 — DELETE /api/users/me/profile-image
+   *  (백엔드 추가 예정. 응답은 갱신된 MyProfileResponse 가정.) */
+  deleteProfileImage: () =>
+    api.delete<User>('/users/me/profile-image'),
 
   deleteAccount: (password: string, reason?: string) =>
     api.delete('/users/me', { data: { password, reason } }),
