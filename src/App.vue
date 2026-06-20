@@ -8,8 +8,37 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted, onUnmounted } from 'vue';
 import { IonApp, IonRouterOutlet, IonToast } from '@ionic/vue';
+import { useRouter } from 'vue-router';
+import { Capacitor } from '@capacitor/core';
+import type { PluginListenerHandle } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
 import { useUIStore } from '@/stores/ui';
 
 const uiStore = useUIStore();
+const router = useRouter();
+
+// 네이티브 소셜 로그인 콜백: 제공자가 com.hola.climbing://oauth/{provider}?code= 로
+// 돌려보내면 OS 가 이 리스너를 깨운다. 웹 콜백 페이지와 동일 라우트로 보내 처리 통일.
+const OAUTH_SCHEME_PREFIX = 'com.hola.climbing://oauth/';
+let urlOpenHandle: PluginListenerHandle | null = null;
+
+onMounted(async () => {
+  if (!Capacitor.isNativePlatform()) return;
+  urlOpenHandle = await CapacitorApp.addListener('appUrlOpen', ({ url }) => {
+    if (!url.startsWith(OAUTH_SCHEME_PREFIX)) return;
+    try {
+      const parsed = new URL(url);
+      const slug = parsed.pathname.replace(/^\/+/, '');
+      router.replace({ path: `/auth/oauth/${slug}/callback`, query: Object.fromEntries(parsed.searchParams) });
+    } catch (err) {
+      if (import.meta.env.DEV) console.error(err);
+    }
+  });
+});
+
+onUnmounted(() => {
+  void urlOpenHandle?.remove();
+});
 </script>

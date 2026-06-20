@@ -1,6 +1,7 @@
 import api from './client'
 import type {
-  AuthTokens, BlockedUser, FollowUser, LoginPayload,
+  AuthTokens, BlockedUser, FollowUser, LoginPayload, LoginTokens,
+  OAuthExchangeRequest, OAuthLoginResponse, OAuthSignupRequest,
   PageResponse, RegisterPayload, Term, User, UserPublicProfile,
 } from '@/types/api'
 
@@ -23,9 +24,15 @@ export const authService = {
   getTerms: () =>
     api.get<Term[]>('/terms'),
 
-  // Social login — not in spec yet, kept for future
-  socialLogin: (provider: 'google' | 'kakao' | 'naver', code: string, redirectUri: string) =>
-    api.post<LoginResponse>(`/auth/social/${provider}`, { code, redirectUri }),
+  /** 소셜 로그인 1단계 — 인가코드 교환 (POST /api/auth/oauth/exchange).
+   *  signupRequired 로 기존/신규 분기. (oauth-social-login-contract 참고) */
+  oauthExchange: (payload: OAuthExchangeRequest) =>
+    api.post<OAuthLoginResponse>('/auth/oauth/exchange', payload),
+
+  /** 소셜 로그인 2단계 — 신규 유저 가입 완료 (POST /api/auth/oauth/signup).
+   *  응답은 자체 로그인과 동일한 토큰 모양. 가입 즉시 로그인된다. */
+  oauthSignup: (payload: OAuthSignupRequest) =>
+    api.post<LoginTokens>('/auth/oauth/signup', payload),
 
   refresh: (refreshToken: string) =>
     api.post<AuthTokens>('/auth/refresh', { refreshToken }),

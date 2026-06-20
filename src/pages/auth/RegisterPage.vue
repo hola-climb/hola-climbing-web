@@ -82,7 +82,7 @@ function onPasswordInput() {
 async function loadTerms() {
   try {
     const { data } = await authService.getTerms();
-    terms.value = data;
+    terms.value = [...data].sort((a, b) => a.termId - b.termId);
     // default all to false
     agreed.value = Object.fromEntries(data.map((t) => [t.termId, false]));
   } catch (err: unknown) {

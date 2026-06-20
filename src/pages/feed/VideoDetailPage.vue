@@ -69,6 +69,36 @@ const commentInput = ref("");
 const isPosting = ref(false);
 const commentCount = computed(() => comments.value.length);
 
+const editingCommentId = ref<string | null>(null);
+const editInput = ref("");
+const isUpdating = ref(false);
+
+function startEdit(c: Comment) {
+  editingCommentId.value = c.id;
+  editInput.value = c.content;
+}
+
+function cancelEdit() {
+  editingCommentId.value = null;
+  editInput.value = "";
+}
+
+async function submitEdit(commentId: string) {
+  const content = editInput.value.trim();
+  if (!content || isUpdating.value) return;
+  isUpdating.value = true;
+  try {
+    await videoService.updateComment(commentId, content);
+    const target = comments.value.find((c) => c.id === commentId);
+    if (target) target.content = content;
+    cancelEdit();
+  } catch {
+    uiStore.showToast("댓글 수정에 실패했어요.", "danger");
+  } finally {
+    isUpdating.value = false;
+  }
+}
+
 async function loadComments() {
   commentsLoading.value = true;
   try {
@@ -332,9 +362,19 @@ onMounted(async () => {
                         <button class="c-name c-name-btn" @click="openProfile(c.user.id)">{{ c.user.nickname }}</button>
                         <span class="c-time">{{ formatTime(c.createdAt) }}</span>
                       </div>
-                      <p class="c-content">{{ c.content }}</p>
+                      <template v-if="editingCommentId === c.id">
+                        <div class="c-edit-row">
+                          <input v-model="editInput" class="c-edit-input" type="text" aria-label="댓글 수정" :disabled="isUpdating" @keydown.enter="submitEdit(c.id)" @keydown.esc="cancelEdit" />
+                          <button class="c-edit-save" :disabled="!editInput.trim() || isUpdating" aria-label="수정 저장" @click="submitEdit(c.id)">저장</button>
+                          <button class="c-edit-cancel" :disabled="isUpdating" aria-label="수정 취소" @click="cancelEdit">취소</button>
+                        </div>
+                      </template>
+                      <p v-else class="c-content">{{ c.content }}</p>
                     </div>
-                    <button v-if="authStore.user && c.user.id === authStore.user.id" class="c-del" aria-label="댓글 삭제" @click="deleteComment(c)">삭제</button>
+                    <div v-if="authStore.user && c.user.id === authStore.user.id && editingCommentId !== c.id" class="c-actions">
+                      <button class="c-action-btn" aria-label="댓글 수정" @click="startEdit(c)">수정</button>
+                      <button class="c-action-btn c-action-btn--danger" aria-label="댓글 삭제" @click="deleteComment(c)">삭제</button>
+                    </div>
                   </li>
                 </ul>
               </section>
@@ -583,6 +623,7 @@ onMounted(async () => {
 .author-name {
   font-size: var(--fs-body);
   font-weight: var(--w-semibold);
+  padding-bottom: 4px;
 }
 .sub-line {
   font-size: var(--fs-caption);
@@ -890,14 +931,74 @@ onMounted(async () => {
   margin: 3px 0 0;
   word-break: break-word;
 }
-.c-del {
+.c-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.c-action-btn {
   background: none;
   border: none;
   color: var(--fg-muted);
   font-size: 12px;
   cursor: pointer;
-  flex-shrink: 0;
   padding: 2px 4px;
+  font-family: inherit;
+}
+.c-action-btn--danger {
+  color: var(--hold-pink);
+}
+
+.c-edit-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 4px;
+}
+.c-edit-input {
+  flex: 1;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-input, 14px);
+  background: var(--surface-soft);
+  padding: 0 10px;
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  color: var(--fg);
+  outline: none;
+  min-width: 0;
+}
+.c-edit-input:focus {
+  border-color: var(--fg);
+}
+.c-edit-save {
+  height: 34px;
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--r-button, 14px);
+  background: var(--hold-dark, #151515);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+}
+.c-edit-save:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.c-edit-cancel {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-button, 14px);
+  background: none;
+  color: var(--fg-muted);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
 }
 
 /* ── 댓글 입력바 ─────────────────────────────────── */

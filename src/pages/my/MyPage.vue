@@ -61,10 +61,12 @@ function formatLastClimbed(iso: string | null | undefined): string {
 // Headline stats — derived from real /stats/me
 const headlineStats = computed(() => {
   const s = stats.value;
-  const hours = s ? (s.totalClimbingSeconds / 3600).toFixed(1) : "0";
+  // 1시간 이상이면 시간 단위(소수 1자리), 1시간 미만이면 분 단위로 표시
+  const sec = s?.totalClimbingSeconds ?? 0;
+  const climb = sec >= 3600 ? `${(sec / 3600).toFixed(1)}h` : `${Math.floor(sec / 60)}m`;
   return [
     { value: s?.isDynamic ? "다이나믹" : "스태틱", label: "STYLE" },
-    { value: `${hours}h`, label: "CLIMB" },
+    { value: climb, label: "CLIMB" },
     { value: formatLastClimbed(s?.lastClimbedAt), label: "LAST" },
   ];
 });

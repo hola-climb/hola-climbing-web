@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, computed, watch } from "vue";
-import type { User } from "@/types/api";
+import type { OAuthExchangeRequest, OAuthLoginResponse, OAuthSignupRequest, User } from "@/types/api";
 import { authService } from "@/services/auth";
 import { setObservabilityUser } from "@/services/observability";
 
@@ -50,10 +50,27 @@ export const useAuthStore = defineStore("auth", () => {
     await authService.agreeTerms(agreements);
   }
 
-  async function socialLogin(provider: "google" | "kakao" | "naver", code: string, redirectUri: string) {
+  /** 소셜 로그인 1단계 — 인가코드 교환. 기존 유저면 토큰 적용 후 프로필까지 로드.
+   *  신규 유저면 토큰 없이 OAuthLoginResponse 를 그대로 반환 → 호출부가 가입 화면으로. */
+  async function oauthExchange(payload: OAuthExchangeRequest): Promise<OAuthLoginResponse> {
     isLoading.value = true;
     try {
-      const { data } = await authService.socialLogin(provider, code, redirectUri);
+      const { data } = await authService.oauthExchange(payload);
+      if (!data.signupRequired && data.token) {
+        _applyTokens(data.token.accessToken, data.token.refreshToken);
+        await fetchMe();
+      }
+      return data;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /** 소셜 로그인 2단계 — 신규 유저 가입 완료. 응답 토큰으로 즉시 로그인 상태가 된다. */
+  async function oauthSignup(payload: OAuthSignupRequest) {
+    isLoading.value = true;
+    try {
+      const { data } = await authService.oauthSignup(payload);
       _applyTokens(data.accessToken, data.refreshToken);
       await fetchMe();
     } finally {
@@ -176,7 +193,8 @@ export const useAuthStore = defineStore("auth", () => {
     login,
     register,
     agreeTerms,
-    socialLogin,
+    oauthExchange,
+    oauthSignup,
     logout,
     fetchMe,
     updateProfile,

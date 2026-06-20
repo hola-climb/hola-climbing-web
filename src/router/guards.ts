@@ -12,8 +12,9 @@ export async function authGuard(to: RouteLocationNormalized, _from: RouteLocatio
   const authPaths = ["/auth/login", "/auth/register", "/auth/password-reset"];
   const isAuthPath = authPaths.some((path) => to.path.startsWith(path));
 
-  // Public content paths — accessible without authentication (per spec)
-  const publicPaths = ["/feed", "/explore", "/verify-email", "/videos", "/users", "gyms"];
+  // Public content paths — accessible without authentication (per spec).
+  // 소셜 콜백/가입 단계는 로그인 전 상태에서 접근해야 하므로 공개 취급한다.
+  const publicPaths = ["/feed", "/explore", "/verify-email", "/videos", "/users", "gyms", "/auth/oauth", "/auth/social-signup"];
   const isPublicPath = publicPaths.some((path) => to.path.startsWith(path));
 
   // 백엔드 인증 메일 링크가 /feed?token=... 형태로 오는 경우 → /verify-email로 리다이렉트

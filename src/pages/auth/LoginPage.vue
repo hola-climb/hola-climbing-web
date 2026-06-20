@@ -7,11 +7,14 @@ import { useRouter, useRoute } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useUIStore } from "@/stores/ui";
 import { authService } from "@/services/auth";
+import { useOAuth } from "@/composables/useOAuth";
+import { OAuthProvider } from "@/types/api";
 
 const router = useRouter();
 const route = useRoute();
 const authStore = useAuthStore();
 const uiStore = useUIStore();
+const { startLogin: startSocialLogin } = useOAuth();
 
 const email = ref("");
 const password = ref("");
@@ -110,9 +113,9 @@ async function handleLogin() {
           <div class="divider"><span>또는</span></div>
 
           <div class="social-btns">
-            <button class="social-btn kakao" aria-label="카카오로 로그인">카카오로 시작하기</button>
-            <button class="social-btn google" aria-label="구글로 로그인">Google로 시작하기</button>
-            <button class="social-btn naver" aria-label="네이버로 로그인">네이버로 시작하기</button>
+            <button class="social-btn kakao" aria-label="카카오로 로그인" @click="startSocialLogin(OAuthProvider.KAKAO)">카카오로 시작하기</button>
+            <button class="social-btn google" aria-label="구글로 로그인" @click="startSocialLogin(OAuthProvider.GOOGLE)">Google로 시작하기</button>
+            <button class="social-btn naver" aria-label="네이버로 로그인" @click="startSocialLogin(OAuthProvider.NAVER)">네이버로 시작하기</button>
           </div>
         </div>
 

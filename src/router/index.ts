@@ -79,6 +79,16 @@ const routes: Array<RouteRecordRaw> = [
         path: 'password-reset',
         component: () => import('@/pages/auth/PasswordResetPage.vue'),
       },
+      // 소셜 로그인 콜백 (웹: /auth/oauth/:provider/callback?code=, 네이티브: 딥링크가 이 라우트로 라우팅)
+      {
+        path: 'oauth/:provider/callback',
+        component: () => import('@/pages/auth/OAuthCallbackPage.vue'),
+      },
+      // 소셜 최초 로그인 시 닉네임/약관 동의 단계 (F-01-05)
+      {
+        path: 'social-signup',
+        component: () => import('@/pages/auth/SocialSignupPage.vue'),
+      },
     ],
   },
 

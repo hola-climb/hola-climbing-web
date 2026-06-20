@@ -59,6 +59,49 @@ export interface Term {
   content: string;
 }
 
+// ── Social login (OAuth) ───────────────────────────────────────────────────────
+
+export enum OAuthProvider {
+  GOOGLE = "GOOGLE",
+  KAKAO = "KAKAO",
+  NAVER = "NAVER",
+}
+
+/** 로그인 / 소셜가입 공통 토큰 응답 모양. */
+export interface LoginTokens {
+  accessToken: string;
+  refreshToken: string;
+  tokenType: string;
+}
+
+/** POST /api/auth/oauth/exchange — 프론트가 받은 인가코드를 백엔드로 교환.
+ *  codeVerifier 는 PKCE 용. 네이버는 PKCE 미지원이라 null 로 보낸다. */
+export interface OAuthExchangeRequest {
+  provider: OAuthProvider;
+  code: string;
+  redirectUri: string;
+  codeVerifier: string | null;
+}
+
+/** exchange 응답.
+ *  signupRequired=false → token 채워짐(바로 로그인).
+ *  signupRequired=true  → signupToken + 프리필 필드 채워짐(가입 단계로). */
+export interface OAuthLoginResponse {
+  signupRequired: boolean;
+  token: LoginTokens | null;
+  signupToken: string | null;
+  email: string | null;
+  suggestedNickname: string | null;
+  profileImage: string | null;
+}
+
+/** POST /api/auth/oauth/signup — 신규 소셜 유저의 닉네임/약관 동의 후 가입 완료. */
+export interface OAuthSignupRequest {
+  signupToken: string;
+  nickname: string;
+  termsAgreed: Array<{ termId: number; agreed: boolean }>;
+}
+
 // ── Video ─────────────────────────────────────────────────────────────────────
 
 export type AnalysisStatus = "pending" | "analyzing" | "done" | "failed";
@@ -386,6 +429,7 @@ export interface Gym {
   ratingCount: number; // was "reviewCount"
   distanceKm: number | null;
   isFavorited: boolean;
+  isOpen: boolean | null;
   businessHours?: BusinessHours | null;
   // Kept for mock data / future API support
   logoUrl?: string | null;

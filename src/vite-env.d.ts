@@ -7,6 +7,10 @@ interface ImportMetaEnv {
   readonly VITE_FARO_URL: string
   /** 앱 버전 — Faro 릴리스 태깅용 */
   readonly VITE_APP_VERSION: string
+  /** 소셜 로그인 client_id (공개값). 콘솔에서 발급. 미설정 시 해당 provider 비활성. */
+  readonly VITE_GOOGLE_CLIENT_ID: string
+  readonly VITE_KAKAO_CLIENT_ID: string
+  readonly VITE_NAVER_CLIENT_ID: string
 }
 
 interface ImportMeta {

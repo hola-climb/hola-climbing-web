@@ -54,7 +54,13 @@ const nearestGym = ref<Gym | null>(null);
 const recommendedGyms = ref<RecommendedGym[]>([]);
 const isLocating = ref(false);
 
-const displayGyms = computed(() => (nearbyGyms.value.length ? nearbyGyms.value : gymStore.gyms));
+function sortFavoritesFirst<T extends { isFavorited: boolean }>(list: T[]): T[] {
+  return [...list].sort((a, b) => (b.isFavorited ? 1 : 0) - (a.isFavorited ? 1 : 0));
+}
+
+const displayGyms = computed(() =>
+  sortFavoritesFirst(nearbyGyms.value.length ? nearbyGyms.value : gymStore.gyms)
+);
 const isNearbyMode = computed(() => nearbyGyms.value.length > 0);
 // 추천 섹션은 위치를 한 번이라도 획득(근처 모드)했을 때만 노출
 const showRecoSection = computed(() => isNearbyMode.value);

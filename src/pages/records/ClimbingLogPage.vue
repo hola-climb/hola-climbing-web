@@ -149,7 +149,19 @@ async function loadForEdit() {
     climbedOn.value = data.climbedOn;
     memo.value = data.memo ?? "";
     // 암장 이름 해석 후 선택 상태로 복원
-    let gym: Gym = { id: String(data.gymId), name: "암장", address: "", latitude: 0, longitude: 0, thumbnailUrl: null, ratingAvg: null, ratingCount: 0, distanceKm: null, isFavorited: false };
+    let gym: Gym = {
+      id: String(data.gymId),
+      name: "암장",
+      address: "",
+      latitude: 0,
+      longitude: 0,
+      thumbnailUrl: null,
+      ratingAvg: null,
+      ratingCount: 0,
+      distanceKm: null,
+      isFavorited: false,
+      isOpen: false,
+    };
     try {
       const { data: g } = await gymService.getGym(String(data.gymId));
       gym = { ...gym, name: g.name, address: g.address };

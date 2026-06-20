@@ -23,10 +23,11 @@ const holdColor = computed(() => {
 });
 
 const isOpen = computed(() => {
+  if (props.gym.isOpen !== null && props.gym.isOpen !== undefined) return props.gym.isOpen;
   const days = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
   const today = days[new Date().getDay()];
   const bh = props.gym.businessHours;
-  if (!bh) return true;
+  if (!bh) return null;
   const slot = bh[today];
   if (!slot) return false;
   const now = new Date();
@@ -82,22 +83,51 @@ function openDetail() {
           </span>
         </template>
       </div>
-      <!-- <div class="chip-row">
+      <div class="chip-row">
         <span v-if="source === 'style_match'" class="chip chip-cyan">맞춤</span>
-        <span class="chip" :class="isOpen ? 'chip-lime' : 'chip-dark'">
+        <span v-if="isOpen !== null" class="chip" :class="isOpen ? 'chip-lime' : 'chip-dark'">
           {{ isOpen ? "OPEN" : "CLOSED" }}
         </span>
-        <span v-if="showAiBeta" class="chip chip-cyan">AI BETA</span>
-      </div> -->
+      </div>
     </div>
 
-    <!-- Chevron / favorite -->
-    <!-- <button class="fav-btn" @click="handleFavorite" :aria-label="gym.isFavorited ? '즐겨찾기 해제' : '즐겨찾기 추가'"> -->
-    <!-- chevron right icon -->
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Star favorite icon -->
+    <button class="fav-btn" @click="handleFavorite" :aria-label="gym.isFavorited ? '즐겨찾기 해제' : '즐겨찾기'">
+      <svg v-if="gym.isFavorited" viewBox="0 0 180 200" width="35" height="35" aria-hidden="true" class="star-icon">
+        <defs>
+          <radialGradient id="sh" cx="40%" cy="34%" r="72%">
+            <stop offset="0%" stop-color="#fff" stop-opacity="0.55"></stop>
+            <stop offset="55%" stop-color="#fff" stop-opacity="0"></stop>
+          </radialGradient>
+        </defs>
+        <path
+          d="M 89.4 46.4 Q 100.0 20.0 110.6 46.4 L 110.6 46.4 Q 121.2 72.9 149.6 74.8 L 149.6 74.8 Q 178.0 76.7 156.1 94.9 L 156.1 94.9 Q 134.2 113.1 141.2 140.7 L 141.2 140.7 Q 148.2 168.3 124.1 153.2 L 124.1 153.2 Q 100.0 138.0 75.9 153.2 L 75.9 153.2 Q 51.8 168.3 58.8 140.7 L 58.8 140.7 Q 65.8 113.1 43.9 94.9 L 43.9 94.9 Q 22.0 76.7 50.4 74.8 L 50.4 74.8 Q 78.8 72.9 89.4 46.4 Z"
+          fill="#22D3EE"
+          stroke="#066a78"
+          stroke-width="2"
+          stroke-opacity="0.18"
+          stroke-linejoin="round"
+        ></path>
+        <path
+          d="M 89.4 46.4 Q 100.0 20.0 110.6 46.4 L 110.6 46.4 Q 121.2 72.9 149.6 74.8 L 149.6 74.8 Q 178.0 76.7 156.1 94.9 L 156.1 94.9 Q 134.2 113.1 141.2 140.7 L 141.2 140.7 Q 148.2 168.3 124.1 153.2 L 124.1 153.2 Q 100.0 138.0 75.9 153.2 L 75.9 153.2 Q 51.8 168.3 58.8 140.7 L 58.8 140.7 Q 65.8 113.1 43.9 94.9 L 43.9 94.9 Q 22.0 76.7 50.4 74.8 L 50.4 74.8 Q 78.8 72.9 89.4 46.4 Z"
+          fill="url(#sh)"
+        ></path>
+      </svg>
+      <svg v-else viewBox="0 0 200 200" width="30" height="30" aria-hidden="true" class="star-icon">
+        <path
+          d="M 89.4 46.4 Q 100.0 20.0 110.6 46.4 L 110.6 46.4 Q 121.2 72.9 149.6 74.8 L 149.6 74.8 Q 178.0 76.7 156.1 94.9 L 156.1 94.9 Q 134.2 113.1 141.2 140.7 L 141.2 140.7 Q 148.2 168.3 124.1 153.2 L 124.1 153.2 Q 100.0 138.0 75.9 153.2 L 75.9 153.2 Q 51.8 168.3 58.8 140.7 L 58.8 140.7 Q 65.8 113.1 43.9 94.9 L 43.9 94.9 Q 22.0 76.7 50.4 74.8 L 50.4 74.8 Q 78.8 72.9 89.4 46.4 Z"
+          fill="none"
+          stroke="#8D96A8"
+          stroke-width="8"
+          stroke-linejoin="round"
+        />
+      </svg>
+    </button>
+
+    <!-- Chevron right -->
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <path d="m9 5 7 7-7 7" />
     </svg>
-    <!-- </button> -->
   </div>
 </template>
 

@@ -60,6 +60,8 @@ interface RawGymSummary {
   lng?: number | null;
   distanceKm?: number | null;
   isFavorited?: boolean;
+  isFavorite?: boolean;
+  isOpen?: boolean | null;
   businessHours?: Record<string, RawDayHours | null> | null;
 }
 
@@ -89,7 +91,8 @@ function toGym(raw: RawGymSummary): Gym {
     ratingAvg: raw.ratingAvg != null ? Number(raw.ratingAvg) : null,
     ratingCount: raw.ratingCount ?? 0,
     distanceKm: raw.distanceKm != null ? Number(raw.distanceKm) : null,
-    isFavorited: raw.isFavorited ?? false,
+    isFavorited: raw.isFavorite ?? raw.isFavorited ?? false,
+    isOpen: raw.isOpen ?? null,
     businessHours: toBusinessHours(raw.businessHours),
   };
 }
@@ -185,6 +188,9 @@ export const gymService = {
       },
     };
   },
+
+  updateReview: (reviewId: string, rating: number, content: string) =>
+    api.patch(`/gyms/reviews/${reviewId}`, { rating, content }),
 
   deleteReview: (reviewId: string) => api.delete(`/gyms/reviews/${reviewId}`),
 
