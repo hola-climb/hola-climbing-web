@@ -1,7 +1,7 @@
 import api from './client'
 import type {
   AuthTokens, BlockedUser, FollowUser, LoginPayload, LoginTokens,
-  OAuthExchangeRequest, OAuthLoginResponse, OAuthSignupRequest,
+  OAuthResultRequest, OAuthResultResponse, OAuthSignupRequest,
   PageResponse, RegisterPayload, Term, User, UserPublicProfile,
 } from '@/types/api'
 
@@ -24,10 +24,10 @@ export const authService = {
   getTerms: () =>
     api.get<Term[]>('/terms'),
 
-  /** 소셜 로그인 1단계 — 인가코드 교환 (POST /api/auth/oauth/exchange).
-   *  signupRequired 로 기존/신규 분기. (oauth-social-login-contract 참고) */
-  oauthExchange: (payload: OAuthExchangeRequest) =>
-    api.post<OAuthLoginResponse>('/auth/oauth/exchange', payload),
+  /** 소셜 로그인 결과 조회 — 콜백의 1회용 oauthCode 로 로그인 결과를 받는다
+   *  (POST /api/auth/oauth/result). status 로 기존/신규/이메일중복 분기. */
+  oauthResult: (payload: OAuthResultRequest) =>
+    api.post<OAuthResultResponse>('/auth/oauth/result', payload),
 
   /** 소셜 로그인 2단계 — 신규 유저 가입 완료 (POST /api/auth/oauth/signup).
    *  응답은 자체 로그인과 동일한 토큰 모양. 가입 즉시 로그인된다. */

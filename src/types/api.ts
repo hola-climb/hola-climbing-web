@@ -74,25 +74,29 @@ export interface LoginTokens {
   tokenType: string;
 }
 
-/** POST /api/auth/oauth/exchange — 프론트가 받은 인가코드를 백엔드로 교환.
- *  codeVerifier 는 PKCE 용. 네이버는 PKCE 미지원이라 null 로 보낸다. */
-export interface OAuthExchangeRequest {
-  provider: OAuthProvider;
+/** 백엔드 OAuth redirect 흐름은 프론트가 SDK/인가코드를 직접 다루지 않는다.
+ *  프론트는 /authorize 로 페이지 이동 → 백엔드가 provider·콜백을 처리 →
+ *  프론트 /oauth/callback 으로 oauthCode 를 들고 돌아옴 → /result 로 결과 조회. */
+
+/** /result 응답 상태.
+ *  LOGGED_IN: 기존 소셜 유저(token 채워짐) / SIGNUP_REQUIRED: 신규(signupToken+프리필) /
+ *  EMAIL_ALREADY_EXISTS: 같은 이메일의 자체가입 계정 존재(토큰·signupToken 둘 다 없음). */
+export type OAuthStatus = "LOGGED_IN" | "SIGNUP_REQUIRED" | "EMAIL_ALREADY_EXISTS";
+
+/** POST /api/auth/oauth/result — 콜백에서 받은 1회용 oauthCode 로 로그인 결과 조회. */
+export interface OAuthResultRequest {
   code: string;
-  redirectUri: string;
-  codeVerifier: string | null;
 }
 
-/** exchange 응답.
- *  signupRequired=false → token 채워짐(바로 로그인).
- *  signupRequired=true  → signupToken + 프리필 필드 채워짐(가입 단계로). */
-export interface OAuthLoginResponse {
+export interface OAuthResultResponse {
+  status: OAuthStatus;
   signupRequired: boolean;
-  token: LoginTokens | null;
-  signupToken: string | null;
-  email: string | null;
-  suggestedNickname: string | null;
-  profileImage: string | null;
+  /** 상태에 따라 일부만 채워진다(LOGGED_IN→token, SIGNUP_REQUIRED→signupToken+프리필). */
+  token?: LoginTokens | null;
+  signupToken?: string | null;
+  email?: string | null;
+  suggestedNickname?: string | null;
+  profileImage?: string | null;
 }
 
 /** POST /api/auth/oauth/signup — 신규 소셜 유저의 닉네임/약관 동의 후 가입 완료. */

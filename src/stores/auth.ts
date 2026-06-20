@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, computed, watch } from "vue";
-import type { OAuthExchangeRequest, OAuthLoginResponse, OAuthSignupRequest, User } from "@/types/api";
+import type { OAuthResultRequest, OAuthResultResponse, OAuthSignupRequest, User } from "@/types/api";
 import { authService } from "@/services/auth";
 import { setObservabilityUser } from "@/services/observability";
 
@@ -50,13 +50,13 @@ export const useAuthStore = defineStore("auth", () => {
     await authService.agreeTerms(agreements);
   }
 
-  /** 소셜 로그인 1단계 — 인가코드 교환. 기존 유저면 토큰 적용 후 프로필까지 로드.
-   *  신규 유저면 토큰 없이 OAuthLoginResponse 를 그대로 반환 → 호출부가 가입 화면으로. */
-  async function oauthExchange(payload: OAuthExchangeRequest): Promise<OAuthLoginResponse> {
+  /** 소셜 로그인 결과 조회 — 콜백의 oauthCode 로 결과를 받는다. status==LOGGED_IN 이면
+   *  토큰 적용 후 프로필까지 로드. 그 외(신규/이메일중복)는 응답을 그대로 반환 → 호출부가 분기. */
+  async function oauthResult(payload: OAuthResultRequest): Promise<OAuthResultResponse> {
     isLoading.value = true;
     try {
-      const { data } = await authService.oauthExchange(payload);
-      if (!data.signupRequired && data.token) {
+      const { data } = await authService.oauthResult(payload);
+      if (data.status === "LOGGED_IN" && data.token) {
         _applyTokens(data.token.accessToken, data.token.refreshToken);
         await fetchMe();
       }
@@ -193,7 +193,7 @@ export const useAuthStore = defineStore("auth", () => {
     login,
     register,
     agreeTerms,
-    oauthExchange,
+    oauthResult,
     oauthSignup,
     logout,
     fetchMe,

@@ -1,31 +1,19 @@
 <script setup lang="ts">
 import { onMounted } from "vue";
 import { IonPage, IonContent } from "@ionic/vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 import { useOAuth } from "@/composables/useOAuth";
-import { useUIStore } from "@/stores/ui";
-import { providerFromSlug } from "@/services/oauth";
 
-// 제공자 로그인 후 돌아오는 웹 콜백(/auth/oauth/:provider/callback?code=&state=).
-// 네이티브 딥링크도 App.vue 가 이 라우트로 라우팅해 동일 경로로 처리된다.
+// 백엔드가 provider 처리를 마친 뒤 돌아오는 프론트 콜백(/oauth/callback?oauthCode=).
+// 네이티브 딥링크(com.hola.climbing://oauth/callback)도 App.vue 가 이 라우트로 라우팅한다.
+// oauthCode 는 1회용(TTL 1분)이라 마운트 시 즉시 한 번만 처리한다.
 const route = useRoute();
-const router = useRouter();
-const uiStore = useUIStore();
 const { handleCallback } = useOAuth();
 
 onMounted(() => {
-  const slug = String(route.params.provider ?? "");
-  const provider = providerFromSlug(slug);
-  if (!provider) {
-    uiStore.showToast("알 수 없는 로그인 경로예요.", "danger");
-    router.replace("/auth/login");
-    return;
-  }
-  void handleCallback(provider, {
-    code: route.query.code as string | undefined,
-    state: route.query.state as string | undefined,
-    error: route.query.error as string | undefined,
-    errorDescription: route.query.error_description as string | undefined,
+  void handleCallback({
+    oauthCode: route.query.oauthCode as string | undefined,
+    oauthError: route.query.oauthError as string | undefined,
   });
 });
 </script>
