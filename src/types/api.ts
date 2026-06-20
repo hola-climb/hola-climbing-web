@@ -455,6 +455,26 @@ export interface RecommendedGym extends Gym {
   rankingDistance: number | null; // pgvector cosine distance, style ranking 불가 시 null
 }
 
+/** POST /api/reports — 신고 대상 종류 */
+export type ReportTargetType = "video" | "comment" | "user";
+
+/** POST /api/reports — 신고 사유 카테고리 */
+export enum ReportCategory {
+  OBSCENE = "obscene",
+  COPYRIGHT = "copyright",
+  HATE = "hate",
+  SPAM = "spam",
+  ETC = "etc",
+}
+
+export const REPORT_CATEGORY_LABELS: Record<ReportCategory, string> = {
+  [ReportCategory.OBSCENE]: "음란물",
+  [ReportCategory.COPYRIGHT]: "저작권 침해",
+  [ReportCategory.HATE]: "욕설/혐오",
+  [ReportCategory.SPAM]: "스팸/광고",
+  [ReportCategory.ETC]: "기타",
+};
+
 /** GET /api/gyms/{id}/reviews — backend GymReviewResponse (+ resolved user) */
 export interface GymReview {
   id: string;

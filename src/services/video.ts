@@ -8,6 +8,8 @@ import type {
   PageResponse,
   RawRecommendedVideo,
   RegisterVideoPayload,
+  ReportCategory,
+  ReportTargetType,
   TechniqueTag,
   ThumbnailUploadResponse,
   UpdateVideoPayload,
@@ -438,5 +440,6 @@ export const videoService = {
 
   // ── Reports ───────────────────────────────────────────────────────────────
 
-  report: (targetType: "video" | "comment" | "user", targetId: string, category: string, reason?: string) => api.post("/reports", { targetType, targetId, category, reason }),
+  report: (targetType: ReportTargetType, targetId: string, category: ReportCategory, reason?: string) =>
+    api.post("/reports", { targetType, targetId: Number(targetId), category, reason }),
 };

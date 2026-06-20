@@ -3,6 +3,7 @@ import { ref, computed, watch } from "vue";
 import type { OAuthResultRequest, OAuthResultResponse, OAuthSignupRequest, User } from "@/types/api";
 import { authService } from "@/services/auth";
 import { setObservabilityUser } from "@/services/observability";
+import { pushService } from "@/services/push";
 
 export const useAuthStore = defineStore("auth", () => {
   // state
@@ -18,7 +19,12 @@ export const useAuthStore = defineStore("auth", () => {
   // id만 전달(이메일·닉네임 등 PII 금지).
   watch(
     () => user.value?.id,
-    (id) => setObservabilityUser(id || undefined),
+    (id) => {
+      setObservabilityUser(id || undefined);
+      // 인증 상태로 전환되면 FCM 토큰을 등록 (로그인·소셜·세션복원 공통 진입점).
+      // fire-and-forget — 권한 거부/미지원은 push 서비스 내부에서 흡수한다.
+      if (id) void pushService.register();
+    },
   );
 
   // actions
@@ -79,6 +85,8 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   async function logout() {
+    // 토큰 해제는 인증이 유효한 동안(토큰 삭제 전) 호출해야 서버 인증을 통과한다.
+    await pushService.unregister();
     const refreshToken = localStorage.getItem("refresh_token");
     if (refreshToken) {
       try {
@@ -161,6 +169,7 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   async function deleteAccount(password: string) {
+    await pushService.unregister();
     await authService.deleteAccount(password);
     _clearTokens();
     user.value = null;

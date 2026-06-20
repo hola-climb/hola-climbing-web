@@ -9,6 +9,7 @@ import AIResultBadge from "@/components/video/AIResultBadge.vue";
 import AIFeedbackModal from "@/components/video/AIFeedbackModal.vue";
 import VideoPlayer from "@/components/video/VideoPlayer.vue";
 import VideoEditModal from "@/components/video/VideoEditModal.vue";
+import ReportModal from "@/components/common/ReportModal.vue";
 import { useRoute, useRouter } from "vue-router";
 import { useVideoStore } from "@/stores/video";
 import { useAuthStore } from "@/stores/auth";
@@ -16,7 +17,7 @@ import { useUIStore } from "@/stores/ui";
 import { useMediaQuery } from "@/composables/useMediaQuery";
 import { videoService } from "@/services/video";
 import { gradeColor, gradeTextColor } from "@/utils/gradeColor";
-import type { Comment } from "@/types/api";
+import type { Comment, ReportTargetType } from "@/types/api";
 import { useShare } from "@/composables/useShare";
 
 const route = useRoute();
@@ -33,6 +34,20 @@ const showActionSheet = ref(false);
 const showDeleteDialog = ref(false);
 const showEditModal = ref(false);
 const isDeleting = ref(false);
+
+// 신고
+const showReportModal = ref(false);
+const reportTarget = ref<{ type: ReportTargetType; id: string } | null>(null);
+
+function openReport(type: ReportTargetType, id: string) {
+  if (!authStore.isAuthenticated) {
+    uiStore.openLoginSheet();
+    return;
+  }
+  reportTarget.value = { type, id };
+  showReportModal.value = true;
+  showActionSheet.value = false;
+}
 
 const video = computed(() => videoStore.currentVideo);
 const isOwner = computed(() => authStore.user && video.value?.user.id === authStore.user.id);
@@ -227,8 +242,11 @@ onMounted(async () => {
 <template>
   <IonPage>
     <AppHeader :title="isOwner ? '내 영상' : '영상'">
-      <template v-if="isOwner" #action>
-        <button class="more-btn" aria-label="더보기" @click="showActionSheet = true">
+      <template #action>
+        <button v-if="isOwner" class="more-btn" aria-label="더보기" @click="showActionSheet = true">
+          <IonIcon :icon="ellipsisVertical" />
+        </button>
+        <button v-else-if="video" class="more-btn" aria-label="영상 신고" @click="openReport('video', videoId)">
           <IonIcon :icon="ellipsisVertical" />
         </button>
       </template>
@@ -375,6 +393,9 @@ onMounted(async () => {
                       <button class="c-action-btn" aria-label="댓글 수정" @click="startEdit(c)">수정</button>
                       <button class="c-action-btn c-action-btn--danger" aria-label="댓글 삭제" @click="deleteComment(c)">삭제</button>
                     </div>
+                    <div v-else-if="!authStore.user || c.user.id !== authStore.user.id" class="c-actions">
+                      <button class="c-action-btn" aria-label="댓글 신고" @click="openReport('comment', c.id)">신고</button>
+                    </div>
                   </li>
                 </ul>
               </section>
@@ -459,6 +480,15 @@ onMounted(async () => {
 
     <!-- 수정 모달 (내 영상 전용) -->
     <VideoEditModal v-if="isOwner" :open="showEditModal" :video="video" @save="onEditSave" @cancel="showEditModal = false" />
+
+    <!-- 신고 모달 -->
+    <ReportModal
+      v-if="reportTarget"
+      :open="showReportModal"
+      :target-type="reportTarget.type"
+      :target-id="reportTarget.id"
+      @close="showReportModal = false"
+    />
   </IonPage>
 </template>
 

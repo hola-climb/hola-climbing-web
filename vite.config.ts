@@ -27,6 +27,10 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
+        // SPA navigation fallback(index.html)이 /api 풀페이지 이동까지 가로채면
+        // 백엔드 OAuth redirect(/api/auth/oauth/*)가 SPA로 새서 /feed 로 튕긴다.
+        // /api 로의 네비게이션은 가로채지 말고 서버(백엔드)로 그대로 보낸다.
+        navigateFallbackDenylist: [/^\/api\//],
       },
     }),
   ],

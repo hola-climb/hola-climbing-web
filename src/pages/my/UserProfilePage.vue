@@ -7,6 +7,7 @@ import { ellipsisHorizontal } from 'ionicons/icons'
 import AppHeader from '@/components/common/AppHeader.vue'
 import LoadingState from '@/components/common/LoadingState.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
+import ReportModal from '@/components/common/ReportModal.vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/services/client'
 import { authService } from '@/services/auth'
@@ -50,12 +51,20 @@ function formatDate(iso: string) {
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
 }
 
+const showReportModal = ref(false)
+
 const moreButtons = computed(() => [
+  { text: '신고', handler: openReport },
   isBlocked.value
     ? { text: '차단 해제', handler: handleUnblock }
     : { text: '차단', role: 'destructive', handler: handleBlock },
   { text: '취소', role: 'cancel' as const },
 ])
+
+function openReport() {
+  if (!authStore.isAuthenticated) { uiStore.openLoginSheet(); return }
+  showReportModal.value = true
+}
 
 async function loadVideos() {
   try {
@@ -249,12 +258,15 @@ async function handleFollow() {
         </template>
       </div>
 
-      <!-- 더보기 액션 시트 (차단/차단 해제) -->
+      <!-- 더보기 액션 시트 (신고/차단/차단 해제) -->
       <IonActionSheet
         :is-open="showMoreSheet"
         :buttons="moreButtons"
         @did-dismiss="showMoreSheet = false"
       />
+
+      <!-- 사용자 신고 모달 -->
+      <ReportModal :open="showReportModal" target-type="user" :target-id="userId" @close="showReportModal = false" />
     </IonContent>
   </IonPage>
 </template>
