@@ -28,7 +28,12 @@ jobs:
         run: npm ci
 
       - name: Build (production)
-        run: npm run build # .env.production 의 VITE_API_BASE_URL=/api 사용
+        run: npm run build # 웹은 API_BASE를 /api로 하드코딩 → VITE_API_BASE_URL 불필요
+        env:
+          # .env.production 은 gitignore 라 CI 에는 없음. Faro collector URL 은
+          # 클라이언트 JS 에 노출되는 공개 키이므로 워크플로우에 직접 주입한다.
+          VITE_FARO_URL: https://faro-collector-prod-ap-northeast-0.grafana.net/collect/eddfec18f71f62e8fd1a5c19e6e23778
+          VITE_APP_VERSION: 0.1.0
 
       - name: Upload dist to Nginx VM
         uses: appleboy/scp-action@v0.1.7
