@@ -34,6 +34,9 @@ jobs:
           # 클라이언트 JS 에 노출되는 공개 키이므로 워크플로우에 직접 주입한다.
           VITE_FARO_URL: https://faro-collector-prod-ap-northeast-0.grafana.net/collect/eddfec18f71f62e8fd1a5c19e6e23778
           VITE_APP_VERSION: 0.1.0
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+          VITE_KAKAO_CLIENT_ID: ${{ secrets.VITE_KAKAO_CLIENT_ID }}
+          VITE_NAVER_CLIENT_ID: ${{ secrets.VITE_NAVER_CLIENT_ID }}
 
       - name: Upload dist to Nginx VM
         uses: appleboy/scp-action@v0.1.7
