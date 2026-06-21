@@ -71,41 +71,23 @@ interface RawVideoDetail {
   updatedAt: string;
 }
 
-/** Raw GET /api/videos/{id}/comments item — backend CommentResponse (no nested user) */
 interface RawComment {
   id: number;
   videoId: number;
   userId: number;
+  nickname?: string | null;
+  profileImage?: string | null;
   parentId: number | null;
   content: string;
   createdAt: string;
 }
 
-// Shared author-profile cache so comment lists don't refetch the same user.
-const userCache = new Map<string, { id: string; nickname: string; profileImage: string | null }>();
-
-async function resolveUser(userId: string): Promise<{ id: string; nickname: string; profileImage: string | null }> {
-  if (userCache.has(userId)) return userCache.get(userId)!;
-  try {
-    const { data } = await api.get<{ userId?: number; id?: number; nickname: string; profileImage?: string | null; profileImageUrl?: string | null }>(`/users/${userId}`);
-    const user = {
-      id: String(data.id ?? data.userId ?? userId),
-      nickname: data.nickname ?? "사용자",
-      profileImage: data.profileImage ?? data.profileImageUrl ?? null,
-    };
-    userCache.set(userId, user);
-    return user;
-  } catch {
-    return { id: userId, nickname: "사용자", profileImage: null };
-  }
-}
-
-function toComment(raw: RawComment, user: { id: string; nickname: string; profileImage: string | null }): Comment {
+function toComment(raw: RawComment): Comment {
   return {
     id: String(raw.id),
     videoId: String(raw.videoId),
     parentId: raw.parentId != null ? String(raw.parentId) : null,
-    user,
+    user: { id: String(raw.userId), nickname: raw.nickname ?? "사용자", profileImage: raw.profileImage ?? null },
     content: raw.content,
     createdAt: raw.createdAt,
     updatedAt: null,
@@ -124,13 +106,21 @@ export const videoService = {
   getVideo: async (id: string): Promise<{ data: Video }> => {
     const { data: raw } = await api.get<RawVideoDetail>(`/videos/${id}`);
 
-    const [gymRes, analysisRes] = await Promise.allSettled([
+    const [userRes, gymRes, analysisRes] = await Promise.allSettled([
+      api.get<{ userId?: number; id?: number; nickname: string; profileImage?: string | null; profileImageUrl?: string | null }>(`/users/${raw.userId}`),
       raw.gymId != null ? api.get<{ id: number; name: string }>(`/gyms/${raw.gymId}`) : Promise.reject(new Error("no_gym")),
       // Analysis is owner-only on the backend; non-owners get 403 → ignored.
       raw.status === "done" ? videoService.getAnalysis(String(raw.id)) : Promise.reject(new Error("not_done")),
     ]);
 
-    const user = { id: String(raw.userId), nickname: raw.nickname ?? "사용자", profileImage: raw.profileImage ?? null };
+    const user =
+      userRes.status === "fulfilled"
+        ? {
+            id: String(userRes.value.data.id ?? userRes.value.data.userId ?? raw.userId),
+            nickname: raw.nickname ?? userRes.value.data.nickname ?? "사용자",
+            profileImage: raw.profileImage ?? userRes.value.data.profileImage ?? userRes.value.data.profileImageUrl ?? null,
+          }
+        : { id: String(raw.userId), nickname: raw.nickname ?? "사용자", profileImage: raw.profileImage ?? null };
 
     const gym = gymRes.status === "fulfilled" ? { id: String(gymRes.value.data.id), name: gymRes.value.data.name } : null;
 
@@ -402,22 +392,12 @@ export const videoService = {
 
   getComments: async (videoId: string, params?: { page?: number; size?: number }): Promise<{ data: PageResponse<Comment> }> => {
     const { data } = await api.get<PageResponse<RawComment>>(`/videos/${videoId}/comments`, { params });
-    // Resolve unique authors once, then map each comment.
-    const uniqueIds = [...new Set(data.content.map((c) => String(c.userId)))];
-    const users = await Promise.all(uniqueIds.map((id) => resolveUser(id)));
-    const userMap = new Map(users.map((u) => [u.id, u]));
-    return {
-      data: {
-        ...data,
-        content: data.content.map((c) => toComment(c, userMap.get(String(c.userId)) ?? { id: String(c.userId), nickname: "사용자", profileImage: null })),
-      },
-    };
+    return { data: { ...data, content: data.content.map(toComment) } };
   },
 
   addComment: async (videoId: string, content: string, parentId?: string): Promise<{ data: Comment }> => {
     const { data: raw } = await api.post<RawComment>(`/videos/${videoId}/comments`, { content, parentId: parentId ?? null });
-    const user = await resolveUser(String(raw.userId));
-    return { data: toComment(raw, user) };
+    return { data: toComment(raw) };
   },
 
   updateComment: (commentId: string, content: string) => api.patch<Comment>(`/comments/${commentId}`, { content }),

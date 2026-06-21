@@ -1,11 +1,12 @@
 import api from './client'
 import type { ChatMessage, ChatRoom, PageResponse, VideoUser } from '@/types/api'
-import { resolveUser, resolveUsers } from './userResolver'
+import { resolveUser } from './userResolver'
 
 interface RawChatMessage {
   id: number
   roomId: number
   userId: number
+  nickname?: string | null
   content: string
   verifiedAtGym: boolean
   createdAt: string
@@ -26,12 +27,11 @@ export const chatService = {
   /** 최근 메시지 (미리보기/이력) — GET /api/chats/gyms/{gymId}/messages */
   getMessages: async (gymId: string, params?: { page?: number; size?: number }): Promise<{ data: PageResponse<ChatMessage> }> => {
     const { data } = await api.get<PageResponse<RawChatMessage>>(`/chats/gyms/${gymId}/messages`, { params })
-    const userMap = await resolveUsers(data.content.map((m) => m.userId))
     return {
       data: {
         ...data,
         content: data.content.map((m) =>
-          toChatMessage(m, userMap.get(String(m.userId)) ?? { id: String(m.userId), nickname: '사용자', profileImage: null }),
+          toChatMessage(m, { id: String(m.userId), nickname: m.nickname ?? '사용자', profileImage: null }),
         ),
       },
     }

@@ -9,6 +9,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useUIStore } from "@/stores/ui";
 import { authService } from "@/services/auth";
 import type { Term } from "@/types/api";
+import { getErrorMessage } from "@/utils/apiError";
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -116,8 +117,7 @@ async function handleRegister() {
     uiStore.showToast("인증 메일을 보냈어요. 메일 확인 후 로그인해주세요.");
     router.replace("/auth/login");
   } catch (err: unknown) {
-    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-    uiStore.showToast(msg ?? "회원가입에 실패했어요.", "danger");
+    uiStore.showToast(getErrorMessage(err, "회원가입에 실패했어요."), "danger");
   } finally {
     isLoading.value = false;
   }

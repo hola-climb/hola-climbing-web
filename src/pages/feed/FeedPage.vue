@@ -24,6 +24,7 @@ const hasScrolled = ref(false);
 const greetingHour = new Date().getHours();
 const greeting = greetingHour < 6 || greetingHour > 22 ? "오늘 하루도 수고했어요" : greetingHour < 12 ? "좋은 아침이에요" : "오늘도 높이 올라요";
 const showInitialLoading = computed(() => videoStore.isLoadingFeed && videoStore.feedVideos.length === 0);
+const hasUnread = computed(() => uiStore.unreadCount > 0);
 
 function durationLabel(sec: number | null): string {
   if (!sec || sec <= 0) return "";
@@ -76,11 +77,11 @@ watch(
       <IonToolbar class="transparent-toolbar">
         <div class="toolbar-inner">
           <span class="brand">HOLA</span>
-          <button class="icon-btn" @click="router.push('/my/notifications')" aria-label="알림">
+          <button class="icon-btn" @click="router.push('/my/notifications')" :aria-label="hasUnread ? '알림, 안 읽은 알림 있음' : '알림'">
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
               <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10 21a2 2 0 0 0 4 0" />
             </svg>
-            <span v-if="uiStore.unreadCount > 0" class="noti-badge">{{ uiStore.unreadCount > 99 ? "99+" : uiStore.unreadCount }}</span>
+            <span v-if="hasUnread" class="noti-dot" aria-hidden="true" />
           </button>
         </div>
       </IonToolbar>
@@ -232,20 +233,16 @@ watch(
   place-items: center;
   position: relative;
 }
-.noti-badge {
+.noti-dot {
   position: absolute;
-  top: 0;
-  right: 0;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 999px;
+  top: 4px;
+  right: 4px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
   background: var(--hold-pink);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 16px;
-  text-align: center;
+  border: 2px solid var(--bg);
+  box-sizing: content-box;
 }
 
 /* ── Greeting ───────────────────────────────────── */

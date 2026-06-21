@@ -5,6 +5,7 @@ import BaseSheet from "@/components/common/BaseSheet.vue";
 import BaseButton from "@/components/common/BaseButton.vue";
 import { useAuthStore } from "@/stores/auth";
 import { useUIStore } from "@/stores/ui";
+import { getErrorMessage, getErrorCode } from "@/utils/apiError";
 
 const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{
@@ -112,10 +113,9 @@ function onRemoveImage() {
 }
 
 function mapError(err: unknown): string {
-  const e = err as { response?: { data?: { code?: string; message?: string } } };
-  const code = e.response?.data?.code;
-  if (code === "U008") return "이미 사용 중인 닉네임이에요.";
-  return e.response?.data?.message ?? "저장에 실패했어요.";
+  // 닉네임 중복(U008)은 백엔드 메시지 대신 더 친근한 안내로 덮어쓴다.
+  if (getErrorCode(err) === "U008") return "이미 사용 중인 닉네임이에요.";
+  return getErrorMessage(err, "저장에 실패했어요.");
 }
 
 async function onSave() {

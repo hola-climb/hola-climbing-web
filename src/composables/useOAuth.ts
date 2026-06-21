@@ -7,6 +7,7 @@ import { OAuthProvider } from "@/types/api";
 import { useAuthStore } from "@/stores/auth";
 import { useUIStore } from "@/stores/ui";
 import * as oauth from "@/services/oauth";
+import { getErrorMessage } from "@/utils/apiError";
 
 const SOCIAL_SIGNUP_KEY = "oauth_signup_ctx";
 
@@ -91,8 +92,7 @@ export function useOAuth() {
       router.replace(redirect);
     } catch (err: unknown) {
       if (import.meta.env.DEV) console.error(err);
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      uiStore.showToast(msg ?? "소셜 로그인에 실패했어요.", "danger");
+      uiStore.showToast(getErrorMessage(err, "소셜 로그인에 실패했어요."), "danger");
       router.replace("/auth/login");
     }
   }

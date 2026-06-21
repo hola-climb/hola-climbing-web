@@ -19,6 +19,7 @@ import { gradeColor, gradeTextColor } from "@/utils/gradeColor";
 import { Geolocation } from "@capacitor/geolocation";
 import VideoThumbnail from "@/components/video/VideoThumbnail.vue";
 import type { GymReview, FeedVideo, ChatMessage, BusinessHours } from "@/types/api";
+import { getErrorMessage } from "@/utils/apiError";
 
 const props = defineProps<{ gymId: string }>();
 
@@ -88,8 +89,8 @@ async function submitEditReview() {
     }
     showEditForm.value = false;
     uiStore.showToast("리뷰를 수정했어요.");
-  } catch {
-    uiStore.showToast("리뷰 수정에 실패했어요.", "danger");
+  } catch (err: unknown) {
+    uiStore.showToast(getErrorMessage(err, "리뷰 수정에 실패했어요."), "danger");
   } finally {
     isUpdatingReview.value = false;
   }
@@ -121,7 +122,7 @@ async function loadSections() {
   const [vRes, rRes, cRes] = await Promise.allSettled([
     gymService.getGymVideos(gymId, { page: 0, size: 10 }),
     gymService.getReviews(gymId, { page: 0, size: 20 }),
-    chatService.getMessages(gymId, { page: 0, size: 5 }),
+    chatService.getMessages(gymId, { page: 0, size: 3 }),
   ]);
   if (vRes.status === "fulfilled") videos.value = vRes.value.data.content;
   if (rRes.status === "fulfilled") {
@@ -156,7 +157,9 @@ onMounted(async () => {
     await nextTick();
     if (reviewSentinelRef.value) {
       reviewObserver = new IntersectionObserver(
-        ([entry]) => { if (entry.isIntersecting) loadMoreReviews(); },
+        ([entry]) => {
+          if (entry.isIntersecting) loadMoreReviews();
+        },
         { threshold: 0 },
       );
       reviewObserver.observe(reviewSentinelRef.value);
@@ -210,8 +213,9 @@ async function submitReview() {
     reviews.value.unshift(data);
     showReviewForm.value = false;
     uiStore.showToast("리뷰를 남겼어요.");
-  } catch {
-    uiStore.showToast("리뷰 등록에 실패했어요.", "danger");
+  } catch (err: unknown) {
+    // 백엔드 메시지(예: "이미 리뷰를 작성한 암장입니다.")를 그대로 노출한다.
+    uiStore.showToast(getErrorMessage(err, "리뷰 등록에 실패했어요."), "danger");
   } finally {
     isSubmittingReview.value = false;
   }
@@ -221,8 +225,8 @@ async function deleteReview(r: GymReview) {
   try {
     await gymService.deleteReview(r.id);
     reviews.value = reviews.value.filter((x) => x.id !== r.id);
-  } catch {
-    uiStore.showToast("리뷰 삭제에 실패했어요.", "danger");
+  } catch (err: unknown) {
+    uiStore.showToast(getErrorMessage(err, "리뷰 삭제에 실패했어요."), "danger");
   }
 }
 
@@ -242,8 +246,7 @@ async function enterChat() {
     await chatStore.enterRoom(gymId, token);
   } catch (e: unknown) {
     if (import.meta.env.DEV) console.error("[chat] join failed", e);
-    const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
-    uiStore.showToast(msg ?? "채팅방 입장에 실패했어요.", "danger");
+    uiStore.showToast(getErrorMessage(e, "채팅방 입장에 실패했어요."), "danger");
   }
 }
 
@@ -301,17 +304,15 @@ function setupObserver() {
 
 watch(
   () => chatStore.showChat,
-  async (open) => {
-    if (open) {
-      await nextTick();
-      setupObserver();
-      // 최초 진입 시 맨 아래로 스크롤
-      if (chatLogRef.value) chatLogRef.value.scrollTop = chatLogRef.value.scrollHeight;
-    } else {
-      observer?.disconnect();
-    }
+  (open) => {
+    if (!open) observer?.disconnect();
   },
 );
+
+function onChatModalPresent() {
+  setupObserver();
+  if (chatLogRef.value) chatLogRef.value.scrollTop = chatLogRef.value.scrollHeight;
+}
 
 // '새 메시지' 안내 버튼 — 스크롤을 위로 올린 상태에서 남이 메시지를 보냈을 때 노출.
 const hasNewMessage = ref(false);
@@ -520,7 +521,10 @@ function openVideo(id: string) {
         <div v-else class="review-list">
           <div v-for="r in reviews" :key="r.id" class="review-item hola-card">
             <div class="review-top">
-              <div class="r-avatar">{{ r.user.nickname.charAt(0).toUpperCase() }}</div>
+              <div class="r-avatar">
+                <img v-if="r.user.profileImage" :src="r.user.profileImage" :alt="`${r.user.nickname} 프로필`" class="r-avatar-img" />
+                <template v-else>{{ r.user.nickname.charAt(0).toUpperCase() }}</template>
+              </div>
               <div class="r-meta">
                 <div class="r-name">{{ r.user.nickname }}</div>
                 <div class="r-stars">
@@ -576,7 +580,7 @@ function openVideo(id: string) {
     </BaseSheet>
 
     <!-- Live chat modal -->
-    <IonModal :is-open="showChat" @did-dismiss="onChatDismiss">
+    <IonModal :is-open="showChat" @did-present="onChatModalPresent" @did-dismiss="onChatDismiss">
       <AppHeader :title="gym?.name ?? '채팅'" back-icon="close" @back="leaveChat">
         <template #action>
           <span class="chat-status" :class="chatStore.status">
@@ -607,9 +611,7 @@ function openVideo(id: string) {
       </IonContent>
       <div class="chat-bar-wrap">
         <Transition name="new-msg-fade">
-          <button v-if="hasNewMessage" class="new-msg-btn" aria-label="새 메시지로 이동" @click="scrollChatToBottom">
-            새 메시지 ↓
-          </button>
+          <button v-if="hasNewMessage" class="new-msg-btn" aria-label="새 메시지로 이동" @click="scrollChatToBottom">새 메시지 ↓</button>
         </Transition>
         <div class="chat-bar">
           <input v-model="chatStore.draft" class="chat-input" type="text" placeholder="메시지 입력" aria-label="메시지 입력" @keydown.enter="sendChat($event)" />
@@ -928,6 +930,12 @@ function openVideo(id: string) {
   font-size: 13px;
   font-weight: 700;
   flex-shrink: 0;
+  overflow: hidden;
+}
+.r-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .r-meta {
   flex: 1;

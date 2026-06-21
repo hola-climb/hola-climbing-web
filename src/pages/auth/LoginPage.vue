@@ -9,6 +9,7 @@ import { useUIStore } from "@/stores/ui";
 import { authService } from "@/services/auth";
 import { useOAuth } from "@/composables/useOAuth";
 import { OAuthProvider } from "@/types/api";
+import { getErrorMessage, getErrorCode } from "@/utils/apiError";
 
 const router = useRouter();
 const route = useRoute();
@@ -57,13 +58,13 @@ async function handleLogin() {
     const redirect = (route.query.redirect as string) || "/feed";
     router.replace(redirect);
   } catch (err: unknown) {
-    const res = (err as { response?: { data?: { message?: string; code?: string } } })?.response?.data;
-    const msg = res?.message;
+    const code = getErrorCode(err);
+    const msg = getErrorMessage(err, "로그인에 실패했어요.");
     // 이메일 미인증(U004)으로 인한 실패면 재발송 안내를 노출한다.
-    if (res?.code === "U004" || (msg && msg.includes("인증"))) {
+    if (code === "U004" || msg.includes("인증")) {
       showResend.value = true;
     }
-    uiStore.showToast(msg ?? "로그인에 실패했어요.", "danger");
+    uiStore.showToast(msg, "danger");
   } finally {
     isLoading.value = false;
   }

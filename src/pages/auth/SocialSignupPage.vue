@@ -10,6 +10,7 @@ import { useUIStore } from "@/stores/ui";
 import { authService } from "@/services/auth";
 import { loadSocialSignupContext, clearSocialSignupContext } from "@/composables/useOAuth";
 import type { Term } from "@/types/api";
+import { getErrorMessage } from "@/utils/apiError";
 
 // 소셜 최초 로그인 시 닉네임 입력 + 필수 약관 동의 (F-01-05).
 // 컨텍스트(signupToken·프리필)는 exchange 단계에서 sessionStorage 에 저장돼 있다.
@@ -63,8 +64,7 @@ async function handleSubmit() {
     uiStore.showToast("환영해요! 가입이 완료됐어요.");
     router.replace("/feed");
   } catch (err: unknown) {
-    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-    uiStore.showToast(msg ?? "가입에 실패했어요.", "danger");
+    uiStore.showToast(getErrorMessage(err, "가입에 실패했어요."), "danger");
   } finally {
     isLoading.value = false;
   }

@@ -1,16 +1,51 @@
 <script setup lang="ts">
 // imports → state → methods
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
 import { IonPage, IonContent } from "@ionic/vue";
 import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
 import AppHeader from "@/components/common/AppHeader.vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useUIStore } from "@/stores/ui";
+import { getErrorMessage } from "@/utils/apiError";
+import { notificationService } from "@/services/notification";
+import type { NotificationSettings } from "@/services/notification";
 
 const router = useRouter();
 const authStore = useAuthStore();
 const uiStore = useUIStore();
+
+// ── Notification settings ──────────────────────────
+const notiSettings = ref<NotificationSettings>({
+  notifyComment: true,
+  notifyReply: true,
+  notifyLike: true,
+  notifyFollow: true,
+  notifyChat: true,
+  notifySystem: true,
+});
+const notiLoading = ref(true);
+
+const notiItems: { key: keyof NotificationSettings; label: string }[] = [
+  { key: "notifyComment", label: "댓글" },
+  { key: "notifyReply", label: "답글" },
+  { key: "notifyLike", label: "좋아요" },
+  { key: "notifyFollow", label: "팔로우" },
+  { key: "notifyChat", label: "채팅" },
+  { key: "notifySystem", label: "공지 및 시스템" },
+];
+
+async function toggleNoti(key: keyof NotificationSettings) {
+  const prev = notiSettings.value[key];
+  notiSettings.value[key] = !prev;
+  try {
+    const { data } = await notificationService.updateSettings({ [key]: !prev });
+    notiSettings.value = data;
+  } catch (err: unknown) {
+    notiSettings.value[key] = prev;
+    uiStore.showToast(getErrorMessage(err, "알림 설정 변경에 실패했어요."), "danger");
+  }
+}
 
 // ── Management entries ─────────────────────────────
 const manageItems = [
@@ -21,6 +56,17 @@ const manageItems = [
 
 // ── Logout ─────────────────────────────────────────
 const showLogoutAlert = ref(false);
+
+onMounted(async () => {
+  try {
+    const { data } = await notificationService.getSettings();
+    notiSettings.value = data;
+  } catch {
+    // 조회 실패 시 기본값(전부 true) 유지
+  } finally {
+    notiLoading.value = false;
+  }
+});
 
 async function handleLogout() {
   await authStore.logout();
@@ -45,8 +91,7 @@ async function handleDelete(password: string) {
     router.replace("/auth/login");
     uiStore.showToast("계정이 삭제됐어요.");
   } catch (err: unknown) {
-    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-    uiStore.showToast(msg ?? "계정 삭제에 실패했어요.", "danger");
+    uiStore.showToast(getErrorMessage(err, "계정 삭제에 실패했어요."), "danger");
   } finally {
     isDeleting.value = false;
     showDeleteAlert.value = false;
@@ -61,6 +106,30 @@ async function handleDelete(password: string) {
 
     <IonContent>
       <div class="settings-content page-padding">
+        <!-- Notification settings section -->
+        <section class="settings-section">
+          <h2 class="section-title">알림</h2>
+          <div class="hola-card action-card" :class="{ loading: notiLoading }">
+            <template v-for="(item, i) in notiItems" :key="item.key">
+              <div v-if="i > 0" class="action-divider" />
+              <div class="toggle-row">
+                <span class="action-label">{{ item.label }}</span>
+                <button
+                  class="toggle"
+                  :class="{ on: notiSettings[item.key] }"
+                  role="switch"
+                  :aria-checked="notiSettings[item.key]"
+                  :aria-label="`${item.label} 알림 ${notiSettings[item.key] ? '켜짐' : '꺼짐'}`"
+                  :disabled="notiLoading"
+                  @click="toggleNoti(item.key)"
+                >
+                  <span class="toggle-thumb" />
+                </button>
+              </div>
+            </template>
+          </div>
+        </section>
+
         <!-- Management section -->
         <section class="settings-section">
           <h2 class="section-title">관리</h2>
@@ -175,5 +244,49 @@ async function handleDelete(password: string) {
   height: 1px;
   background: var(--border);
   margin: 0 18px;
+}
+
+/* Toggle row */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+}
+.toggle {
+  position: relative;
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--dur-fast) var(--ease-state);
+}
+.toggle.on {
+  background: var(--hold-lime);
+}
+.toggle:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform var(--dur-fast) var(--ease-state);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.toggle.on .toggle-thumb {
+  transform: translateX(18px);
+}
+.action-card.loading {
+  opacity: 0.6;
+  pointer-events: none;
 }
 </style>

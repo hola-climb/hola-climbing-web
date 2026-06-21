@@ -1,6 +1,5 @@
 import api from "./client";
 import type { BusinessHours, FeedVideo, Gym, GymDetail, GymGrade, GymReview, PageResponse, RawRecommendedVideo, RecommendedGym, Video } from "@/types/api";
-import { resolveUser, resolveUsers } from "./userResolver";
 
 export interface BoardPost {
   id: string;
@@ -14,6 +13,8 @@ interface RawGymReview {
   id: number;
   gymId: number;
   userId: number;
+  nickname?: string | null;
+  profileImage?: string | null;
   rating: number;
   content: string | null;
   createdAt: string;
@@ -156,14 +157,13 @@ export const gymService = {
 
   getReviews: async (gymId: string, params?: { page?: number; size?: number }): Promise<{ data: PageResponse<GymReview> }> => {
     const { data } = await api.get<PageResponse<RawGymReview>>(`/gyms/${gymId}/reviews`, { params });
-    const userMap = await resolveUsers(data.content.map((r) => r.userId));
     return {
       data: {
         ...data,
         content: data.content.map((r) => ({
           id: String(r.id),
           gymId: String(r.gymId),
-          user: userMap.get(String(r.userId)) ?? { id: String(r.userId), nickname: "사용자", profileImage: null },
+          user: { id: String(r.userId), nickname: r.nickname ?? "사용자", profileImage: r.profileImage ?? null },
           rating: r.rating,
           content: r.content,
           createdAt: r.createdAt,
@@ -175,12 +175,11 @@ export const gymService = {
 
   createReview: async (gymId: string, rating: number, content: string): Promise<{ data: GymReview }> => {
     const { data: r } = await api.post<RawGymReview>(`/gyms/${gymId}/reviews`, { rating, content });
-    const user = await resolveUser(String(r.userId));
     return {
       data: {
         id: String(r.id),
         gymId: String(r.gymId),
-        user,
+        user: { id: String(r.userId), nickname: r.nickname ?? "사용자", profileImage: r.profileImage ?? null },
         rating: r.rating,
         content: r.content,
         createdAt: r.createdAt,

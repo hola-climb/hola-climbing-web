@@ -9,6 +9,7 @@ import type { Gym, GymGrade } from "@/types/api";
 import VideoTrimModal from "@/components/video/VideoTrimModal.vue";
 import VideoThumbnailModal from "@/components/video/VideoThumbnailModal.vue";
 import BaseButton from "@/components/common/BaseButton.vue";
+import { getErrorMessage } from "@/utils/apiError";
 
 const router = useRouter();
 const videoStore = useVideoStore();
@@ -145,8 +146,7 @@ async function handleSubmit() {
     router.replace(`/my/videos/${video.id}`);
   } catch (err: unknown) {
     uploadState.value = "failed";
-    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-    uiStore.showToast(msg ?? "업로드에 실패했어요.", "danger");
+    uiStore.showToast(getErrorMessage(err, "업로드에 실패했어요."), "danger");
   }
 }
 </script>

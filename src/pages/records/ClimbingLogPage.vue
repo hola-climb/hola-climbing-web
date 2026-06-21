@@ -9,6 +9,7 @@ import { climbingLogService } from "@/services/climbingLog";
 import { gymService } from "@/services/gym";
 import { useUIStore } from "@/stores/ui";
 import { gradeColor } from "@/utils/gradeColor";
+import { getErrorMessage } from "@/utils/apiError";
 import type { Gym, GymGrade } from "@/types/api";
 
 const router = useRouter();
@@ -133,8 +134,7 @@ async function handleSubmit() {
     }
     router.replace("/records");
   } catch (err: unknown) {
-    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-    uiStore.showToast(msg ?? "저장에 실패했어요.", "danger");
+    uiStore.showToast(getErrorMessage(err, "저장에 실패했어요."), "danger");
   } finally {
     isSaving.value = false;
   }
