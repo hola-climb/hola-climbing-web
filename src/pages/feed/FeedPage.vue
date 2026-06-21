@@ -22,8 +22,7 @@ const brokenThumbs = reactive<Set<string>>(new Set());
 const hasScrolled = ref(false);
 
 const greetingHour = new Date().getHours();
-const greeting = greetingHour < 12 ? "좋은 아침이에요" : greetingHour < 18 ? "오늘도 높이 올라요" : "오늘 하루도 수고했어요";
-
+const greeting = greetingHour < 6 || greetingHour > 22 ? "오늘 하루도 수고했어요" : greetingHour < 12 ? "좋은 아침이에요" : "오늘도 높이 올라요";
 const showInitialLoading = computed(() => videoStore.isLoadingFeed && videoStore.feedVideos.length === 0);
 
 function durationLabel(sec: number | null): string {
@@ -155,8 +154,14 @@ watch(
           <div class="card-meta">
             <div v-if="video.title" class="card-title">{{ video.title }}</div>
             <div class="card-stats">
-              <span class="stat"><AppIcon name="heart" :size="13" /> {{ video.likeCount }}</span>
-              <span class="stat"><AppIcon name="play" :size="12" /> {{ video.viewCount }}</span>
+              <span class="stat">
+                <AppIcon name="heart" :size="13" />
+                {{ video.likeCount }}
+              </span>
+              <span class="stat">
+                <AppIcon name="play" :size="12" />
+                {{ video.viewCount }}
+              </span>
             </div>
           </div>
         </button>

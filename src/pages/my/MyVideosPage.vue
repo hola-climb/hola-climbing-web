@@ -101,7 +101,7 @@ onMounted(async () => {
         <div v-else class="video-grid reveal-on-load">
           <button v-for="video in videos" :key="video.id" class="video-item" :aria-label="`${video.title ?? '제목 없음'} 영상 보기`" @click="goDetail(video)">
             <div class="thumb-wrap">
-              <VideoThumbnail :title="video.title" :thumbnail-url="video.thumbnailUrl" :grade="video.grade" :alt="`${video.title ?? '클라이밍 영상'} 썸네일`" />
+              <VideoThumbnail :title="video.title" :thumbnail-url="video.thumbnailUrl" :grade="video.grade" :gym-name="video.gymName" :alt="`${video.title ?? '클라이밍 영상'} 썸네일`" />
             </div>
             <div class="item-info">
               <p class="item-title">{{ video.title ?? "제목 없음" }}</p>
@@ -202,12 +202,9 @@ onMounted(async () => {
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
 }
-
-@media (min-width: 600px) {
-  .video-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
+@media (min-width: 600px)  { .video-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 900px)  { .video-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 1200px) { .video-grid { grid-template-columns: repeat(5, 1fr); } }
 
 .video-item {
   background: none;

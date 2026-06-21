@@ -647,6 +647,8 @@ onMounted(load);
   padding-top: 16px;
   padding-bottom: 0;
   max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
 }
 .mini-stat {
   padding: 12px;
@@ -670,6 +672,8 @@ onMounted(load);
   padding-top: 24px;
   padding-bottom: 120px;
   max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
 }
 .month-nav {
   display: flex;

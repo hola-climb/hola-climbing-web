@@ -1,6 +1,6 @@
 import api from './client'
 import type {
-  AuthTokens, BlockedUser, FollowUser, LoginPayload, LoginTokens,
+  AgreementStatus, AuthTokens, BlockedUser, FollowUser, LoginPayload, LoginTokens,
   OAuthResultRequest, OAuthResultResponse, OAuthSignupRequest,
   PageResponse, RegisterPayload, Term, User, UserPublicProfile,
 } from '@/types/api'
@@ -23,6 +23,11 @@ export const authService = {
   /** 활성 약관 목록 — GET /api/terms (공개) */
   getTerms: () =>
     api.get<Term[]>('/terms'),
+
+  /** 약관 동의 상태 조회 — GET /api/terms/agreement-status (인증 필요).
+   *  type 별 agreed 여부를 반환. 위치기반서비스(type: 'location') 동의 확인에 사용. */
+  getAgreementStatus: () =>
+    api.get<AgreementStatus>('/terms/agreement-status'),
 
   /** 소셜 로그인 결과 조회 — 콜백의 1회용 oauthCode 로 로그인 결과를 받는다
    *  (POST /api/auth/oauth/result). status 로 기존/신규/이메일중복 분기. */
@@ -108,11 +113,25 @@ export const authService = {
   unfollow: (userId: string) =>
     api.delete<{ isFollowing: boolean; followerCount: number }>(`/users/${userId}/follow`),
 
-  getFollowers: (userId: string, params?: { page?: number; size?: number }) =>
-    api.get<PageResponse<FollowUser>>(`/users/${userId}/followers`, { params }),
+  getFollowers: async (userId: string, params?: { page?: number; size?: number }) => {
+    const res = await api.get<PageResponse<FollowUser & { userId?: number | string; profileImage?: string | null }>>(`/users/${userId}/followers`, { params });
+    res.data.content = res.data.content.map((u) => ({
+      ...u,
+      id: String(u.id ?? u.userId ?? ''),
+      profileImageUrl: u.profileImageUrl ?? u.profileImage ?? null,
+    }));
+    return res as { data: PageResponse<FollowUser> };
+  },
 
-  getFollowing: (userId: string, params?: { page?: number; size?: number }) =>
-    api.get<PageResponse<FollowUser>>(`/users/${userId}/following`, { params }),
+  getFollowing: async (userId: string, params?: { page?: number; size?: number }) => {
+    const res = await api.get<PageResponse<FollowUser & { userId?: number | string; profileImage?: string | null }>>(`/users/${userId}/following`, { params });
+    res.data.content = res.data.content.map((u) => ({
+      ...u,
+      id: String(u.id ?? u.userId ?? ''),
+      profileImageUrl: u.profileImageUrl ?? u.profileImage ?? null,
+    }));
+    return res as { data: PageResponse<FollowUser> };
+  },
 
   // ── Block ─────────────────────────────────────────────────────────────────
 

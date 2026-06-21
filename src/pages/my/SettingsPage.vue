@@ -16,6 +16,7 @@ const uiStore = useUIStore();
 const manageItems = [
   { label: "즐겨찾기 암장", action: () => router.push("/my/favorites") },
   { label: "차단 관리", action: () => router.push("/my/blocks") },
+  { label: "약관 동의 현황", action: () => router.push("/my/terms") },
 ];
 
 // ── Logout ─────────────────────────────────────────

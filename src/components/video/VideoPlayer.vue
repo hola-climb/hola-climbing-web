@@ -145,6 +145,8 @@ onBeforeUnmount(clearHideTimer);
       :src="src"
       :poster="poster"
       playsinline
+      webkit-playsinline
+      preload="metadata"
       :aria-label="ariaLabel"
       @click.stop="togglePlay"
       @play="onPlay"

@@ -3,6 +3,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, onUnmounted } from "vue";
 import { IonContent, IonIcon, IonSpinner, IonModal } from "@ionic/vue";
 import AppHeader from "@/components/common/AppHeader.vue";
+import BaseSheet from "@/components/common/BaseSheet.vue";
 import LoadingState from "@/components/common/LoadingState.vue";
 import BaseButton from "@/components/common/BaseButton.vue";
 import AppIcon from "@/components/common/AppIcon.vue";
@@ -417,7 +418,7 @@ function openVideo(id: string) {
     </div>
 
     <!-- Review write modal -->
-    <IonModal :is-open="showReviewForm" :initial-breakpoint="0.6" :breakpoints="[0, 0.6, 0.95]" @did-dismiss="showReviewForm = false">
+    <BaseSheet :open="showReviewForm" @close="showReviewForm = false">
       <div class="sheet">
         <h2 class="sheet-title">리뷰 쓰기</h2>
         <div class="star-pick" role="radiogroup" aria-label="별점">
@@ -426,12 +427,14 @@ function openVideo(id: string) {
           </button>
         </div>
         <textarea v-model="newReviewContent" class="review-textarea" rows="4" maxlength="1000" placeholder="암장은 어땠나요? (선택)" aria-label="리뷰 내용" />
-        <BaseButton variant="primary" block :loading="isSubmittingReview" :disabled="newRating < 1" @click="submitReview">등록</BaseButton>
       </div>
-    </IonModal>
+      <template #footer>
+        <BaseButton variant="primary" block :loading="isSubmittingReview" :disabled="newRating < 1" @click="submitReview">등록</BaseButton>
+      </template>
+    </BaseSheet>
 
     <!-- Review edit modal -->
-    <IonModal :is-open="showEditForm" :initial-breakpoint="0.6" :breakpoints="[0, 0.6, 0.95]" @did-dismiss="showEditForm = false">
+    <BaseSheet :open="showEditForm" @close="showEditForm = false">
       <div class="sheet">
         <h2 class="sheet-title">리뷰 수정</h2>
         <div class="star-pick" role="radiogroup" aria-label="별점">
@@ -440,9 +443,11 @@ function openVideo(id: string) {
           </button>
         </div>
         <textarea v-model="editContent" class="review-textarea" rows="4" maxlength="1000" placeholder="암장은 어땠나요? (선택)" aria-label="리뷰 내용" />
-        <BaseButton variant="primary" block :loading="isUpdatingReview" :disabled="editRating < 1" @click="submitEditReview">저장</BaseButton>
       </div>
-    </IonModal>
+      <template #footer>
+        <BaseButton variant="primary" block :loading="isUpdatingReview" :disabled="editRating < 1" @click="submitEditReview">저장</BaseButton>
+      </template>
+    </BaseSheet>
 
     <!-- Live chat modal -->
     <IonModal :is-open="showChat" @did-dismiss="onChatDismiss">
@@ -850,10 +855,10 @@ function openVideo(id: string) {
 
 /* Review sheet */
 .sheet {
-  padding: 24px 20px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  padding-top: 8px;
 }
 .sheet-title {
   font-size: var(--fs-h3);

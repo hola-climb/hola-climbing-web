@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // imports → props/emits → composables → state → methods
 import { ref, watch } from "vue";
-import { IonModal } from "@ionic/vue";
+import BaseSheet from "@/components/common/BaseSheet.vue";
 import { videoService } from "@/services/video";
 import { useUIStore } from "@/stores/ui";
 import { ReportCategory, REPORT_CATEGORY_LABELS, type ReportTargetType } from "@/types/api";
@@ -63,64 +63,56 @@ async function submit() {
 </script>
 
 <template>
-  <IonModal class="report-modal" :is-open="open" :initial-breakpoint="0.65" :breakpoints="[0, 1]" @did-dismiss="emit('close')">
-    <div class="sheet">
-      <h2 class="sheet-title">{{ TARGET_LABELS[targetType] }} 신고</h2>
-      <p class="sheet-sub">신고 사유를 선택해주세요.</p>
+  <BaseSheet class="report-modal" :open="open" @close="emit('close')">
+    <h2 class="sheet-title">{{ TARGET_LABELS[targetType] }} 신고</h2>
+    <p class="sheet-sub">신고 사유를 선택해주세요.</p>
 
-      <div class="cat-list" role="radiogroup" aria-label="신고 사유">
-        <button
-          v-for="cat in categories"
-          :key="cat"
-          class="cat-row"
-          :class="{ selected: selectedCategory === cat }"
-          role="radio"
-          :aria-checked="selectedCategory === cat"
-          @click="selectedCategory = cat"
-        >
-          <span class="cat-label">{{ REPORT_CATEGORY_LABELS[cat] }}</span>
-          <span class="cat-radio" aria-hidden="true" />
-        </button>
-      </div>
+    <div class="cat-list" role="radiogroup" aria-label="신고 사유">
+      <button
+        v-for="cat in categories"
+        :key="cat"
+        class="cat-row"
+        :class="{ selected: selectedCategory === cat }"
+        role="radio"
+        :aria-checked="selectedCategory === cat"
+        @click="selectedCategory = cat"
+      >
+        <span class="cat-label">{{ REPORT_CATEGORY_LABELS[cat] }}</span>
+        <span class="cat-radio" aria-hidden="true" />
+      </button>
+    </div>
 
-      <textarea v-model="reason" class="reason-textarea" rows="3" maxlength="500" placeholder="상세 사유를 입력해주세요 (선택)" aria-label="상세 신고 사유" />
+    <textarea v-model="reason" class="reason-textarea" rows="3" maxlength="500" placeholder="상세 사유를 입력해주세요 (선택)" aria-label="상세 신고 사유" />
 
+    <template #footer>
       <div class="sheet-actions">
         <button class="sheet-btn sheet-btn--cancel" :disabled="isSubmitting" @click="emit('close')">취소</button>
         <button class="sheet-btn sheet-btn--submit" :disabled="!selectedCategory || isSubmitting" @click="submit">
           {{ isSubmitting ? "접수 중..." : "신고하기" }}
         </button>
       </div>
-    </div>
-  </IonModal>
+    </template>
+  </BaseSheet>
 </template>
 
 <style scoped>
-.report-modal {
-  --border-radius: var(--r-sheet);
-}
-.sheet {
-  padding: 24px 20px calc(20px + env(safe-area-inset-bottom));
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
 .sheet-title {
   font-size: var(--fs-h3);
   font-weight: var(--w-extrabold);
   letter-spacing: -0.01em;
-  margin: 0;
+  margin: 8px 0 0;
 }
 .sheet-sub {
   font-size: var(--fs-caption);
   color: var(--fg-muted);
-  margin: -8px 0 0;
+  margin: 4px 0 0;
 }
 
 .cat-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  margin-top: 14px;
 }
 .cat-row {
   display: flex;
@@ -158,6 +150,7 @@ async function submit() {
 
 .reason-textarea {
   width: 100%;
+  margin-top: 14px;
   border: 1px solid var(--border);
   border-radius: var(--r-button);
   background: var(--surface-soft);
@@ -175,7 +168,6 @@ async function submit() {
 .sheet-actions {
   display: flex;
   gap: 8px;
-  margin-top: 4px;
 }
 .sheet-btn {
   flex: 1;

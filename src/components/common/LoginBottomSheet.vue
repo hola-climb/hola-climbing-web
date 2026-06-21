@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { IonModal, IonIcon } from '@ionic/vue'
+import { IonIcon } from '@ionic/vue'
 import { closeOutline } from 'ionicons/icons'
 import { useRouter } from 'vue-router'
+import BaseSheet from '@/components/common/BaseSheet.vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 
 defineProps<{ isOpen: boolean }>()
@@ -21,12 +22,7 @@ function goRegister() {
 </script>
 
 <template>
-  <IonModal
-    :is-open="isOpen"
-    :initial-breakpoint="0.45"
-    :breakpoints="[0, 0.45]"
-    @did-dismiss="emit('close')"
-  >
+  <BaseSheet :open="isOpen" :breakpoints="[0, 0.45]" :initial-breakpoint="0.45" :grabber="false" @close="emit('close')">
     <div class="sheet-content">
       <button class="sheet-close close-btn" @click="emit('close')" aria-label="닫기">
         <IonIcon :icon="closeOutline" />
@@ -40,12 +36,12 @@ function goRegister() {
         <BaseButton variant="secondary" block @click="goRegister">회원가입</BaseButton>
       </div>
     </div>
-  </IonModal>
+  </BaseSheet>
 </template>
 
 <style scoped>
 .sheet-content {
-  padding: 24px 20px 40px;
+  padding: 16px 0 calc(16px + env(safe-area-inset-bottom));
   text-align: center;
   position: relative;
 }

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { IonModal, IonButton, IonIcon } from "@ionic/vue";
+import { IonIcon } from "@ionic/vue";
 import { closeOutline, checkmarkOutline, closeCircleOutline } from "ionicons/icons";
+import BaseSheet from "@/components/common/BaseSheet.vue";
 import type { TechniqueTag } from "@/types/api";
 import { getTagLabel } from "@/utils/tagLabels";
 import { useVideoStore } from "@/stores/video";
@@ -98,8 +99,8 @@ async function handleDidDismiss() {
 </script>
 
 <template>
-  <IonModal :is-open="isOpen" :initial-breakpoint="0.75" :breakpoints="[0, 0.75, 1]" @did-dismiss="handleDidDismiss">
-    <div class="modal-content">
+  <BaseSheet :open="isOpen" @close="handleDidDismiss">
+    <template #header>
       <div class="modal-header">
         <span class="modal-title">AI 분석 피드백</span>
         <button class="sheet-close" :class="{ loading: submitting }" @click="handleClose" aria-label="닫기">
@@ -112,8 +113,9 @@ async function handleDidDismiss() {
         <br />
         피드백은 AI 개선에 사용됩니다.
       </p>
+    </template>
 
-      <div class="tag-list">
+    <div class="tag-list">
         <!-- 다이나믹/스태틱 분류 피드백 -->
         <div v-if="isDynamic != null" class="tag-row">
           <span class="tag-label">
@@ -169,15 +171,10 @@ async function handleDidDismiss() {
 
         <p v-if="!techniques.length" class="empty">감지된 기술이 없어요.</p>
       </div>
-    </div>
-  </IonModal>
+  </BaseSheet>
 </template>
 
 <style scoped>
-.modal-content {
-  padding: 20px 20px 40px;
-}
-
 .modal-header {
   display: flex;
   align-items: center;
@@ -192,13 +189,14 @@ async function handleDidDismiss() {
   font-size: var(--fs-caption);
   color: var(--fg-muted);
   line-height: 1.5;
-  margin-bottom: 20px;
+  margin: 0;
 }
 
 .tag-list {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  padding-bottom: 8px;
 }
 
 .tag-row {

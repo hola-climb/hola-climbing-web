@@ -7,6 +7,7 @@ const props = defineProps<{
   title: string | null;
   thumbnailUrl?: string | null;
   grade?: string | null;
+  gymName?: string | null;
   alt?: string;
   /** 상태 배지 표시 (VideoCard 등에서 사용) */
   status?: AnalysisStatus;
@@ -61,8 +62,11 @@ function onError() {
     <!-- Duration badge -->
     <span v-if="durationLabel" class="vt-dur">{{ durationLabel }}</span>
 
-    <!-- Grade badge -->
-    <span v-if="grade && thumbnailUrl && !broken" class="vt-grade-badge" :style="{ background: gradeColor(grade), color: gradeTextColor(gradeColor(grade)) }">{{ grade }}</span>
+    <!-- Grade chip (피드와 동일한 스타일) -->
+    <span v-if="grade || gymName" class="vt-grade-chip">
+      <span v-if="grade" class="vt-grade-dot" :style="{ background: gradeColor(grade) }" aria-hidden="true" />
+      {{ gymName ?? grade }}
+    </span>
 
     <!-- Status badge (pending / analyzing / failed) -->
     <div v-if="status && status !== 'done'" class="vt-status-badge" :class="`vt-status-${status}`">
@@ -105,14 +109,34 @@ function onError() {
   color: rgba(0, 0, 0, 0.55);
 }
 
-.vt-grade-badge {
+.vt-grade-chip {
   position: absolute;
-  top: 6px;
-  left: 6px;
+  top: 8px;
+  left: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: calc(100% - 16px);
   font-size: 11px;
-  font-weight: 800;
-  padding: 2px 7px;
-  border-radius: 999px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+  border-radius: 5px;
+  line-height: 1;
+  padding: 5px 8px;
+  background: rgba(0, 0, 0, 0.6);
+  box-shadow: 0 1px 3px rgba(20, 22, 28, 0.1);
+  backdrop-filter: saturate(140%) blur(6px);
+  -webkit-backdrop-filter: saturate(140%) blur(6px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vt-grade-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border: 1px solid rgba(21, 21, 21, 0.1);
+  border-radius: 50%;
 }
 
 .vt-play {

@@ -59,6 +59,22 @@ export interface Term {
   content: string;
 }
 
+/** GET /api/terms/agreement-status — 약관별 동의 여부 (인증 필요).
+ *  공개 Term 과 달리 content 가 없고 agreed 가 추가된다. */
+export interface TermAgreement {
+  termId: number;
+  type: string;
+  version: string;
+  title: string;
+  required: boolean;
+  agreed: boolean;
+}
+
+export interface AgreementStatus {
+  allRequiredAgreed: boolean;
+  terms: TermAgreement[];
+}
+
 // ── Social login (OAuth) ───────────────────────────────────────────────────────
 
 export enum OAuthProvider {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // imports → props/emits → composables → state → computed → methods
 import { ref, computed, watch, onBeforeUnmount } from "vue";
-import { IonModal } from "@ionic/vue";
+import BaseSheet from "@/components/common/BaseSheet.vue";
 import BaseButton from "@/components/common/BaseButton.vue";
 import { useAuthStore } from "@/stores/auth";
 import { useUIStore } from "@/stores/ui";
@@ -159,10 +159,8 @@ function onCancel() {
 </script>
 
 <template>
-  <IonModal class="edit-modal" :is-open="open" :initial-breakpoint="1" :breakpoints="[0, 1]" @did-dismiss="onCancel">
-    <div class="edit-wrap">
-      <div class="grabber" aria-hidden="true" />
-
+  <BaseSheet class="edit-modal" :open="open" @close="onCancel">
+    <div class="edit-body">
       <header class="edit-head">
         <div class="micro-label">EDIT</div>
         <h2 class="edit-title">프로필 수정</h2>
@@ -197,33 +195,22 @@ function onCancel() {
           <span class="field-count">{{ bio.length }}/{{ BIO_MAX }}</span>
         </div>
       </div>
+    </div>
 
+    <template #footer>
       <div class="edit-actions">
         <BaseButton variant="secondary" class="action-cancel" :disabled="isSaving" @click="onCancel">취소</BaseButton>
         <BaseButton variant="accent" class="action-save" :loading="isSaving" @click="onSave">저장</BaseButton>
       </div>
-    </div>
-  </IonModal>
+    </template>
+  </BaseSheet>
 </template>
 
 <style scoped>
-.edit-modal {
-  --border-radius: var(--r-sheet);
-}
-.edit-wrap {
-  height: 100%;
-  background: var(--bg);
-  padding: 10px 20px calc(24px + env(safe-area-inset-bottom));
+.edit-body {
   display: flex;
   flex-direction: column;
   gap: 20px;
-}
-.grabber {
-  width: 36px;
-  height: 4px;
-  border-radius: 999px;
-  background: var(--border);
-  margin: 0 auto 2px;
 }
 .edit-head {
   display: flex;

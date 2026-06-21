@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // imports → props/emits → methods
-import { IonModal, IonIcon } from "@ionic/vue";
+import { IonIcon } from "@ionic/vue";
 import { videocamOutline, createOutline, chevronForward } from "ionicons/icons";
+import BaseSheet from "@/components/common/BaseSheet.vue";
 
 defineProps<{ open: boolean }>();
 const emit = defineEmits<{
@@ -15,15 +16,8 @@ function choose(choice: "upload" | "record") {
 </script>
 
 <template>
-  <IonModal
-    class="choice-sheet"
-    :is-open="open"
-    :initial-breakpoint="0.42"
-    :breakpoints="[0, 0.42]"
-    @did-dismiss="emit('close')"
-  >
+  <BaseSheet class="choice-sheet" :open="open" :breakpoints="[0, 0.42]" :initial-breakpoint="0.42" @close="emit('close')">
     <div class="sheet">
-      <div class="grabber" aria-hidden="true" />
       <h2 class="sheet-title">무엇을 추가할까요?</h2>
 
       <button class="choice choice--upload" @click="choose('upload')" aria-label="영상 업로드">
@@ -48,25 +42,15 @@ function choose(choice: "upload" | "record") {
         <IonIcon :icon="chevronForward" class="choice-chevron" aria-hidden="true" />
       </button>
     </div>
-  </IonModal>
+  </BaseSheet>
 </template>
 
 <style scoped>
-.choice-sheet {
-  --border-radius: var(--r-sheet);
-}
 .sheet {
-  padding: 10px 20px calc(24px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-.grabber {
-  width: 36px;
-  height: 4px;
-  border-radius: 999px;
-  background: var(--border);
-  margin: 0 auto 4px;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom));
 }
 .sheet-title {
   font-size: var(--fs-h2);

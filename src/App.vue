@@ -66,9 +66,13 @@ async function registerPushListeners() {
 }
 
 onMounted(async () => {
+  // 푸시는 네이티브 전용. iOS Safari(홈화면 PWA 포함) 같은 웹에서 호출하면
+  // @capacitor-firebase/messaging 웹 구현이 Firebase/FCM 서비스워커를 루트
+  // 스코프에 등록해 Workbox SW 와 경합 → 네비게이션 흰 화면을 유발한다.
+  if (!Capacitor.isNativePlatform()) return;
+
   await registerPushListeners();
 
-  if (!Capacitor.isNativePlatform()) return;
   urlOpenHandle = await CapacitorApp.addListener('appUrlOpen', ({ url }) => {
     if (!url.startsWith(OAUTH_SCHEME_PREFIX)) return;
     try {

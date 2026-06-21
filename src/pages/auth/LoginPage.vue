@@ -135,6 +135,9 @@ async function handleLogin() {
   display: flex;
   flex-direction: column;
   padding: 0 20px;
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .auth-hero {

@@ -262,7 +262,7 @@ onMounted(async () => {
         <!-- ── 영상 플레이어 ───────────────────────── -->
         <div class="video-pane">
           <div class="video-wrap">
-            <VideoPlayer v-if="video.streamingUrl" :src="video.streamingUrl" :ariaLabel="`${video.user.nickname}의 클라이밍 영상`" />
+            <VideoPlayer v-if="video.streamingUrl" :src="video.streamingUrl" :poster="video.thumbnailUrl ?? undefined" :ariaLabel="`${video.user.nickname}의 클라이밍 영상`" />
             <div v-else class="video-placeholder">
               <span class="placeholder-text">
                 <span v-if="isAnalyzing" class="ai-dot" aria-hidden="true" />
@@ -310,6 +310,10 @@ onMounted(async () => {
               <div v-if="showAIResult" class="ai-section hola-card">
                 <div class="ai-header">
                   <span class="ai-label">AI 분석</span>
+                  <button class="retry-btn retry-btn--sm" aria-label="분석 재시도" @click="retryAnalysis">
+                    <IonIcon :icon="refreshOutline" />
+                    재시도
+                  </button>
                 </div>
                 <AIResultBadge :techniques="video.analysis!.techniques" :problem-type="video.analysis!.problemType ?? null" :is-dynamic="video.analysis!.isDynamic ?? null" />
                 <button class="feedback-link" @click="showFeedbackModal = true">AI 결과가 맞나요? 피드백 남기기</button>
@@ -336,6 +340,10 @@ onMounted(async () => {
                     <span class="step-label">{{ step.label }}</span>
                   </div>
                 </div>
+                <button class="retry-btn retry-btn--muted" aria-label="분석 재시도" @click="retryAnalysis">
+                  <IonIcon :icon="refreshOutline" />
+                  멈췄나요? 재시도
+                </button>
               </div>
 
               <!-- failed (내 영상 전용) -->
@@ -829,6 +837,21 @@ onMounted(async () => {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
+  font-family: var(--font-sans);
+}
+.retry-btn--sm {
+  background: none;
+  color: var(--fg-muted);
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.retry-btn--muted {
+  background: none;
+  color: var(--fg-muted);
+  border: 1px solid var(--border);
+  align-self: flex-start;
+  margin-top: 4px;
 }
 .feedback-link {
   background: none;

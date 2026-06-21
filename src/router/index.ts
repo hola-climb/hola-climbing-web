@@ -126,6 +126,13 @@ const routes: Array<RouteRecordRaw> = [
     component: () => import('@/pages/my/SettingsPage.vue'),
   },
 
+  // ── Terms agreement status ────────────────────────────────────────────
+  {
+    path: '/my/terms',
+    component: () => import('@/pages/my/TermsAgreementPage.vue'),
+    meta: { requiresAuth: true },
+  },
+
   // ── Favorite gyms ─────────────────────────────────────────────────────
   {
     path: '/my/favorites',

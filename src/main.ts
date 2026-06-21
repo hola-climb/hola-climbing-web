@@ -27,6 +27,27 @@ import { initObservability } from './services/observability'
 // 부팅 단계 에러까지 잡도록 앱 생성 전에 가장 먼저 초기화 (PROD 전용)
 initObservability()
 
+// ── 새 배포 후 stale 청크로 인한 흰 화면 복구 ────────────────────────────
+// autoUpdate SW + lazy 라우트 조합에서, 재배포로 해시 청크 파일명이 바뀌면
+// 메모리에 남아있던 옛 페이지(특히 iOS standalone PWA)가 사라진 청크를
+// import 하다 실패해 흰 화면이 된다. 이때 1회 새로고침으로 최신 청크를 받는다.
+// sessionStorage 플래그로 무한 새로고침 루프를 방지한다.
+const CHUNK_RELOAD_KEY = 'hola:chunk-reloaded'
+function reloadOnceForStaleChunk() {
+  if (sessionStorage.getItem(CHUNK_RELOAD_KEY)) return
+  sessionStorage.setItem(CHUNK_RELOAD_KEY, '1')
+  window.location.reload()
+}
+router.onError((err: unknown) => {
+  const msg = err instanceof Error ? err.message : String(err)
+  if (/dynamically imported module|Importing a module script failed|Failed to fetch/i.test(msg)) {
+    reloadOnceForStaleChunk()
+  }
+})
+window.addEventListener('vite:preloadError', () => reloadOnceForStaleChunk())
+// 정상 네비게이션이 한 번 끝나면 플래그를 비워, 다음 배포 때 다시 복구되게 한다.
+router.afterEach(() => sessionStorage.removeItem(CHUNK_RELOAD_KEY))
+
 const pinia = createPinia()
 const app = createApp(App).use(IonicVue).use(pinia).use(router)
 

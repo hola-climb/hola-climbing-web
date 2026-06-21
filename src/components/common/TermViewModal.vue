@@ -1,7 +1,8 @@
 <script setup lang="ts">
-// imports → props/emits → composables → state → computed → methods
-import { IonModal, IonIcon } from "@ionic/vue";
+// imports → props/emits → methods
+import { IonIcon } from "@ionic/vue";
 import { closeOutline } from "ionicons/icons";
+import BaseSheet from "@/components/common/BaseSheet.vue";
 import type { Term } from "@/types/api";
 
 const props = defineProps<{ term: Term | null }>();
@@ -13,11 +14,9 @@ function onClose() {
 </script>
 
 <template>
-  <IonModal class="term-modal" :is-open="!!term" :initial-breakpoint="0.9" :breakpoints="[0, 0.9]" @did-dismiss="onClose">
-    <div v-if="term" class="term-wrap">
-      <div class="grabber" aria-hidden="true" />
-
-      <header class="term-head">
+  <BaseSheet :open="!!term" @close="onClose">
+    <template v-if="term" #header>
+      <div class="term-head">
         <div class="term-titles">
           <div class="micro-label">{{ term.required ? "필수 약관" : "선택 약관" }}</div>
           <h2 class="term-title">{{ term.title }}</h2>
@@ -26,40 +25,19 @@ function onClose() {
         <button type="button" class="close-btn" aria-label="닫기" @click="onClose">
           <IonIcon :icon="closeOutline" />
         </button>
-      </header>
-
-      <div class="term-body">
-        <p class="term-content">{{ term.content }}</p>
       </div>
-    </div>
-  </IonModal>
+    </template>
+
+    <p v-if="term" class="term-content">{{ term.content }}</p>
+  </BaseSheet>
 </template>
 
 <style scoped>
-.term-modal {
-  --border-radius: var(--r-sheet);
-}
-.term-wrap {
-  height: 100%;
-  background: var(--bg);
-  padding: 10px 20px calc(20px + env(safe-area-inset-bottom));
-  display: flex;
-  flex-direction: column;
-}
-.grabber {
-  width: 36px;
-  height: 4px;
-  border-radius: 999px;
-  background: var(--border);
-  margin: 0 auto 12px;
-  flex-shrink: 0;
-}
 .term-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  flex-shrink: 0;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--border);
 }
@@ -99,12 +77,6 @@ function onClose() {
   font-size: 20px;
   color: var(--fg);
   cursor: pointer;
-}
-.term-body {
-  flex: 1;
-  overflow-y: auto;
-  margin-top: 16px;
-  -webkit-overflow-scrolling: touch;
 }
 .term-content {
   margin: 0;

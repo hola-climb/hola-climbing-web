@@ -6,12 +6,14 @@ import { useGymStore } from "@/stores/gym";
 import { useUIStore } from "@/stores/ui";
 import { useAuthStore } from "@/stores/auth";
 import { gymService } from "@/services/gym";
+import { authService } from "@/services/auth";
 import { useMediaQuery } from "@/composables/useMediaQuery";
 import { useGeolocation } from "@/composables/useGeolocation";
 import GymCard from "@/components/gym/GymCard.vue";
 import GymDetailView from "./GymDetailView.vue";
 import LoadingState from "@/components/common/LoadingState.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
+import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
 import type { Gym, RecommendedGym } from "@/types/api";
 
 const router = useRouter();
@@ -54,13 +56,14 @@ const nearestGym = ref<Gym | null>(null);
 const recommendedGyms = ref<RecommendedGym[]>([]);
 const isLocating = ref(false);
 
+// 위치기반서비스 약관 미동의 시 안내 다이얼로그
+const showLocationConsent = ref(false);
+
 function sortFavoritesFirst<T extends { isFavorited: boolean }>(list: T[]): T[] {
   return [...list].sort((a, b) => (b.isFavorited ? 1 : 0) - (a.isFavorited ? 1 : 0));
 }
 
-const displayGyms = computed(() =>
-  sortFavoritesFirst(nearbyGyms.value.length ? nearbyGyms.value : gymStore.gyms)
-);
+const displayGyms = computed(() => sortFavoritesFirst(nearbyGyms.value.length ? nearbyGyms.value : gymStore.gyms));
 const isNearbyMode = computed(() => nearbyGyms.value.length > 0);
 // 추천 섹션은 위치를 한 번이라도 획득(근처 모드)했을 때만 노출
 const showRecoSection = computed(() => isNearbyMode.value);
@@ -112,7 +115,31 @@ async function handleInfinite(event: CustomEvent) {
   (event.target as HTMLIonInfiniteScrollElement).complete();
 }
 
+/** 위치기반서비스(type: 'location') 약관 동의 여부.
+ *  확인 불가(미로그인·네트워크 오류 등)는 미동의로 간주한다. */
+async function hasLocationConsent(): Promise<boolean> {
+  try {
+    const { data } = await authService.getAgreementStatus();
+    const locationTerm = data.terms.find((t) => t.type === "location");
+    return !!locationTerm?.agreed;
+  } catch (err: unknown) {
+    if (import.meta.env.DEV) console.error(err);
+    return false;
+  }
+}
+
+function goToLocationSettings() {
+  showLocationConsent.value = false;
+  router.push("/my/terms");
+}
+
 async function handleLocate() {
+  // 위치 탐색 전, 위치기반서비스 약관 동의 여부를 먼저 확인한다.
+  if (!(await hasLocationConsent())) {
+    showLocationConsent.value = true;
+    return;
+  }
+
   isLocating.value = true;
   try {
     const coords = await locate();
@@ -135,7 +162,7 @@ async function handleLocate() {
     // 2) 로그인 사용자 한정 개인화 추천 — /recommendations/gyms (실패해도 근처 목록은 유지)
     if (authStore.isAuthenticated) {
       try {
-        const { data } = await gymService.getRecommendations({ lat: coords.lat, lng: coords.lng, radius: 10, size: 20 });
+        const { data } = await gymService.getRecommendations({ lat: coords.lat, lng: coords.lng, radius: 5, size: 20 });
         recommendedGyms.value = data;
       } catch {
         recommendedGyms.value = [];
@@ -320,6 +347,17 @@ async function handleLocate() {
         </div>
       </div>
       <!-- end .explore-layout -->
+
+      <!-- 위치기반서비스 약관 미동의 안내 -->
+      <ConfirmDialog
+        :open="showLocationConsent"
+        title="위치 서비스 동의가 필요해요"
+        message="내 주변 암장을 찾으려면 위치기반서비스 이용약관에 동의해야 해요. 설정에서 동의할 수 있어요."
+        confirm-text="설정으로 이동"
+        cancel-text="닫기"
+        @confirm="goToLocationSettings"
+        @cancel="showLocationConsent = false"
+      />
     </IonContent>
   </IonPage>
 </template>
