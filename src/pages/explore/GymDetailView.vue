@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // imports → state → computed → methods → lifecycle
-import { ref, computed, onMounted, onBeforeUnmount, onUnmounted } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch, nextTick } from "vue";
 import { IonContent, IonIcon, IonSpinner, IonModal } from "@ionic/vue";
 import AppHeader from "@/components/common/AppHeader.vue";
 import BaseSheet from "@/components/common/BaseSheet.vue";
@@ -16,6 +16,7 @@ import { gymService } from "@/services/gym";
 import { chatService } from "@/services/chat";
 import { useChatStore } from "@/stores/chat";
 import { gradeColor, gradeTextColor } from "@/utils/gradeColor";
+import { Geolocation } from "@capacitor/geolocation";
 import VideoThumbnail from "@/components/video/VideoThumbnail.vue";
 import type { GymReview, FeedVideo, ChatMessage, BusinessHours } from "@/types/api";
 
@@ -45,6 +46,11 @@ const DAY_LABELS: Record<string, string> = {
 const videos = ref<FeedVideo[]>([]);
 const reviews = ref<GymReview[]>([]);
 const chatPreview = ref<ChatMessage[]>([]);
+const reviewPage = ref(0);
+const reviewHasMore = ref(false);
+const isLoadingMoreReviews = ref(false);
+const reviewSentinelRef = ref<HTMLElement | null>(null);
+let reviewObserver: IntersectionObserver | null = null;
 
 // ── Review form ────────────────────────────────────
 const showReviewForm = ref(false);
@@ -118,17 +124,43 @@ async function loadSections() {
     chatService.getMessages(gymId, { page: 0, size: 5 }),
   ]);
   if (vRes.status === "fulfilled") videos.value = vRes.value.data.content;
-  if (rRes.status === "fulfilled") reviews.value = rRes.value.data.content;
+  if (rRes.status === "fulfilled") {
+    reviews.value = rRes.value.data.content;
+    reviewPage.value = 0;
+    reviewHasMore.value = rRes.value.data.hasNext;
+  }
   if (cRes.status === "fulfilled") chatPreview.value = cRes.value.data.content.slice(-3);
 }
 
+async function loadMoreReviews() {
+  if (!reviewHasMore.value || isLoadingMoreReviews.value) return;
+  isLoadingMoreReviews.value = true;
+  try {
+    const nextPage = reviewPage.value + 1;
+    const { data } = await gymService.getReviews(gymId, { page: nextPage, size: 20 });
+    reviews.value = [...reviews.value, ...data.content];
+    reviewPage.value = nextPage;
+    reviewHasMore.value = data.hasNext;
+  } catch {
+    // 실패 시 조용히 무시 — 사용자가 다시 스크롤하면 재시도됨
+  } finally {
+    isLoadingMoreReviews.value = false;
+  }
+}
+
 onMounted(async () => {
-  // 이 뷰가 해당 암장 채팅의 '시청자'임을 등록 — 리마운트 핸드오프 동안
-  // 소켓이 유지되도록 한다.
   chatStore.retainView(gymId);
   try {
     await gymStore.fetchGym(gymId);
-    loadSections();
+    await loadSections();
+    await nextTick();
+    if (reviewSentinelRef.value) {
+      reviewObserver = new IntersectionObserver(
+        ([entry]) => { if (entry.isIntersecting) loadMoreReviews(); },
+        { threshold: 0 },
+      );
+      reviewObserver.observe(reviewSentinelRef.value);
+    }
   } catch {
     uiStore.showToast("암장 정보를 불러올 수 없어요.", "danger");
   } finally {
@@ -138,6 +170,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   unmounting = true;
+  reviewObserver?.disconnect();
 });
 
 // 시청자 해제 — 같은 암장 뷰가 곧바로 다시 마운트되지 않으면 소켓을 정리한다.
@@ -225,14 +258,103 @@ function onChatDismiss() {
   leaveChat();
 }
 
-function sendChat(e?: KeyboardEvent | MouseEvent) {
+async function sendChat(e?: KeyboardEvent | MouseEvent) {
   // Korean IME: keydown.enter fires during composition — ignore those.
   if ((e as KeyboardEvent)?.isComposing) return;
   const content = chatStore.draft.trim();
   if (!content) return;
-  chatStore.sendMessage(content);
+
+  let coords: { lat: number; lng: number } | undefined;
+  try {
+    const pos = await Geolocation.getCurrentPosition({ timeout: 5000 });
+    coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+  } catch {
+    // 위치 권한 거부 or 타임아웃 — coords 없이 전송
+  }
+
+  chatStore.sendMessage(content, coords);
   chatStore.draft = "";
 }
+
+// 무한스크롤 ─────────────────────────────────────
+const chatLogRef = ref<HTMLElement | null>(null);
+const sentinelRef = ref<HTMLElement | null>(null);
+let observer: IntersectionObserver | null = null;
+
+function setupObserver() {
+  if (observer) observer.disconnect();
+  if (!sentinelRef.value) return;
+  observer = new IntersectionObserver(
+    async ([entry]) => {
+      if (!entry.isIntersecting || !chatStore.hasMore || chatStore.isLoadingMore) return;
+      const log = chatLogRef.value;
+      const prevHeight = log?.scrollHeight ?? 0;
+      await chatStore.loadMoreMessages();
+      // 이전 메시지 추가 후 스크롤 위치 유지
+      await nextTick();
+      if (log) log.scrollTop = log.scrollHeight - prevHeight;
+    },
+    { root: chatLogRef.value, threshold: 0 },
+  );
+  observer.observe(sentinelRef.value);
+}
+
+watch(
+  () => chatStore.showChat,
+  async (open) => {
+    if (open) {
+      await nextTick();
+      setupObserver();
+      // 최초 진입 시 맨 아래로 스크롤
+      if (chatLogRef.value) chatLogRef.value.scrollTop = chatLogRef.value.scrollHeight;
+    } else {
+      observer?.disconnect();
+    }
+  },
+);
+
+// '새 메시지' 안내 버튼 — 스크롤을 위로 올린 상태에서 남이 메시지를 보냈을 때 노출.
+const hasNewMessage = ref(false);
+
+function scrollChatToBottom() {
+  const log = chatLogRef.value;
+  if (!log) return;
+  log.scrollTop = log.scrollHeight;
+  hasNewMessage.value = false;
+}
+
+// 사용자가 직접 맨 아래까지 스크롤하면 '새 메시지' 안내를 해제한다.
+function onChatScroll() {
+  const log = chatLogRef.value;
+  if (!log) return;
+  const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
+  if (nearBottom) hasNewMessage.value = false;
+}
+
+// 새 메시지 추가 시 스크롤 처리.
+// - 내 메시지: 항상 맨 아래로 자동 스크롤
+// - 남의 메시지: 최하단 근처면 따라 내려가고, 위로 올라가 있으면 '새 메시지' 버튼 노출
+watch(
+  () => chatStore.messages.length,
+  async (newLen, oldLen) => {
+    // 이전 메시지 로드(prepend)나 감소는 무시 — 새 메시지 추가일 때만.
+    if (chatStore.isLoadingMore || newLen <= oldLen) return;
+    await nextTick();
+    const log = chatLogRef.value;
+    if (!log) return;
+    const last = chatStore.messages[chatStore.messages.length - 1];
+    const isMine = !!authStore.user && last?.user.id === authStore.user.id;
+    const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
+    if (isMine || nearBottom) {
+      log.scrollTop = log.scrollHeight;
+      hasNewMessage.value = false;
+    } else {
+      hasNewMessage.value = true;
+    }
+  },
+);
+
+onBeforeUnmount(() => observer?.disconnect());
 
 function openVideo(id: string) {
   router.push(`/videos/${id}`);
@@ -363,6 +485,26 @@ function openVideo(id: string) {
         <p v-else class="no-info">정보 없음</p>
       </div>
 
+      <!-- Live chat preview -->
+      <div class="section">
+        <div class="section-head">
+          <div class="section-title">실시간 채팅</div>
+          <button class="see-all" @click="enterChat">
+            <IonSpinner v-if="chatStore.isJoining" name="crescent" class="btn-spinner" />
+            <span v-else>입장</span>
+          </button>
+        </div>
+        <div class="chat-preview hola-card" @click="enterChat" role="button" tabindex="0">
+          <template v-if="chatPreview.length">
+            <div v-for="m in chatPreview" :key="m.id" class="cp-line">
+              <span class="cp-name">{{ m.user.nickname }}</span>
+              <span class="cp-text">{{ m.content }}</span>
+            </div>
+          </template>
+          <p v-else class="no-info">아직 대화가 없어요. 입장해 첫 메시지를 남겨보세요.</p>
+        </div>
+      </div>
+
       <!-- Reviews -->
       <div class="section">
         <div class="section-head">
@@ -393,26 +535,10 @@ function openVideo(id: string) {
             </div>
             <p v-if="r.content" class="r-content">{{ r.content }}</p>
           </div>
-        </div>
-      </div>
-
-      <!-- Live chat preview -->
-      <div class="section">
-        <div class="section-head">
-          <div class="section-title">실시간 채팅</div>
-          <button class="see-all" @click="enterChat">
-            <IonSpinner v-if="chatStore.isJoining" name="crescent" class="btn-spinner" />
-            <span v-else>입장</span>
-          </button>
-        </div>
-        <div class="chat-preview hola-card" @click="enterChat" role="button" tabindex="0">
-          <template v-if="chatPreview.length">
-            <div v-for="m in chatPreview" :key="m.id" class="cp-line">
-              <span class="cp-name">{{ m.user.nickname }}</span>
-              <span class="cp-text">{{ m.content }}</span>
-            </div>
-          </template>
-          <p v-else class="no-info">아직 대화가 없어요. 입장해 첫 메시지를 남겨보세요.</p>
+          <div v-if="isLoadingMoreReviews" class="review-load-more" aria-label="리뷰 불러오는 중">
+            <IonSpinner name="crescent" />
+          </div>
+          <div v-if="reviewHasMore" ref="reviewSentinelRef" class="review-sentinel" aria-hidden="true" />
         </div>
       </div>
     </div>
@@ -459,7 +585,11 @@ function openVideo(id: string) {
         </template>
       </AppHeader>
       <IonContent>
-        <div class="chat-log page-padding">
+        <div ref="chatLogRef" class="chat-log page-padding" @scroll="onChatScroll">
+          <div ref="sentinelRef" class="chat-sentinel" aria-hidden="true" />
+          <div v-if="chatStore.isLoadingMore" class="chat-loading-more">
+            <IonSpinner name="crescent" />
+          </div>
           <div v-for="m in chatStore.messages" :key="m.id" class="chat-msg" :class="{ mine: authStore.user && m.user.id === authStore.user.id }">
             <div class="chat-bubble">
               <div class="cb-head">
@@ -475,11 +605,18 @@ function openVideo(id: string) {
           </div>
         </div>
       </IonContent>
-      <div class="chat-bar">
-        <input v-model="chatStore.draft" class="chat-input" type="text" placeholder="메시지 입력" aria-label="메시지 입력" @keydown.enter="sendChat($event)" />
-        <button class="chat-send" :disabled="!chatStore.draft.trim()" aria-label="전송" @click="sendChat">
-          <IonIcon :icon="sendOutline" />
-        </button>
+      <div class="chat-bar-wrap">
+        <Transition name="new-msg-fade">
+          <button v-if="hasNewMessage" class="new-msg-btn" aria-label="새 메시지로 이동" @click="scrollChatToBottom">
+            새 메시지 ↓
+          </button>
+        </Transition>
+        <div class="chat-bar">
+          <input v-model="chatStore.draft" class="chat-input" type="text" placeholder="메시지 입력" aria-label="메시지 입력" @keydown.enter="sendChat($event)" />
+          <button class="chat-send" :disabled="!chatStore.draft.trim()" aria-label="전송" @click="sendChat">
+            <IonIcon :icon="sendOutline" />
+          </button>
+        </div>
       </div>
     </IonModal>
   </div>
@@ -757,6 +894,14 @@ function openVideo(id: string) {
 }
 
 /* Reviews */
+.review-sentinel {
+  height: 1px;
+}
+.review-load-more {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0;
+}
 .review-list {
   display: flex;
   flex-direction: column;
@@ -805,7 +950,6 @@ function openVideo(id: string) {
 }
 .r-actions {
   display: flex;
-  flex-direction: column;
   gap: 2px;
   flex-shrink: 0;
 }
@@ -917,6 +1061,17 @@ function openVideo(id: string) {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  height: 100%;
+  overflow-y: auto;
+}
+.chat-sentinel {
+  height: 1px;
+  flex-shrink: 0;
+}
+.chat-loading-more {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 8px;
 }
 .chat-msg {
   display: flex;
@@ -966,6 +1121,40 @@ function openVideo(id: string) {
   padding: 0 4px;
 }
 
+.chat-bar-wrap {
+  position: relative;
+}
+.new-msg-btn {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 16px;
+  border: none;
+  border-radius: 999px;
+  background: var(--hold-dark, #151515);
+  color: #fff;
+  font-family: var(--font-sans);
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.new-msg-fade-enter-active,
+.new-msg-fade-leave-active {
+  transition:
+    opacity 180ms var(--ease-state),
+    transform 180ms var(--ease-state);
+}
+.new-msg-fade-enter-from,
+.new-msg-fade-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(6px);
+}
 .chat-bar {
   display: flex;
   gap: 8px;

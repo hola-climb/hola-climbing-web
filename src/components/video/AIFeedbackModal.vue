@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { IonIcon } from "@ionic/vue";
-import { closeOutline, checkmarkOutline, closeCircleOutline } from "ionicons/icons";
+import { closeOutline, checkmarkOutline, closeCircleOutline, addOutline } from "ionicons/icons";
 import BaseSheet from "@/components/common/BaseSheet.vue";
 import type { TechniqueTag } from "@/types/api";
-import { getTagLabel } from "@/utils/tagLabels";
+import tagLabels, { getTagLabel } from "@/utils/tagLabels";
 import { useVideoStore } from "@/stores/video";
 import { useUIStore } from "@/stores/ui";
 
@@ -23,6 +23,16 @@ const submitting = ref(false);
 // 로컬 선택 상태 — API 호출 없이 누적
 const pendingFeedback = ref<Record<string, "correct" | "incorrect">>({});
 const pendingDynamic = ref<"correct" | "incorrect" | null>(null);
+const pendingAdded = ref<Set<string>>(new Set());
+
+// 움직임 유형 — 기술 추가 후보에서 제외
+const MOVEMENT_KEYS = ["dynamic", "static"];
+
+// AI가 놓친 기술 후보 = 전체 기술 - 이미 감지된 기술 - 움직임 유형
+const availableToAdd = computed(() => {
+  const detected = new Set(allTechniqueKeys());
+  return Object.keys(tagLabels).filter((key) => !MOVEMENT_KEYS.includes(key) && !detected.has(key));
+});
 
 function selectFeedback(tag: TechniqueTag, feedback: "correct" | "incorrect") {
   pendingFeedback.value[tag.key] = feedback;
@@ -30,6 +40,13 @@ function selectFeedback(tag: TechniqueTag, feedback: "correct" | "incorrect") {
 
 function selectDynamicFeedback(feedback: "correct" | "incorrect") {
   pendingDynamic.value = feedback;
+}
+
+function toggleAdded(key: string) {
+  const next = new Set(pendingAdded.value);
+  if (next.has(key)) next.delete(key);
+  else next.add(key);
+  pendingAdded.value = next;
 }
 
 function allTechniqueKeys() {
@@ -47,20 +64,25 @@ function resolvedIsDynamic() {
 async function flushPending(): Promise<boolean> {
   const verdicts = { ...pendingFeedback.value };
   const hasDynamic = pendingDynamic.value !== null;
-  if (Object.keys(verdicts).length === 0 && !hasDynamic) return false;
+  const added = [...pendingAdded.value];
+  if (Object.keys(verdicts).length === 0 && !hasDynamic && added.length === 0) return false;
 
   // 사용자가 "틀렸다"고 한 기술만 제외 — 미피드백은 맞은 것으로 간주
-  const techniques = allTechniqueKeys().filter((key) => verdicts[key] !== "incorrect");
+  // 사용자가 추가한 기술은 최종 보정 집합(techniques)에 병합
+  const kept = allTechniqueKeys().filter((key) => verdicts[key] !== "incorrect");
+  const techniques = [...new Set([...kept, ...added])];
 
   // 최종 한 번만 전송 ({ isDynamic, techniques })
   await videoStore.submitFeedback(
     props.videoId,
     { isDynamic: resolvedIsDynamic(), techniques },
     verdicts,
+    added,
   );
 
   pendingFeedback.value = {};
   pendingDynamic.value = null;
+  pendingAdded.value = new Set();
   return true;
 }
 
@@ -171,6 +193,28 @@ async function handleDidDismiss() {
 
         <p v-if="!techniques.length" class="empty">감지된 기술이 없어요.</p>
       </div>
+
+      <!-- 더 사용한 기술 추가 -->
+      <div v-if="availableToAdd.length" class="add-section">
+        <div class="add-head">
+          <span class="add-title">더 사용한 기술이 있나요?</span>
+          <span class="add-sub">AI가 놓친 기술을 알려주세요.</span>
+        </div>
+        <div class="add-chips">
+          <button
+            v-for="key in availableToAdd"
+            :key="key"
+            class="add-chip"
+            :class="{ active: pendingAdded.has(key) }"
+            :aria-pressed="pendingAdded.has(key)"
+            :aria-label="getTagLabel(key) + (pendingAdded.has(key) ? ' 선택됨' : ' 추가')"
+            @click="toggleAdded(key)"
+          >
+            <IonIcon :icon="addOutline" />
+            {{ getTagLabel(key) }}
+          </button>
+        </div>
+      </div>
   </BaseSheet>
 </template>
 
@@ -268,5 +312,57 @@ async function handleDidDismiss() {
   color: var(--fg-muted);
   font-size: var(--fs-caption);
   padding: 20px 0;
+}
+
+/* ── 더 사용한 기술 추가 ───────────────────────── */
+.add-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.add-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 12px;
+}
+.add-title {
+  font-size: var(--fs-body);
+  font-weight: var(--w-bold);
+}
+.add-sub {
+  font-size: var(--fs-caption);
+  color: var(--fg-muted);
+}
+.add-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.add-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 13px;
+  border-radius: var(--r-chip);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-state);
+}
+.add-chip ion-icon {
+  font-size: 15px;
+  transition: transform var(--dur-fast) var(--ease-state);
+}
+.add-chip.active {
+  background: var(--tint-lime);
+  border-color: var(--hold-lime-ink);
+  color: var(--on-tint-lime);
+}
+.add-chip.active ion-icon {
+  transform: rotate(45deg);
 }
 </style>

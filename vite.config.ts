@@ -12,7 +12,12 @@ export default defineConfig({
     legacy(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.ico", "apple-touch-icon.png"],
+      // 앱은 favicon.png 를 사용한다. 존재하지 않는 favicon.ico 를 참조하면
+      // 브라우저 기본 요청이 404 가 되므로 실제 존재하는 에셋만 나열한다.
+      includeAssets: ["favicon.png", "apple-touch-icon.png"],
+      // dev 서버(HMR)에는 precache SW 를 등록하지 않는다. dev 에 SW 가 붙으면
+      // 캐시된 옛 프로덕션 index.html 이 죽은 해시 청크(/assets/index-xxxx.js)를
+      // 요청하다 404 → 흰 화면이 된다. PWA 동작 테스트는 `vite preview`(실빌드)로.
       manifest: {
         name: "올라 - 클라이밍 분석",
         short_name: "올라",

@@ -42,6 +42,9 @@ export const useChatStore = defineStore('chat', () => {
   const status = ref<ChatStatus>('idle')
   const draft = ref('')
   const client = shallowRef<Client | null>(null)
+  const currentPage = ref(0)
+  const hasMore = ref(false)
+  const isLoadingMore = ref(false)
 
   // Non-reactive bookkeeping for deferred teardown.
   const viewers = new Map<string, number>()
@@ -116,9 +119,12 @@ export const useChatStore = defineStore('chat', () => {
       try {
         const { data } = await chatService.getMessages(gymId, { page: 0, size: 30 })
         messages.value = [...data.content].reverse()
+        currentPage.value = 0
+        hasMore.value = data.hasNext
       } catch (e) {
         if (import.meta.env.DEV) console.error('[chat] history load failed', e)
         messages.value = []
+        hasMore.value = false
       }
 
       showChat.value = true
@@ -132,11 +138,29 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  async function loadMoreMessages() {
+    if (!activeGymId.value || !hasMore.value || isLoadingMore.value) return
+    isLoadingMore.value = true
+    try {
+      const nextPage = currentPage.value + 1
+      const { data } = await chatService.getMessages(activeGymId.value, { page: nextPage, size: 30 })
+      messages.value = [...[...data.content].reverse(), ...messages.value]
+      currentPage.value = nextPage
+      hasMore.value = data.hasNext
+    } catch (e) {
+      if (import.meta.env.DEV) console.error('[chat] loadMore failed', e)
+    } finally {
+      isLoadingMore.value = false
+    }
+  }
+
   /** Explicitly close the chat and drop the socket. */
   function leaveRoom() {
     showChat.value = false
     activeGymId.value = null
     draft.value = ''
+    currentPage.value = 0
+    hasMore.value = false
     disconnect()
   }
 
@@ -168,7 +192,8 @@ export const useChatStore = defineStore('chat', () => {
 
   return {
     activeGymId, showChat, isJoining, messages, status, draft,
-    enterRoom, leaveRoom, sendMessage,
+    hasMore, isLoadingMore,
+    enterRoom, leaveRoom, sendMessage, loadMoreMessages,
     retainView, releaseView,
   }
 })

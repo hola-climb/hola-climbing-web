@@ -27,6 +27,21 @@ import { initObservability } from './services/observability'
 // 부팅 단계 에러까지 잡도록 앱 생성 전에 가장 먼저 초기화 (PROD 전용)
 initObservability()
 
+// ── DEV 자가치유: localhost 에 남아있는 prod 서비스워커/캐시 제거 ──────────
+// `vite preview`(실빌드)로 한번 띄웠던 localhost 는 prod SW 가 등록돼,
+// 이후 dev 서버(5173)에서도 캐시된 옛 prod index.html 을 돌려준다. 그 안의
+// 죽은 해시 청크(/assets/index-xxxx.js)가 dev 에 없어 404 → 흰 화면이 된다.
+// dev 빌드에서는 모든 SW 를 해제하고 캐시를 비워 이 상태를 자동 복구한다.
+if (import.meta.env.DEV && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then((regs) => {
+    if (regs.length === 0) return
+    Promise.all(regs.map((r) => r.unregister()))
+      .then(() => (window.caches ? caches.keys() : Promise.resolve([])))
+      .then((keys) => Promise.all((keys as string[]).map((k) => caches.delete(k))))
+      .then(() => window.location.reload())
+  })
+}
+
 // ── 새 배포 후 stale 청크로 인한 흰 화면 복구 ────────────────────────────
 // autoUpdate SW + lazy 라우트 조합에서, 재배포로 해시 청크 파일명이 바뀌면
 // 메모리에 남아있던 옛 페이지(특히 iOS standalone PWA)가 사라진 청크를

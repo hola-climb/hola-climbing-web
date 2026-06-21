@@ -67,6 +67,8 @@ const displayGyms = computed(() => sortFavoritesFirst(nearbyGyms.value.length ? 
 const isNearbyMode = computed(() => nearbyGyms.value.length > 0);
 // 추천 섹션은 위치를 한 번이라도 획득(근처 모드)했을 때만 노출
 const showRecoSection = computed(() => isNearbyMode.value);
+// 이름 검색 중에는 지도(위치 기반 탐색용)를 숨겨 검색 결과를 바로 노출한다
+const isSearching = computed(() => searchQuery.value.trim().length > 0);
 
 /** 근처/추천 상태 초기화 — 검색·새로고침·전체보기 시 호출 */
 function resetLocation() {
@@ -228,8 +230,8 @@ async function handleLocate() {
             </div>
           </div>
 
-          <!-- Map preview card -->
-          <div class="map-section page-padding" :class="{ 'nearby-active': isNearbyMode }">
+          <!-- Map preview card (이름 검색 중에는 숨김) -->
+          <div v-if="!isSearching" class="map-section page-padding" :class="{ 'nearby-active': isNearbyMode }">
             <div class="map-card hola-card">
               <!-- SVG map backdrop -->
               <svg viewBox="0 0 400 180" class="map-svg" aria-hidden="true" preserveAspectRatio="none">

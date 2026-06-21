@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import { IonPage, IonContent, IonIcon, IonSpinner, IonModal, toastController } from "@ionic/vue";
-import { heartOutline, heart, shareOutline, chatbubbleOutline, refreshOutline, checkmarkCircle, ellipsisVertical, createOutline, trashOutline } from "ionicons/icons";
+import { IonPage, IonContent, IonIcon, IonSpinner, IonModal } from "@ionic/vue";
+import { heartOutline, heart, shareOutline, chatbubbleOutline, refreshOutline, ellipsisVertical, createOutline, trashOutline } from "ionicons/icons";
 import AppHeader from "@/components/common/AppHeader.vue";
 import LoadingState from "@/components/common/LoadingState.vue";
 import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
+import BaseButton from "@/components/common/BaseButton.vue";
 import AIResultBadge from "@/components/video/AIResultBadge.vue";
 import AIFeedbackModal from "@/components/video/AIFeedbackModal.vue";
+import AnalysisLoader from "@/components/video/AnalysisLoader.vue";
 import VideoPlayer from "@/components/video/VideoPlayer.vue";
 import VideoEditModal from "@/components/video/VideoEditModal.vue";
 import ReportModal from "@/components/common/ReportModal.vue";
@@ -55,22 +57,11 @@ const showAIResult = computed(() => isOwner.value && video.value?.status === "do
 const isAnalyzing = computed(() => video.value?.status === "analyzing" || video.value?.status === "pending");
 const analysisFailed = computed(() => video.value?.status === "failed");
 
-const ANALYSIS_STEPS = [
-  { stage: "started", label: "분석 시작" },
-  { stage: "downloaded", label: "영상 다운로드" },
-  { stage: "pose_estimation", label: "포즈 추정" },
-  { stage: "classification", label: "기술 분류" },
-  { stage: "completed", label: "분석 완료" },
-] as const;
-const STAGE_ORDER = ANALYSIS_STEPS.map((s) => s.stage);
+// 분석 진행 상태 — store가 videoId별로 백그라운드 추적
+const analysisProgress = computed(() => videoStore.getAnalysisProgress(videoId));
 
-function stepState(stage: string): "done" | "active" | "pending" {
-  const currentIdx = STAGE_ORDER.indexOf(videoStore.analysisStage as (typeof STAGE_ORDER)[number]);
-  const stepIdx = STAGE_ORDER.indexOf(stage as (typeof STAGE_ORDER)[number]);
-  if (currentIdx === -1) return "pending";
-  if (stepIdx < currentIdx) return "done";
-  if (stepIdx === currentIdx) return "active";
-  return "pending";
+function leaveAnalysis() {
+  router.push(isOwner.value ? "/my/videos" : "/feed");
 }
 
 function openProfile(userId: string | undefined) {
@@ -179,7 +170,7 @@ async function handleShare() {
 async function retryAnalysis() {
   try {
     await videoStore.retryAnalysis(videoId);
-    videoStore.pollAnalysis(videoId);
+    videoStore.watchAnalysis(videoId);
     uiStore.showToast("AI 분석을 다시 시작했어요.");
   } catch {
     uiStore.showToast("재시도에 실패했어요.", "danger");
@@ -227,7 +218,9 @@ onMounted(async () => {
   try {
     await videoStore.fetchVideo(videoId);
     if (isAnalyzing.value) {
-      videoStore.pollAnalysis(videoId);
+      // 워처는 store에 살아 화면을 나가도 백그라운드로 계속 추적·완료 알림.
+      // onUnmounted에서 중단하지 않는다 (멱등 — 재진입 시 중복 방지).
+      videoStore.watchAnalysis(videoId);
     }
     loadComments();
   } catch {
@@ -321,24 +314,12 @@ onMounted(async () => {
 
               <!-- analyzing / pending (내 영상 전용) -->
               <div v-else-if="isOwner && isAnalyzing" class="ai-section hola-card ai-pending">
-                <div class="progress-header">
-                  <div class="progress-label-row">
-                    <span class="ai-dot" aria-hidden="true" />
-                    <span class="analyzing-text">{{ videoStore.analysisProgressMessage || "AI가 영상을 분석하고 있어요..." }}</span>
-                  </div>
-                  <span class="progress-pct">{{ videoStore.analysisProgress }}%</span>
-                </div>
-                <div class="progress-bar-wrap" role="progressbar" :aria-valuenow="videoStore.analysisProgress" aria-valuemin="0" aria-valuemax="100">
-                  <div class="progress-bar-fill" :style="{ width: videoStore.analysisProgress + '%' }" />
-                </div>
-                <div class="analysis-steps">
-                  <div v-for="step in ANALYSIS_STEPS" :key="step.stage" class="analysis-step" :class="stepState(step.stage)">
-                    <div class="step-icon-wrap">
-                      <IonIcon v-if="stepState(step.stage) === 'done'" :icon="checkmarkCircle" class="step-icon step-icon--done" aria-hidden="true" />
-                      <span v-else class="step-dot" aria-hidden="true" />
-                    </div>
-                    <span class="step-label">{{ step.label }}</span>
-                  </div>
+                <AnalysisLoader :progress="analysisProgress.progress" :stage="analysisProgress.stage" :message="analysisProgress.message" />
+                <div class="leave-hint">
+                  <p class="leave-hint-text">분석은 백그라운드에서 계속돼요. 다른 화면으로 이동해도 괜찮아요.</p>
+                  <BaseButton variant="secondary" size="sm" @click="leaveAnalysis">
+                    {{ isOwner ? "내 영상으로" : "둘러보기" }}
+                  </BaseButton>
                 </div>
                 <button class="retry-btn retry-btn--muted" aria-label="분석 재시도" @click="retryAnalysis">
                   <IonIcon :icon="refreshOutline" />
@@ -382,7 +363,10 @@ onMounted(async () => {
 
                 <ul v-else class="comment-list">
                   <li v-for="c in comments" :key="c.id" class="comment-item">
-                    <button class="c-avatar c-avatar-btn" :aria-label="`${c.user.nickname} 프로필 보기`" @click="openProfile(c.user.id)">{{ c.user.nickname.charAt(0).toUpperCase() }}</button>
+                    <div class="avatar" aria-hidden="true">
+                      <img v-if="c.user.profileImage" :src="c.user.profileImage" :alt="`${c.user.nickname} 프로필`" class="avatar-img" />
+                      <template v-else>{{ video.user.nickname.charAt(0).toUpperCase() }}</template>
+                    </div>
                     <div class="c-body">
                       <div class="c-head">
                         <button class="c-name c-name-btn" @click="openProfile(c.user.id)">{{ c.user.nickname }}</button>
@@ -490,13 +474,7 @@ onMounted(async () => {
     <VideoEditModal v-if="isOwner" :open="showEditModal" :video="video" @save="onEditSave" @cancel="showEditModal = false" />
 
     <!-- 신고 모달 -->
-    <ReportModal
-      v-if="reportTarget"
-      :open="showReportModal"
-      :target-type="reportTarget.type"
-      :target-id="reportTarget.id"
-      @close="showReportModal = false"
-    />
+    <ReportModal v-if="reportTarget" :open="showReportModal" :target-type="reportTarget.type" :target-id="reportTarget.id" @close="showReportModal = false" />
   </IonPage>
 </template>
 
@@ -697,31 +675,26 @@ onMounted(async () => {
   color: var(--fg-muted);
 }
 .ai-pending {
-  gap: 10px;
+  gap: 16px;
 }
 
-.progress-header {
+/* 화면 이탈 안내 */
+.leave-hint {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--surface-soft);
+  border-radius: var(--r-input);
 }
-.progress-label-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.analyzing-text {
+.leave-hint-text {
+  flex: 1;
   font-size: var(--fs-caption);
-  color: var(--fg);
-  font-weight: 600;
-}
-.progress-pct {
-  font-size: var(--fs-caption);
-  font-weight: 700;
+  line-height: 1.45;
   color: var(--fg-muted);
-  min-width: 36px;
-  text-align: right;
+  margin: 0;
 }
+
 .ai-dot {
   width: 7px;
   height: 7px;
@@ -738,81 +711,6 @@ onMounted(async () => {
   50% {
     opacity: 0.25;
   }
-}
-
-.progress-bar-wrap {
-  height: 3px;
-  background: var(--border);
-  border-radius: var(--r-chip);
-  overflow: hidden;
-}
-.progress-bar-fill {
-  height: 100%;
-  background: var(--hold-lime);
-  border-radius: var(--r-chip);
-  transition: width 0.5s ease;
-}
-
-.analysis-steps {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  margin-top: 4px;
-}
-.analysis-step {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 5px 0;
-  position: relative;
-}
-.analysis-step:not(:last-child)::after {
-  content: "";
-  position: absolute;
-  left: 9px;
-  top: 26px;
-  width: 1.5px;
-  height: calc(100% - 6px);
-  background: var(--border);
-}
-.analysis-step.done::after {
-  background: var(--hold-lime);
-  opacity: 0.4;
-}
-
-.step-icon-wrap {
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  z-index: 1;
-}
-.step-icon {
-  font-size: 18px;
-  color: var(--hold-lime);
-}
-.step-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--border);
-  display: block;
-  margin: auto;
-}
-.analysis-step.active .step-dot {
-  background: var(--hold-lime);
-  animation: blink 1.2s ease-in-out infinite;
-}
-.step-label {
-  font-size: 12px;
-  color: var(--fg-muted);
-  font-weight: 500;
-}
-.analysis-step.done .step-label,
-.analysis-step.active .step-label {
-  color: var(--fg);
 }
 
 .ai-failed {

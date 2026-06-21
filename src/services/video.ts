@@ -124,23 +124,13 @@ export const videoService = {
   getVideo: async (id: string): Promise<{ data: Video }> => {
     const { data: raw } = await api.get<RawVideoDetail>(`/videos/${id}`);
 
-    // Backend returns only userId/gymId — fetch author (and gym name) to build
-    // the nested user/gym objects the UI expects. Best-effort, never throws.
-    const [userRes, gymRes, analysisRes] = await Promise.allSettled([
-      api.get<{ userId?: number; id?: number; nickname: string; profileImage?: string | null; profileImageUrl?: string | null }>(`/users/${raw.userId}`),
+    const [gymRes, analysisRes] = await Promise.allSettled([
       raw.gymId != null ? api.get<{ id: number; name: string }>(`/gyms/${raw.gymId}`) : Promise.reject(new Error("no_gym")),
       // Analysis is owner-only on the backend; non-owners get 403 → ignored.
       raw.status === "done" ? videoService.getAnalysis(String(raw.id)) : Promise.reject(new Error("not_done")),
     ]);
 
-    const user =
-      userRes.status === "fulfilled"
-        ? {
-            id: String(userRes.value.data.id ?? userRes.value.data.userId ?? raw.userId),
-            nickname: raw.nickname ?? userRes.value.data.nickname ?? "사용자",
-            profileImage: raw.profileImage ?? userRes.value.data.profileImage ?? userRes.value.data.profileImageUrl ?? null,
-          }
-        : { id: String(raw.userId), nickname: raw.nickname ?? "사용자", profileImage: raw.profileImage ?? null };
+    const user = { id: String(raw.userId), nickname: raw.nickname ?? "사용자", profileImage: raw.profileImage ?? null };
 
     const gym = gymRes.status === "fulfilled" ? { id: String(gymRes.value.data.id), name: gymRes.value.data.name } : null;
 
@@ -183,13 +173,14 @@ export const videoService = {
    * Terminal events resolve the promise without calling onProgress so the caller
    * can set status + analysis atomically and avoid a blank-state flash.
    */
-  streamAnalysis: (videoId: string, onProgress: (status: AnalysisStatus, progress: number, stage: string, message: string) => void): Promise<AnalysisStatus> => {
+  streamAnalysis: (videoId: string, onProgress: (status: AnalysisStatus, progress: number, stage: string, message: string) => void, externalController?: AbortController): Promise<AnalysisStatus> => {
     return new Promise((resolve, reject) => {
       const token = localStorage.getItem("access_token");
       const headers: Record<string, string> = { Accept: "text/event-stream" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const controller = new AbortController();
+      // store가 워처 정리/중단을 위해 controller를 주입할 수 있다. 없으면 자체 생성.
+      const controller = externalController ?? new AbortController();
 
       fetch(`/api/videos/${videoId}/analysis/stream`, { headers, signal: controller.signal })
         .then((res) => {
@@ -298,17 +289,15 @@ export const videoService = {
     const { data } = await api.get<PageResponse<Omit<RawRecommendedVideo, "source">>>("/videos", {
       params: { userId, size: params?.size },
     });
-    const resolved = await resolveUser(userId);
     return {
       data: {
         ...data,
         content: data.content.map((raw) => ({
           id: String(raw.id),
-          // 목록 응답이 작성자 프로필을 내려주면 우선 사용, 없으면 resolveUser 결과로 보강
           user: {
-            id: resolved.id,
-            nickname: raw.nickname ?? resolved.nickname,
-            profileImage: raw.profileImage ?? resolved.profileImage,
+            id: userId,
+            nickname: raw.nickname ?? "사용자",
+            profileImage: raw.profileImage ?? null,
           },
           title: raw.title,
           gymGrade: raw.gymGrade ?? null,
