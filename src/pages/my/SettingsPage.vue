@@ -28,10 +28,10 @@ const notiLoading = ref(true);
 
 const notiItems: { key: keyof NotificationSettings; label: string }[] = [
   { key: "notifyComment", label: "댓글" },
-  { key: "notifyReply", label: "답글" },
+  // { key: "notifyReply", label: "답글" },
   { key: "notifyLike", label: "좋아요" },
   { key: "notifyFollow", label: "팔로우" },
-  { key: "notifyChat", label: "채팅" },
+  // { key: "notifyChat", label: "채팅" },
   { key: "notifySystem", label: "공지 및 시스템" },
 ];
 
@@ -280,7 +280,7 @@ async function handleDelete(password: string) {
   border-radius: 50%;
   background: #fff;
   transition: transform var(--dur-fast) var(--ease-state);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 .toggle.on .toggle-thumb {
   transform: translateX(18px);

@@ -4,6 +4,7 @@ import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch, nextTick
 import { IonContent, IonIcon, IonSpinner, IonModal } from "@ionic/vue";
 import AppHeader from "@/components/common/AppHeader.vue";
 import BaseSheet from "@/components/common/BaseSheet.vue";
+import ExpandableText from "@/components/common/ExpandableText.vue";
 import LoadingState from "@/components/common/LoadingState.vue";
 import BaseButton from "@/components/common/BaseButton.vue";
 import AppIcon from "@/components/common/AppIcon.vue";
@@ -537,7 +538,7 @@ function openVideo(id: string) {
                 <button class="r-action-btn r-action-btn--danger" aria-label="리뷰 삭제" @click="deleteReview(r)">삭제</button>
               </div>
             </div>
-            <p v-if="r.content" class="r-content">{{ r.content }}</p>
+            <p v-if="r.content" class="r-content"><ExpandableText :text="r.content" /></p>
           </div>
           <div v-if="isLoadingMoreReviews" class="review-load-more" aria-label="리뷰 불러오는 중">
             <IonSpinner name="crescent" />

@@ -68,6 +68,18 @@ async function register(): Promise<void> {
     )
     if (!token) return
 
+    const prevToken = localStorage.getItem(STORAGE_KEY)
+    if (prevToken && prevToken !== token) {
+      // 토큰이 회전됐으면 서버에서 옛 토큰 먼저 제거 — DB 누적 방지.
+      try {
+        await notificationService.removeDeviceToken(prevToken)
+      } catch {
+        // 이미 없는 토큰이어도 새 토큰 등록은 계속한다.
+      }
+    }
+
+    if (prevToken === token) return  // 같은 토큰이면 재등록 스킵
+
     await notificationService.registerDeviceToken(token, platform())
     localStorage.setItem(STORAGE_KEY, token)
   } catch (err) {

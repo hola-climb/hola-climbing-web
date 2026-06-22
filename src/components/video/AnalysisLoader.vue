@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// imports → props → computed
-import { computed } from "vue";
+// imports → props/emits → state → computed → methods
+import { ref, computed, watch } from "vue";
 import HoldPebble from "@/components/common/HoldPebble.vue";
 
 const props = withDefaults(
@@ -8,11 +8,15 @@ const props = withDefaults(
     progress: number;
     stage: string;
     message?: string;
+    /** 분석 done → 아웃트로(홀드 잡기 + 완료 플로리시) 재생 트리거 */
+    finishing?: boolean;
   }>(),
-  { message: "" },
+  { message: "", finishing: false },
 );
 
-// 분석 5단계 = 클라이밍 루트의 홀드 5개 (아래→위)
+const emit = defineEmits<{ (e: "complete"): void }>();
+
+// 분석 단계 라벨 (진행률은 푸터로만 표기)
 const STEPS = [
   { stage: "started", label: "분석 시작" },
   { stage: "downloaded", label: "영상 다운로드" },
@@ -23,71 +27,91 @@ const STEPS = [
 
 const clamped = computed(() => Math.min(100, Math.max(0, props.progress)));
 
-// 진행률 0~100 → 벽 안쪽(6%~94%) 세로 위치로 매핑
-function yFor(ratio: number): number {
-  return 6 + ratio * (94 - 6);
+// 트레드밀 홀드 — 아래로 흐르는 무한 스크롤.
+// 간격 GAP, 좌우 지그재그. 2행(=2*GAP) 주기로 평행이동하면 패턴이 자기 자신과 겹쳐 이음매가 없다.
+// 좌우 오프셋(REACH)은 클라이머 손끝 x와 동일하게 맞춰, 홀드가 손이 지나가는 자리로 흐르게 한다.
+const GAP = 72;
+const REACH = 46; // px — 중앙에서 손끝까지의 가로 거리(확대된 피겨 손 위치에 맞춤)
+const trackHolds = Array.from({ length: 7 }, (_, i) => {
+  const k = i - 2; // -2..4 (위/아래로 한 화면 이상 덮음)
+  return { id: k, top: k * GAP, dx: Math.abs(k % 2) === 0 ? -REACH : REACH };
+});
+
+// ── 아웃트로 상태머신 ──────────────────────────────
+const phase = ref<"climbing" | "grab" | "celebrate" | "done">("climbing");
+let outroStarted = false;
+
+function runOutro() {
+  if (outroStarted) return;
+  outroStarted = true;
+  phase.value = "grab"; // 마지막 홀드 잡기
+  window.setTimeout(() => {
+    phase.value = "celebrate"; // 라임 버스트 + 펌프
+  }, 600);
+  window.setTimeout(() => {
+    phase.value = "done";
+    emit("complete"); // 플로리시 끝 → 페이지가 결과 카드로 전환
+  }, 1600);
 }
 
-const climberBottom = computed(() => yFor(clamped.value / 100));
-
-// 각 홀드의 위치/도달 상태
-const holds = computed(() =>
-  STEPS.map((step, i) => {
-    const ratio = i / (STEPS.length - 1);
-    const threshold = ratio * 100;
-    return {
-      ...step,
-      bottom: yFor(ratio),
-      left: 50 + (i % 2 === 0 ? -19 : 19), // 중앙 기준 지그재그
-      reached: clamped.value >= threshold - 2,
-    };
-  }),
+watch(
+  () => props.finishing,
+  (f) => {
+    if (f) runOutro();
+  },
+  { immediate: true },
 );
-
-const activeStageLabel = computed(() => {
-  const found = STEPS.find((s) => s.stage === props.stage);
-  return found?.label ?? "분석 준비 중";
+watch(clamped, (v) => {
+  if (v >= 100) runOutro();
 });
+
+const activeStageLabel = computed(() => STEPS.find((s) => s.stage === props.stage)?.label ?? "분석 준비 중");
+const isFinishing = computed(() => phase.value !== "climbing");
+const footerLabel = computed(() => (isFinishing.value ? "분석 완료!" : props.message || activeStageLabel.value));
+const footerPct = computed(() => (isFinishing.value ? 100 : clamped.value));
 </script>
 
 <template>
-  <div class="loader" role="progressbar" :aria-valuenow="clamped" aria-valuemin="0" aria-valuemax="100" :aria-label="`AI 분석 ${clamped}% — ${activeStageLabel}`">
+  <div class="loader" role="progressbar" :aria-valuenow="footerPct" aria-valuemin="0" aria-valuemax="100" :aria-label="`AI 분석 ${footerPct}% — ${footerLabel}`">
     <div class="wall">
-      <!-- 루트 라인 -->
-      <span class="route" aria-hidden="true" />
-      <span class="route route--filled" :style="{ height: clamped + '%' }" aria-hidden="true" />
+      <!-- 트레드밀 홀드 (아래로 흐름) — x는 손끝 위치(중앙 ±REACH)에 정렬 -->
+      <div class="holds-track" :class="{ paused: isFinishing }" aria-hidden="true">
+        <span v-for="h in trackHolds" :key="h.id" class="hold" :style="{ top: h.top + 'px', left: `calc(50% + ${h.dx}px)` }">
+          <HoldPebble color="dark" :size="32" />
+        </span>
+      </div>
 
-      <!-- 홀드 5개 (단계) -->
-      <span v-for="hold in holds" :key="hold.stage" class="hold" :class="{ lit: hold.reached }" :style="{ bottom: hold.bottom + '%', left: hold.left + '%' }" aria-hidden="true">
-        <HoldPebble :color="hold.reached ? 'lime' : 'dark'" :size="30" />
+      <!-- 마지막 정상 홀드 (완료 시 등장) — 오른손 x에 정렬 -->
+      <span v-if="isFinishing" class="final-hold" :style="{ left: `calc(50% + ${REACH}px)` }" aria-hidden="true">
+        <HoldPebble color="lime" :size="40" />
       </span>
 
-      <!-- 클라이머 (홀드를 타고 오르는 실루엣) -->
-      <span class="climber" :style="{ bottom: climberBottom + '%' }" aria-hidden="true">
-        <span class="climber-glow" />
-        <svg class="figure" viewBox="0 0 40 52" width="34" height="44" role="presentation">
-          <!-- 다리 (뒤) -->
-          <path class="limb leg leg-l" d="M17.5 30 L13 44" />
-          <path class="limb leg leg-r" d="M22.5 30 L27 44" />
-          <!-- 몸통 + 머리 -->
-          <circle class="body" cx="20" cy="8" r="5" />
-          <rect class="body" x="15" y="13" width="10" height="18" rx="5" />
-          <!-- 분필 가방 악센트 -->
-          <!-- <circle class="chalk" cx="20" cy="29" r="2" /> -->
-          <!-- 팔 (앞) -->
-          <path class="limb arm arm-l" d="M16 15 L9 5" />
-          <path class="limb arm arm-r" d="M24 15 L31 5" />
+      <!-- 클라이머 (상단 고정, 하반신은 벽 아래로 잘림) -->
+      <span class="climber" :data-phase="phase" aria-hidden="true">
+        <span v-if="phase === 'celebrate'" class="burst" />
+        <svg class="figure" viewBox="0 0 40 52" width="154" height="200" role="presentation">
+          <!-- 다리 (뒤) — viewBox 밖으로 길게 뻗어 벽 하단에서 잘림 -->
+          <path class="limb leg leg-l" d="M17.5 31 L11 58" />
+          <path class="limb leg leg-r" d="M22.5 31 L29 58" />
+          <!-- 몸통 + 머리 (compress/stretch) -->
+          <g class="torso">
+            <circle class="body" cx="20" cy="8" r="5" />
+            <rect class="body" x="15" y="13" width="10" height="18" rx="5" />
+          </g>
+          <!-- 팔 (앞) — 손끝이 양옆 홀드 x로 뻗음 -->
+          <path class="limb arm arm-l" d="M15 16 L8 4" />
+          <path class="limb arm arm-r" d="M25 16 L32 4" />
         </svg>
       </span>
     </div>
 
     <div class="loader-footer">
       <div class="footer-head">
-        <span class="ai-dot" aria-hidden="true" />
-        <span class="stage-label">{{ message || activeStageLabel }}</span>
-        <span class="pct">{{ clamped }}%</span>
+        <span class="ai-dot" :class="{ done: isFinishing }" aria-hidden="true" />
+        <span class="stage-label">{{ footerLabel }}</span>
+        <span class="pct">{{ footerPct }}%</span>
       </div>
-      <p class="footer-sub">기술을 한 동작씩 짚어보는 중이에요.</p>
+      <p class="footer-sub">{{ isFinishing ? "정상에 도착했어요." : "기술을 한 동작씩 짚어보는 중이에요." }}</p>
     </div>
   </div>
 </template>
@@ -109,76 +133,80 @@ const activeStageLabel = computed(() => {
   overflow: hidden;
 }
 
-/* 가운데 루트 라인 */
-.route {
+/* ── 트레드밀 홀드 ─────────────────────────────── */
+.holds-track {
   position: absolute;
-  left: 50%;
-  bottom: 6%;
-  transform: translateX(-50%);
-  width: 2px;
-  height: 88%;
-  background: var(--border);
-  border-radius: 999px;
+  inset: 0;
+  animation: scroll-holds 2.6s linear infinite;
 }
-.route--filled {
-  background: var(--hold-lime);
-  opacity: 0.5;
-  transition: height 0.5s var(--ease-soft);
+.holds-track.paused {
+  animation-play-state: paused;
 }
-
-/* 홀드 */
 .hold {
   position: absolute;
-  transform: translate(-50%, 50%);
-  display: grid;
-  place-items: center;
-  opacity: 0.45;
-  transition:
-    opacity 0.4s var(--ease-state),
-    transform 0.4s var(--ease-state);
+  transform: translateX(-50%);
+  opacity: 0.5;
 }
-.hold.lit {
-  opacity: 1;
-  transform: translate(-50%, 50%) scale(1.05);
+@keyframes scroll-holds {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(144px);
+  } /* 2*GAP — 한 주기 */
 }
 
-/* 클라이머 (실루엣 피겨) */
+/* 마지막 정상 홀드 (left는 인라인으로 오른손 x에 정렬) */
+.final-hold {
+  position: absolute;
+  top: 9%;
+  transform: translateX(-50%);
+  z-index: 1;
+  animation: hold-reveal 0.4s var(--ease-soft) both;
+}
+@keyframes hold-reveal {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+}
+
+/* ── 클라이머 (가로 중앙 + 상단 고정, 하반신은 벽 아래로 잘림) ── */
 .climber {
   position: absolute;
+  top: 32px;
   left: 50%;
-  transform: translate(-50%, 50%);
-  display: grid;
-  place-items: center;
-  transition: bottom 0.5s var(--ease-soft);
+  transform: translateX(-50%);
   z-index: 2;
 }
-.climber-glow {
+.burst {
   position: absolute;
-  width: 46px;
-  height: 46px;
+  top: 22%;
+  left: 50%;
+  width: 48px;
+  height: 48px;
+  margin: -24px 0 0 -24px;
   border-radius: 50%;
-  background: var(--hold-cyan);
-  opacity: 0.25;
-  filter: blur(8px);
-  animation: pulse 1.8s ease-in-out infinite;
+  border: 3px solid var(--hold-lime);
+  animation: burst 0.6s var(--ease-soft) forwards;
 }
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 0.18;
-    transform: scale(0.9);
+@keyframes burst {
+  from {
+    opacity: 0.7;
+    transform: scale(0.3);
   }
-  50% {
-    opacity: 0.34;
-    transform: scale(1.06);
+  to {
+    opacity: 0;
+    transform: scale(2.3);
   }
 }
 
-/* 피겨 — 몸통 bob/sway */
 .figure {
-  position: relative;
   overflow: visible;
-  animation: climb-body 1.6s ease-in-out infinite;
 }
 .body {
   fill: var(--hold-dark);
@@ -186,75 +214,97 @@ const activeStageLabel = computed(() => {
 .chalk {
   fill: var(--hold-lime);
 }
+.torso {
+  transform-box: view-box;
+  transform-origin: 20px 31px; /* 엉덩이 기준으로 압축/신장 */
+}
 .limb {
   fill: none;
   stroke: var(--hold-dark);
   stroke-width: 3.4;
   stroke-linecap: round;
-  /* 관절(어깨/엉덩이)을 회전 피벗으로 */
   transform-box: view-box;
 }
 .arm-l {
-  transform-origin: 16px 15px;
-  animation: arm-l 1.6s ease-in-out infinite;
+  transform-origin: 15px 16px;
 }
 .arm-r {
-  transform-origin: 24px 15px;
-  animation: arm-r 1.6s ease-in-out infinite;
+  transform-origin: 25px 16px;
 }
 .leg-l {
-  transform-origin: 17.5px 30px;
-  animation: leg-l 1.6s ease-in-out infinite;
+  transform-origin: 17.5px 31px;
 }
 .leg-r {
-  transform-origin: 22.5px 30px;
-  animation: leg-r 1.6s ease-in-out infinite;
+  transform-origin: 22.5px 31px;
 }
 
-/* 대각선 교차: 왼팔+오른다리 / 오른팔+왼다리 가 같은 위상 */
-@keyframes arm-l {
+/* ── 클라이밍 게이트 (대각선 교차 수축/신장) ──── */
+/* 왼팔+오른다리 / 오른팔+왼다리 가 반대 위상 */
+.climber[data-phase="climbing"] .arm-l,
+.climber[data-phase="climbing"] .leg-r {
+  animation: limb-flex 1.4s ease-in-out infinite;
+}
+.climber[data-phase="climbing"] .arm-r,
+.climber[data-phase="climbing"] .leg-l {
+  animation: limb-flex 1.4s ease-in-out infinite;
+  animation-delay: -0.7s;
+}
+.climber[data-phase="climbing"] .torso {
+  animation: torso-flex 1.4s ease-in-out infinite;
+}
+@keyframes limb-flex {
   0%,
   100% {
-    transform: rotate(-24deg);
+    transform: scaleY(1.06);
   }
   50% {
-    transform: rotate(8deg);
+    transform: scaleY(0.78);
   }
 }
-@keyframes arm-r {
+@keyframes torso-flex {
   0%,
   100% {
-    transform: rotate(22deg);
+    transform: scaleY(1.03);
   }
   50% {
-    transform: rotate(-8deg);
+    transform: scaleY(0.93);
   }
 }
-@keyframes leg-l {
-  0%,
-  100% {
-    transform: rotate(12deg);
-  }
-  50% {
-    transform: rotate(-9deg);
-  }
+
+/* ── 아웃트로 포즈 ─────────────────────────────── */
+/* grab: 오른팔이 정상 홀드로 쭉 뻗음 */
+.climber[data-phase="grab"] .arm-r {
+  transform: scaleY(1.55);
 }
-@keyframes leg-r {
-  0%,
-  100% {
-    transform: rotate(-12deg);
-  }
-  50% {
-    transform: rotate(9deg);
-  }
+.climber[data-phase="grab"] .torso {
+  transform: scaleY(1.05);
 }
-@keyframes climb-body {
-  0%,
-  100% {
-    transform: translateY(0) rotate(-1.5deg);
+/* celebrate: 양팔 번쩍 (펌프) */
+.climber[data-phase="celebrate"] .arm-l {
+  transform: scaleY(1.16) rotate(-14deg);
+}
+.climber[data-phase="celebrate"] .arm-r {
+  transform: scaleY(1.16) rotate(14deg);
+}
+.climber[data-phase="celebrate"] .figure,
+.climber[data-phase="done"] .figure {
+  animation: pump 0.5s var(--ease-soft);
+}
+.climber[data-phase="done"] .arm-l {
+  transform: scaleY(1.16) rotate(-14deg);
+}
+.climber[data-phase="done"] .arm-r {
+  transform: scaleY(1.16) rotate(14deg);
+}
+@keyframes pump {
+  0% {
+    transform: translateY(0);
   }
-  50% {
-    transform: translateY(-2px) rotate(1.5deg);
+  40% {
+    transform: translateY(-6px);
+  }
+  100% {
+    transform: translateY(0);
   }
 }
 
@@ -276,6 +326,9 @@ const activeStageLabel = computed(() => {
   background: var(--hold-lime);
   flex-shrink: 0;
   animation: blink 1.2s ease-in-out infinite;
+}
+.ai-dot.done {
+  animation: none;
 }
 @keyframes blink {
   0%,
@@ -307,24 +360,13 @@ const activeStageLabel = computed(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .holds-track,
   .figure,
   .limb,
-  .climber-glow,
+  .torso,
+  .burst,
   .ai-dot {
     animation: none;
-  }
-  /* 정적인 리치 자세로 고정 */
-  .arm-l {
-    transform: rotate(-24deg);
-  }
-  .arm-r {
-    transform: rotate(22deg);
-  }
-  .leg-l {
-    transform: rotate(12deg);
-  }
-  .leg-r {
-    transform: rotate(-12deg);
   }
 }
 </style>

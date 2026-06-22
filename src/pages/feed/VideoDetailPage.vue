@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { IonPage, IonContent, IonIcon, IonSpinner, IonModal } from "@ionic/vue";
 import { heartOutline, heart, shareOutline, chatbubbleOutline, refreshOutline, ellipsisVertical, createOutline, trashOutline } from "ionicons/icons";
 import AppHeader from "@/components/common/AppHeader.vue";
@@ -12,6 +12,7 @@ import AnalysisLoader from "@/components/video/AnalysisLoader.vue";
 import VideoPlayer from "@/components/video/VideoPlayer.vue";
 import VideoEditModal from "@/components/video/VideoEditModal.vue";
 import ReportModal from "@/components/common/ReportModal.vue";
+import ExpandableText from "@/components/common/ExpandableText.vue";
 import { useRoute, useRouter } from "vue-router";
 import { useVideoStore } from "@/stores/video";
 import { useAuthStore } from "@/stores/auth";
@@ -53,12 +54,28 @@ function openReport(type: ReportTargetType, id: string) {
 
 const video = computed(() => videoStore.currentVideo);
 const isOwner = computed(() => authStore.user && video.value?.user.id === authStore.user.id);
-const showAIResult = computed(() => isOwner.value && video.value?.status === "done" && video.value.analysis);
 const isAnalyzing = computed(() => video.value?.status === "analyzing" || video.value?.status === "pending");
 const analysisFailed = computed(() => video.value?.status === "failed");
 
 // 분석 진행 상태 — store가 videoId별로 백그라운드 추적
 const analysisProgress = computed(() => videoStore.getAnalysisProgress(videoId));
+
+// 아웃트로: 분석이 화면에서 done 되면 로더의 완료 애니메이션이 끝날 때까지 결과 카드 전환을 미룬다.
+const playingOutro = ref(false);
+watch(
+  () => video.value?.status,
+  (s, prev) => {
+    if (s === "done" && (prev === "analyzing" || prev === "pending")) {
+      playingOutro.value = true;
+    }
+  },
+);
+function onAnalysisComplete() {
+  playingOutro.value = false;
+}
+
+const showLoader = computed(() => isOwner.value && (isAnalyzing.value || playingOutro.value));
+const showAIResult = computed(() => isOwner.value && !playingOutro.value && video.value?.status === "done" && video.value.analysis);
 
 function leaveAnalysis() {
   router.push(isOwner.value ? "/my/videos" : "/feed");
@@ -312,19 +329,21 @@ onMounted(async () => {
                 <button class="feedback-link" @click="showFeedbackModal = true">AI 결과가 맞나요? 피드백 남기기</button>
               </div>
 
-              <!-- analyzing / pending (내 영상 전용) -->
-              <div v-else-if="isOwner && isAnalyzing" class="ai-section hola-card ai-pending">
-                <AnalysisLoader :progress="analysisProgress.progress" :stage="analysisProgress.stage" :message="analysisProgress.message" />
-                <div class="leave-hint">
-                  <p class="leave-hint-text">분석은 백그라운드에서 계속돼요. 다른 화면으로 이동해도 괜찮아요.</p>
-                  <BaseButton variant="secondary" size="sm" @click="leaveAnalysis">
-                    {{ isOwner ? "내 영상으로" : "둘러보기" }}
-                  </BaseButton>
-                </div>
-                <button class="retry-btn retry-btn--muted" aria-label="분석 재시도" @click="retryAnalysis">
-                  <IonIcon :icon="refreshOutline" />
-                  멈췄나요? 재시도
-                </button>
+              <!-- analyzing / pending / 아웃트로 (내 영상 전용) -->
+              <div v-else-if="showLoader" class="ai-section hola-card ai-pending">
+                <AnalysisLoader :progress="analysisProgress.progress" :stage="analysisProgress.stage" :message="analysisProgress.message" :finishing="playingOutro" @complete="onAnalysisComplete" />
+                <template v-if="!playingOutro">
+                  <div class="leave-hint">
+                    <p class="leave-hint-text">분석은 백그라운드에서 계속돼요. 다른 화면으로 이동해도 괜찮아요.</p>
+                    <BaseButton variant="secondary" size="sm" @click="leaveAnalysis">
+                      {{ isOwner ? "내 영상으로" : "둘러보기" }}
+                    </BaseButton>
+                  </div>
+                  <button class="retry-btn retry-btn--muted" aria-label="분석 재시도" @click="retryAnalysis">
+                    <IonIcon :icon="refreshOutline" />
+                    멈췄나요? 재시도
+                  </button>
+                </template>
               </div>
 
               <!-- failed (내 영상 전용) -->
@@ -379,7 +398,7 @@ onMounted(async () => {
                           <button class="c-edit-cancel" :disabled="isUpdating" aria-label="수정 취소" @click="cancelEdit">취소</button>
                         </div>
                       </template>
-                      <p v-else class="c-content">{{ c.content }}</p>
+                      <p v-else class="c-content"><ExpandableText :text="c.content" /></p>
                     </div>
                     <div v-if="authStore.user && c.user.id === authStore.user.id && editingCommentId !== c.id" class="c-actions">
                       <button class="c-action-btn" aria-label="댓글 수정" @click="startEdit(c)">수정</button>

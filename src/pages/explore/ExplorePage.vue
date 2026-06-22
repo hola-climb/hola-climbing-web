@@ -136,6 +136,13 @@ function goToLocationSettings() {
 }
 
 async function handleLocate() {
+  // 이미 근처 모드이면 토글로 전체 목록으로 돌아간다
+  if (isNearbyMode.value) {
+    resetLocation();
+    loadGyms(true);
+    return;
+  }
+
   // 위치 탐색 전, 위치기반서비스 약관 동의 여부를 먼저 확인한다.
   if (!(await hasLocationConsent())) {
     showLocationConsent.value = true;
