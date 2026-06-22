@@ -2,12 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CAPACITOR_DEBUG</key>
+	<key>CAPACITOR_DEBUG</key>
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>올라</string>
+	<string>올라</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -24,6 +24,16 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>가까운 클라이밍 암장을 찾고 위치 기반 기능을 제공하기 위해 사용자의 위치 정보를 사용합니다.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>가까운 클라이밍 암장을 찾고 위치 기반 기능을 제공하기 위해 사용자의 위치 정보를 사용합니다.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>등반 영상을 선택하여 업로드하기 위해 사진 보관함에 접근합니다.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
@@ -46,14 +56,6 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
-		<true/>
-	<key>NSLocationWhenInUseUsageDescription</key>
-		<string>가까운 클라이밍 암장을 찾고 위치 기반 기능을 제공하기 위해 사용자의 위치 정보를 사용합니다.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-		<string>가까운 클라이밍 암장을 찾고 위치 기반 기능을 제공하기 위해 사용자의 위치 정보를 사용합니다.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-		<string>등반 영상을 선택하여 업로드하기 위해 사진 보관함에 접근합니다.</string>
-	
-	
+	<true/>
 </dict>
 </plist>
