@@ -3,6 +3,7 @@
 // - handleCallback: 프론트 /oauth/callback 에서 oauthCode 받아 /result 호출 →
 //   status 분기 (LOGGED_IN / SIGNUP_REQUIRED / EMAIL_ALREADY_EXISTS)
 import { useRouter } from "vue-router";
+import { useIonRouter } from "@ionic/vue";
 import { OAuthProvider } from "@/types/api";
 import { useAuthStore } from "@/stores/auth";
 import { useUIStore } from "@/stores/ui";
@@ -40,6 +41,7 @@ export interface CallbackQuery {
 
 export function useOAuth() {
   const router = useRouter();
+  const ionRouter = useIonRouter();
   const authStore = useAuthStore();
   const uiStore = useUIStore();
 
@@ -88,8 +90,10 @@ export function useOAuth() {
         return;
       }
 
-      // LOGGED_IN — 스토어에서 토큰 적용 + 프로필 로드까지 끝난 상태
-      router.replace(redirect);
+      // LOGGED_IN — 스토어에서 토큰 적용 + 프로필 로드까지 끝난 상태.
+      // 탭 레이아웃 복귀는 Ionic 라우터로 스택을 'root'로 리셋해야 캐시된 ion-tabs 가
+      // 깨지지 않는다(평범한 replace 는 탭 클릭이 먹지 않는 문제를 유발).
+      ionRouter.navigate(redirect, "root", "replace");
     } catch (err: unknown) {
       if (import.meta.env.DEV) console.error(err);
       uiStore.showToast(getErrorMessage(err, "소셜 로그인에 실패했어요."), "danger");

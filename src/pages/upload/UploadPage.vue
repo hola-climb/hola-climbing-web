@@ -2,6 +2,8 @@
 import { ref, computed } from "vue";
 import { IonPage, IonContent } from "@ionic/vue";
 import { useRouter } from "vue-router";
+import { Capacitor } from "@capacitor/core";
+import { Camera, MediaTypeSelection } from "@capacitor/camera";
 import { useVideoStore } from "@/stores/video";
 import { useUIStore } from "@/stores/ui";
 import { gymService } from "@/services/gym";
@@ -51,8 +53,39 @@ const uploadPct = computed(() => videoStore.uploadProgress);
 
 const canSubmit = computed(() => !videoStore.isUploading && !!selectedFile.value && !!selectedGym.value && selectedGradeId.value != null && !!recordedDate.value);
 
-function openFilePicker() {
-  fileInput.value?.click();
+async function openFilePicker() {
+  if (Capacitor.isNativePlatform()) {
+    await openNativePicker();
+  } else {
+    fileInput.value?.click();
+  }
+}
+
+// 네이티브(iOS/Android): 갤러리에서 영상만 선택.
+// chooseFromGallery는 PHPicker 기반이라 카메라 권한(NSCameraUsageDescription) 불필요.
+// (deprecated getPhoto는 source가 Photos여도 카메라 키 존재를 강제함)
+async function openNativePicker() {
+  try {
+    const { results } = await Camera.chooseFromGallery({
+      mediaType: MediaTypeSelection.Video,
+      allowMultipleSelection: false,
+    });
+    const media = results[0];
+    const webPath = media?.webPath ?? media?.uri;
+    if (!webPath) return;
+    const res = await fetch(webPath);
+    const blob = await res.blob();
+    const ext = webPath.split(".").pop()?.toLowerCase() ?? "mp4";
+    const mime = ext === "mov" ? "video/quicktime" : "video/mp4";
+    const file = new File([blob], `video.${ext}`, { type: mime });
+    receivePicked(file);
+  } catch (err: unknown) {
+    // 사용자가 취소한 경우 조용히 무시
+    const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+    if (!msg.includes("cancel") && !msg.includes("no image") && !msg.includes("no media")) {
+      uiStore.showToast("영상을 불러오지 못했어요.", "danger");
+    }
+  }
 }
 
 function onFileChange(e: Event) {
@@ -63,11 +96,13 @@ function onFileChange(e: Event) {
     uiStore.showToast("동영상 파일만 업로드할 수 있어요.", "danger");
     return;
   }
-  // 모든 영상은 트림 에디터를 거친다. 길이 검증(≤ MAX_DURATION 출력)은 에디터가 담당하므로
-  // 60초 초과 원본도 잘라서 업로드할 수 있다.
+  receivePicked(file);
+  input.value = ""; // 동일 파일 재선택 시 change 가 다시 발화하도록 초기화
+}
+
+function receivePicked(file: File) {
   pendingFile.value = file;
   trimEditorOpen.value = true;
-  input.value = ""; // 동일 파일 재선택 시 change 가 다시 발화하도록 초기화
 }
 
 function onTrimApply(result: { file: File; durationSeconds: number }) {
@@ -177,7 +212,7 @@ async function handleSubmit() {
 
           <!-- Upload picker zone -->
           <div class="picker-zone" @click="openFilePicker" role="button" tabindex="0" aria-label="영상 파일 선택" @keydown.enter="openFilePicker">
-            <input ref="fileInput" type="file" accept="video/*" class="hidden-input" @change="onFileChange" />
+            <input ref="fileInput" type="file" accept="video/mp4,video/quicktime,video/x-m4v,video/webm,video/ogg" class="hidden-input" @change="onFileChange" />
             <div class="picker-icon-wrap">
               <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M12 3v13M5 10l7-7 7 7M5 21h14" />

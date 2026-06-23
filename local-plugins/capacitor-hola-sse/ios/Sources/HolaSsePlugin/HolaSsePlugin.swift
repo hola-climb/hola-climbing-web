@@ -28,9 +28,12 @@ public class HolaSsePlugin: CAPPlugin, CAPBridgedPlugin, URLSessionDataDelegate 
     private var idByTask: [Int: String] = [:]
     // 스트림 id → 활성 task
     private var taskById: [String: URLSessionDataTask] = [:]
-    // 스트림 id → 미완성 프레임 누적 버퍼
-    private var bufferById: [String: String] = [:]
+    // 스트림 id → 미완성 바이트 버퍼. UTF-8 멀티바이트(한글)가 청크 경계에서
+    // 잘려도 데이터가 유실되지 않도록 String 이 아닌 Data 로 누적한다.
+    private var bufferById: [String: Data] = [:]
     private let lock = NSLock()
+    // SSE 프레임 구분자 `\n\n`
+    private let frameDelimiter = Data([0x0A, 0x0A])
 
     public override func load() {
         let config = URLSessionConfiguration.default
@@ -39,6 +42,13 @@ public class HolaSsePlugin: CAPPlugin, CAPBridgedPlugin, URLSessionDataDelegate 
         config.timeoutIntervalForResource = TimeInterval.infinity
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
+    }
+
+    /** notifyListeners 는 반드시 메인 스레드에서 호출(델리게이트 콜백은 백그라운드 큐). */
+    private func emit(_ event: String, _ data: [String: Any]) {
+        DispatchQueue.main.async { [weak self] in
+            self?.notifyListeners(event, data: data)
+        }
     }
 
     @objc func connect(_ call: CAPPluginCall) {
@@ -62,9 +72,10 @@ public class HolaSsePlugin: CAPPlugin, CAPBridgedPlugin, URLSessionDataDelegate 
         lock.lock()
         idByTask[task.taskIdentifier] = id
         taskById[id] = task
-        bufferById[id] = ""
+        bufferById[id] = Data()
         lock.unlock()
 
+        CAPLog.print("[HolaSse] connect id=\(id) url=\(urlString) token=\(token?.isEmpty == false)")
         task.resume()
         call.resolve(["id": id])
     }
@@ -80,6 +91,7 @@ public class HolaSsePlugin: CAPPlugin, CAPBridgedPlugin, URLSessionDataDelegate 
         bufferById[id] = nil
         if let t = task { idByTask[t.taskIdentifier] = nil }
         lock.unlock()
+        CAPLog.print("[HolaSse] disconnect id=\(id)")
         task?.cancel()
         call.resolve()
     }
@@ -87,12 +99,15 @@ public class HolaSsePlugin: CAPPlugin, CAPBridgedPlugin, URLSessionDataDelegate 
     // MARK: - URLSessionDataDelegate
 
     public func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+        let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+        lock.lock()
+        let id = idByTask[dataTask.taskIdentifier]
+        lock.unlock()
+        CAPLog.print("[HolaSse] response id=\(id ?? "?") status=\(status)")
+
         if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
-            lock.lock()
-            let id = idByTask[dataTask.taskIdentifier]
-            lock.unlock()
             if let id = id {
-                notifyListeners("sseError", data: ["id": id, "message": "SSE error: \(http.statusCode)"])
+                emit("sseError", ["id": id, "message": "SSE error: \(http.statusCode)"])
             }
             completionHandler(.cancel)
             return
@@ -106,20 +121,24 @@ public class HolaSsePlugin: CAPPlugin, CAPBridgedPlugin, URLSessionDataDelegate 
             lock.unlock()
             return
         }
-        var buffer = (bufferById[id] ?? "") + (String(data: data, encoding: .utf8) ?? "")
+        var buffer = (bufferById[id] ?? Data())
+        buffer.append(data)
 
-        // 완성된 프레임(`\n\n`)만 잘라 전달하고 미완성분은 버퍼에 남긴다.
+        // 완성된 프레임(`\n\n`)만 바이트 단위로 잘라 전달하고 미완성분은 버퍼에 남긴다.
         var frames: [String] = []
-        while let range = buffer.range(of: "\n\n") {
-            let frame = String(buffer[buffer.startIndex..<range.lowerBound])
-            frames.append(frame)
-            buffer = String(buffer[range.upperBound...])
+        while let range = buffer.range(of: frameDelimiter) {
+            let frameData = buffer.subdata(in: buffer.startIndex..<range.lowerBound)
+            if let frame = String(data: frameData, encoding: .utf8), !frame.isEmpty {
+                frames.append(frame)
+            }
+            buffer = buffer.subdata(in: range.upperBound..<buffer.endIndex)
         }
         bufferById[id] = buffer
         lock.unlock()
 
-        for frame in frames where !frame.isEmpty {
-            notifyListeners("sseMessage", data: ["id": id, "data": frame])
+        CAPLog.print("[HolaSse] data id=\(id) bytes=\(data.count) frames=\(frames.count)")
+        for frame in frames {
+            emit("sseMessage", ["id": id, "data": frame])
         }
     }
 
@@ -136,10 +155,15 @@ public class HolaSsePlugin: CAPPlugin, CAPBridgedPlugin, URLSessionDataDelegate 
         guard let id = id else { return }
 
         if let error = error as NSError? {
-            if error.code == NSURLErrorCancelled { return } // 명시적 disconnect — 무시
-            notifyListeners("sseError", data: ["id": id, "message": error.localizedDescription])
+            if error.code == NSURLErrorCancelled { // 명시적 disconnect — 무시
+                CAPLog.print("[HolaSse] cancelled id=\(id)")
+                return
+            }
+            CAPLog.print("[HolaSse] error id=\(id) \(error.localizedDescription)")
+            emit("sseError", ["id": id, "message": error.localizedDescription])
         } else {
-            notifyListeners("sseClose", data: ["id": id])
+            CAPLog.print("[HolaSse] close id=\(id)")
+            emit("sseClose", ["id": id])
         }
     }
 }

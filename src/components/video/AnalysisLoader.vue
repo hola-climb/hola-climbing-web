@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // imports → props/emits → state → computed → methods
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import HoldPebble from "@/components/common/HoldPebble.vue";
 
 const props = withDefaults(
@@ -37,6 +37,30 @@ const trackHolds = Array.from({ length: 7 }, (_, i) => {
   return { id: k, top: k * GAP, dx: Math.abs(k % 2) === 0 ? -REACH : REACH };
 });
 
+// ── 홀드 스크롤 (rAF — iOS WKWebView CSS animation 불안정 우회) ──────────
+const CYCLE = GAP * 2; // 144px — 이음매 없는 반복 주기
+const PX_PER_MS = CYCLE / 2600; // 2.6s 주기
+const holdsOffset = ref(0);
+let rafId: number | null = null;
+let lastTs: number | null = null;
+
+function scrollStep(ts: number) {
+  if (lastTs !== null) {
+    const dt = Math.min(ts - lastTs, 50); // 탭 전환 후 점프 방지
+    holdsOffset.value = (holdsOffset.value + PX_PER_MS * dt) % CYCLE;
+  }
+  lastTs = ts;
+  rafId = requestAnimationFrame(scrollStep);
+}
+
+function stopScroll() {
+  if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
+  lastTs = null;
+}
+
+onMounted(() => { rafId = requestAnimationFrame(scrollStep); });
+onUnmounted(() => { stopScroll(); });
+
 // ── 아웃트로 상태머신 ──────────────────────────────
 const phase = ref<"climbing" | "grab" | "celebrate" | "done">("climbing");
 let outroStarted = false;
@@ -44,6 +68,7 @@ let outroStarted = false;
 function runOutro() {
   if (outroStarted) return;
   outroStarted = true;
+  stopScroll();
   phase.value = "grab"; // 마지막 홀드 잡기
   window.setTimeout(() => {
     phase.value = "celebrate"; // 라임 버스트 + 펌프
@@ -75,15 +100,15 @@ const footerPct = computed(() => (isFinishing.value ? 100 : clamped.value));
   <div class="loader" role="progressbar" :aria-valuenow="footerPct" aria-valuemin="0" aria-valuemax="100" :aria-label="`AI 분석 ${footerPct}% — ${footerLabel}`">
     <div class="wall">
       <!-- 트레드밀 홀드 (아래로 흐름) — x는 손끝 위치(중앙 ±REACH)에 정렬 -->
-      <div class="holds-track" :class="{ paused: isFinishing }" aria-hidden="true">
+      <div class="holds-track" :style="{ transform: `translateY(${holdsOffset}px)` }" aria-hidden="true">
         <span v-for="h in trackHolds" :key="h.id" class="hold" :style="{ top: h.top + 'px', left: `calc(50% + ${h.dx}px)` }">
-          <HoldPebble color="dark" :size="32" />
+          <HoldPebble color="dark" :size="20" />
         </span>
       </div>
 
       <!-- 마지막 정상 홀드 (완료 시 등장) — 오른손 x에 정렬 -->
       <span v-if="isFinishing" class="final-hold" :style="{ left: `calc(50% + ${REACH}px)` }" aria-hidden="true">
-        <HoldPebble color="lime" :size="40" />
+        <HoldPebble color="lime" :size="28" />
       </span>
 
       <!-- 클라이머 (상단 고정, 하반신은 벽 아래로 잘림) -->
@@ -136,24 +161,16 @@ const footerPct = computed(() => (isFinishing.value ? 100 : clamped.value));
 /* ── 트레드밀 홀드 ─────────────────────────────── */
 .holds-track {
   position: absolute;
-  inset: 0;
-  animation: scroll-holds 2.6s linear infinite;
-}
-.holds-track.paused {
-  animation-play-state: paused;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  will-change: transform;
 }
 .hold {
   position: absolute;
   transform: translateX(-50%);
   opacity: 0.5;
-}
-@keyframes scroll-holds {
-  from {
-    transform: translateY(0);
-  }
-  to {
-    transform: translateY(144px);
-  } /* 2*GAP — 한 주기 */
 }
 
 /* 마지막 정상 홀드 (left는 인라인으로 오른손 x에 정렬) */
@@ -360,7 +377,6 @@ const footerPct = computed(() => (isFinishing.value ? 100 : clamped.value));
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .holds-track,
   .figure,
   .limb,
   .torso,

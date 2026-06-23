@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import { IonPage, IonContent, IonInput, IonCheckbox, IonIcon } from "@ionic/vue";
+import { IonPage, IonContent, IonInput, IonCheckbox, IonIcon, useIonRouter } from "@ionic/vue";
 import { chevronBackOutline } from "ionicons/icons";
 import BaseButton from "@/components/common/BaseButton.vue";
 import TermViewModal from "@/components/common/TermViewModal.vue";
@@ -15,6 +15,7 @@ import { getErrorMessage } from "@/utils/apiError";
 // 소셜 최초 로그인 시 닉네임 입력 + 필수 약관 동의 (F-01-05).
 // 컨텍스트(signupToken·프리필)는 exchange 단계에서 sessionStorage 에 저장돼 있다.
 const router = useRouter();
+const ionRouter = useIonRouter();
 const authStore = useAuthStore();
 const uiStore = useUIStore();
 
@@ -62,7 +63,8 @@ async function handleSubmit() {
     await authStore.oauthSignup({ signupToken: ctx.signupToken, nickname: name, termsAgreed });
     clearSocialSignupContext();
     uiStore.showToast("환영해요! 가입이 완료됐어요.");
-    router.replace("/feed");
+    // 탭 레이아웃 복귀는 Ionic 라우터로 스택을 'root'로 리셋 (캐시된 ion-tabs 보존).
+    ionRouter.navigate("/feed", "root", "replace");
   } catch (err: unknown) {
     uiStore.showToast(getErrorMessage(err, "가입에 실패했어요."), "danger");
   } finally {

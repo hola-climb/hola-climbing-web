@@ -82,23 +82,21 @@ export const useGymStore = defineStore("gym", () => {
     return data;
   }
 
-  async function toggleFavorite(gymId: string) {
+  async function toggleFavorite(gymId: string, gymRef?: Gym) {
     const listGym = gyms.value.find((g) => g.id === gymId) ?? null;
     const detailGym = currentGym.value?.id === gymId ? currentGym.value : null;
-    const ref = listGym ?? detailGym;
-    if (!ref) throw new Error("favorite_failed");
+    // gymRef covers gyms outside the store (nearbyGyms, recommendedGyms in ExplorePage)
+    const target = listGym ?? detailGym ?? gymRef ?? null;
+    if (!target) throw new Error("favorite_failed");
 
-    const wasFavorited = ref.isFavorited;
-    // Optimistic update
-    if (listGym) listGym.isFavorited = !wasFavorited;
-    if (detailGym) detailGym.isFavorited = !wasFavorited;
+    const wasFavorited = target.isFavorited;
+    // Optimistic update — mutate all matching refs
+    [listGym, detailGym, gymRef].forEach((g) => { if (g) g.isFavorited = !wasFavorited; });
 
     try {
       await (wasFavorited ? gymService.removeFavorite(gymId) : gymService.addFavorite(gymId));
     } catch {
-      // Revert on failure
-      if (listGym) listGym.isFavorited = wasFavorited;
-      if (detailGym) detailGym.isFavorited = wasFavorited;
+      [listGym, detailGym, gymRef].forEach((g) => { if (g) g.isFavorited = wasFavorited; });
       throw new Error("favorite_failed");
     }
   }

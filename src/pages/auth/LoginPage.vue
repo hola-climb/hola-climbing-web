@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
-import { IonPage, IonContent, IonIcon, IonInput } from "@ionic/vue";
+import { IonPage, IonContent, IonIcon, IonInput, useIonRouter } from "@ionic/vue";
 import { eyeOutline, eyeOffOutline } from "ionicons/icons";
 import BaseButton from "@/components/common/BaseButton.vue";
 import { useRouter, useRoute } from "vue-router";
@@ -14,6 +14,7 @@ import { getErrorMessage, getErrorCode } from "@/utils/apiError";
 const REMEMBER_KEY = "hola_remembered_email";
 
 const router = useRouter();
+const ionRouter = useIonRouter();
 const route = useRoute();
 const authStore = useAuthStore();
 const uiStore = useUIStore();
@@ -72,7 +73,10 @@ async function handleLogin() {
       localStorage.removeItem(REMEMBER_KEY);
     }
     const redirect = (route.query.redirect as string) || "/feed";
-    router.replace(redirect);
+    // 탭 레이아웃(AppLayout)으로 돌아갈 때는 Ionic 라우터로 스택을 'root'로 리셋한다.
+    // 평범한 router.replace 는 Ionic 에 방향을 알리지 못해 캐시된 ion-tabs 가
+    // 망가지고(탭 클릭이 먹지 않음) 페이지 전환이 안 되는 문제를 유발한다.
+    ionRouter.navigate(redirect, "root", "replace");
   } catch (err: unknown) {
     const code = getErrorCode(err);
     const msg = getErrorMessage(err, "로그인에 실패했어요.");

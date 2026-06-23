@@ -16,7 +16,7 @@ function choose(choice: "upload" | "record") {
 </script>
 
 <template>
-  <BaseSheet class="choice-sheet" :open="open" :breakpoints="[0, 0.42]" :initial-breakpoint="0.42" @close="emit('close')">
+  <BaseSheet class="choice-sheet" :open="open" @close="emit('close')">
     <div class="sheet">
       <h2 class="sheet-title">무엇을 추가할까요?</h2>
 
@@ -50,7 +50,7 @@ function choose(choice: "upload" | "record") {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  padding-bottom: 8px;
 }
 .sheet-title {
   font-size: var(--fs-h2);

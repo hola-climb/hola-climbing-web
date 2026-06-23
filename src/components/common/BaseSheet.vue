@@ -30,8 +30,7 @@ const emit = defineEmits<{ (e: "close"): void }>();
   <!--
     재사용 바텀시트 셸.
     레이아웃: [grabber] → [header(고정)] → [body(스크롤)] → [footer(고정)]
-    하단 잘림 방지의 핵심은 .sheet-body 의 min-height:0 + overflow-y:auto 이며,
-    footer 는 항상 화면에 고정되고 safe-area 를 반영한다.
+    --height: auto 로 콘텐츠 높이에 맞게 줄어들고, max-height: 90dvh 를 초과하면 body 가 스크롤.
   -->
   <IonModal class="base-sheet" :is-open="open" :handle="false" :initial-breakpoint="initialBreakpoint" :breakpoints="breakpoints" @did-dismiss="emit('close')">
     <div class="sheet-shell">
@@ -55,15 +54,16 @@ const emit = defineEmits<{ (e: "close"): void }>();
 <style scoped>
 .base-sheet {
   --border-radius: var(--r-sheet);
+  --height: auto;
 }
-/* 시트 높이를 꽉 채우는 flex 컬럼 — body 만 스크롤하고 header/footer 는 고정 */
+/* 콘텐츠 높이에 맞되, 90dvh 초과 시 body 스크롤 */
 .sheet-shell {
   display: flex;
   flex-direction: column;
-  height: 100%;
-  max-height: 100%;
+  max-height: 90dvh;
   min-height: 0;
   background: var(--bg);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 .sheet-grabber {
   flex-shrink: 0;
@@ -89,10 +89,10 @@ const emit = defineEmits<{ (e: "close"): void }>();
   padding-left: 0;
   padding-right: 0;
 }
-/* 고정 하단 영역 — 액션 버튼이 항상 보이도록 safe-area 까지 패딩 */
+/* 고정 하단 영역 — 액션 버튼이 항상 보이도록 */
 .sheet-footer {
   flex-shrink: 0;
-  padding: 12px 20px calc(16px + env(safe-area-inset-bottom));
+  padding: 12px 20px 16px;
 }
 .sheet-footer.flush {
   padding-left: 0;

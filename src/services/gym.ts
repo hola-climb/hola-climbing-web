@@ -105,11 +105,13 @@ function toBusinessHours(bh: Record<string, RawDayHours | null> | null | undefin
   for (const [k, v] of Object.entries(bh)) norm[k.toLowerCase().slice(0, 3)] = v;
   const days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
   const out = {} as BusinessHours;
+  let hasAny = false;
   for (const d of days) {
     const v = norm[d];
     out[d] = v && v.open && v.close ? { open: v.open, close: v.close } : null;
+    if (out[d]) hasAny = true;
   }
-  return out;
+  return hasAny ? out : null;
 }
 
 function toRecommendedGym(raw: RawRecommendedGym): RecommendedGym {

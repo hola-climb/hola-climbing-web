@@ -1,6 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import type { PluginListenerHandle } from "@capacitor/core";
 import api from "./client";
+import { reportError } from "./observability";
 import { HolaSse } from "./sseClient";
 import type {
   AnalysisResult,
@@ -211,9 +212,17 @@ function streamAnalysisNative(url: string, token: string | null, onProgress: OnP
   return new Promise((resolve, reject) => {
     let streamId: string | null = null;
     let settled = false;
+    let gotFrame = false;
     const handles: PluginListenerHandle[] = [];
 
+    // 연결은 됐지만 프레임이 전혀 오지 않는 상황(델리미터 불일치/이벤트 미전달 등)을 포착.
+    // 스트림을 끊지 않고 신호만 남긴다.
+    const watchdog = setTimeout(() => {
+      if (!settled && !gotFrame) reportError(new Error("sse_native_no_frames"), { scope: "sse_native" });
+    }, 20_000);
+
     const cleanup = async () => {
+      clearTimeout(watchdog);
       for (const h of handles) {
         try {
           await h.remove();
@@ -240,8 +249,13 @@ function streamAnalysisNative(url: string, token: string | null, onProgress: OnP
       if (settled) return;
       settled = true;
       void cleanup();
-      // 명시적 중단은 웹 경로의 AbortError 와 동일하게 처리되도록 전달.
-      reject(err instanceof Error ? err : new Error(String(err)));
+      const e = err instanceof Error ? err : new Error(String(err));
+      // 명시적 중단(AbortError)은 정상 흐름이므로 보고하지 않는다.
+      if (e.name !== "AbortError") {
+        if (import.meta.env.DEV) console.error("[HolaSse] native SSE failed:", e);
+        reportError(e, { scope: "sse_native" });
+      }
+      reject(e);
     };
 
     externalController?.signal.addEventListener("abort", () => {
@@ -253,6 +267,7 @@ function streamAnalysisNative(url: string, token: string | null, onProgress: OnP
         handles.push(
           await HolaSse.addListener("sseMessage", (e) => {
             if (e.id !== streamId || !e.data) return;
+            gotFrame = true;
             const terminal = handleSseFrame(e.data, onProgress);
             if (terminal) finish(terminal);
           }),

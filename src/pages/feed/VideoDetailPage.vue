@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
-import { IonPage, IonContent, IonIcon, IonSpinner, IonModal, IonActionSheet } from "@ionic/vue";
-import { heartOutline, heart, shareOutline, chatbubbleOutline, refreshOutline, ellipsisVertical, createOutline, trashOutline } from "ionicons/icons";
+import { IonPage, IonContent, IonIcon, IonSpinner, useIonRouter } from "@ionic/vue";
+import BaseSheet from "@/components/common/BaseSheet.vue";
+import { heartOutline, heart, shareOutline, chatbubbleOutline, refreshOutline, ellipsisVertical, createOutline, trashOutline, flagOutline } from "ionicons/icons";
 import AppHeader from "@/components/common/AppHeader.vue";
 import LoadingState from "@/components/common/LoadingState.vue";
 import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
@@ -25,6 +26,7 @@ import { useShare } from "@/composables/useShare";
 
 const route = useRoute();
 const router = useRouter();
+const ionRouter = useIonRouter();
 const videoStore = useVideoStore();
 const authStore = useAuthStore();
 const uiStore = useUIStore();
@@ -214,7 +216,8 @@ async function onDeleteConfirm() {
   try {
     await videoStore.deleteVideo(videoId);
     uiStore.showToast("영상을 삭제했어요.");
-    router.replace("/my");
+    // 탭 레이아웃 복귀 — Ionic 라우터로 스택을 'root'로 리셋 (탭이 죽지 않도록).
+    ionRouter.navigate("/my", "root", "replace");
   } catch {
     uiStore.showToast("삭제에 실패했어요.", "danger");
   } finally {
@@ -447,34 +450,31 @@ onMounted(async () => {
     />
 
     <!-- 수정 / 삭제 선택 (내 영상 전용) -->
-    <IonModal v-if="isOwner" class="options-modal" :is-open="showActionSheet" :initial-breakpoint="1" :breakpoints="[0, 1]" @did-dismiss="showActionSheet = false">
-      <div class="options-sheet">
-        <div class="options-grabber" aria-hidden="true" />
-        <p class="options-label micro-label">영상 관리</p>
-        <button
-          class="option-row"
-          aria-label="영상 수정"
-          @click="
-            showActionSheet = false;
-            showEditModal = true;
-          "
-        >
-          <IonIcon :icon="createOutline" aria-hidden="true" />
-          <span>수정</span>
-        </button>
-        <button
-          class="option-row option-row--danger"
-          aria-label="영상 삭제"
-          @click="
-            showActionSheet = false;
-            showDeleteDialog = true;
-          "
-        >
-          <IonIcon :icon="trashOutline" aria-hidden="true" />
-          <span>삭제</span>
-        </button>
-      </div>
-    </IonModal>
+    <BaseSheet v-if="isOwner" :open="showActionSheet" flush @close="showActionSheet = false">
+      <p class="options-label micro-label">영상 관리</p>
+      <button
+        class="option-row"
+        aria-label="영상 수정"
+        @click="
+          showActionSheet = false;
+          showEditModal = true;
+        "
+      >
+        <IonIcon :icon="createOutline" aria-hidden="true" />
+        <span>수정</span>
+      </button>
+      <button
+        class="option-row option-row--danger"
+        aria-label="영상 삭제"
+        @click="
+          showActionSheet = false;
+          showDeleteDialog = true;
+        "
+      >
+        <IonIcon :icon="trashOutline" aria-hidden="true" />
+        <span>삭제</span>
+      </button>
+    </BaseSheet>
 
     <!-- 삭제 확인 (내 영상 전용) -->
     <ConfirmDialog
@@ -495,15 +495,14 @@ onMounted(async () => {
     <!-- 수정 모달 (내 영상 전용) -->
     <VideoEditModal v-if="isOwner" :open="showEditModal" :video="video" @save="onEditSave" @cancel="showEditModal = false" />
 
-    <!-- 비소유자 더보기 액션시트 -->
-    <IonActionSheet
-      :is-open="showMoreSheet"
-      :buttons="[
-        { text: '신고', handler: () => { showMoreSheet = false; openReport('video', videoId); } },
-        { text: '취소', role: 'cancel' },
-      ]"
-      @did-dismiss="showMoreSheet = false"
-    />
+    <!-- 비소유자 더보기 시트 -->
+    <BaseSheet :open="showMoreSheet" flush @close="showMoreSheet = false">
+      <p class="options-label micro-label">더보기</p>
+      <button class="option-row option-row--danger" aria-label="영상 신고" @click="showMoreSheet = false; openReport('video', videoId)">
+        <IonIcon :icon="flagOutline" aria-hidden="true" />
+        <span>신고</span>
+      </button>
+    </BaseSheet>
 
     <!-- 신고 모달 -->
     <ReportModal v-if="reportTarget" :open="showReportModal" :target-type="reportTarget.type" :target-id="reportTarget.id" @close="showReportModal = false" />
@@ -1038,21 +1037,6 @@ onMounted(async () => {
 }
 
 /* ── 영상 관리 옵션 시트 ─────────────────────────── */
-.options-modal {
-  --border-radius: var(--r-sheet);
-  --height: auto;
-}
-.options-sheet {
-  background: var(--bg);
-  padding: 10px 0 calc(20px + env(safe-area-inset-bottom));
-}
-.options-grabber {
-  width: 36px;
-  height: 4px;
-  border-radius: 999px;
-  background: var(--border);
-  margin: 0 auto 16px;
-}
 .options-label {
   padding: 0 22px 8px;
   margin: 0;

@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import {
-  IonPage, IonContent, IonIcon, IonActionSheet,
+  IonPage, IonContent, IonIcon,
 } from '@ionic/vue'
-import { ellipsisHorizontal } from 'ionicons/icons'
+import { ellipsisHorizontal, flagOutline, banOutline } from 'ionicons/icons'
+import BaseSheet from '@/components/common/BaseSheet.vue'
 import AppHeader from '@/components/common/AppHeader.vue'
 import LoadingState from '@/components/common/LoadingState.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
@@ -53,13 +54,6 @@ function formatDate(iso: string) {
 
 const showReportModal = ref(false)
 
-const moreButtons = computed(() => [
-  { text: '신고', handler: openReport },
-  isBlocked.value
-    ? { text: '차단 해제', handler: handleUnblock }
-    : { text: '차단', role: 'destructive', handler: handleBlock },
-  { text: '취소', role: 'cancel' as const },
-])
 
 function openReport() {
   if (!authStore.isAuthenticated) { uiStore.openLoginSheet(); return }
@@ -259,12 +253,22 @@ async function handleFollow() {
         </template>
       </div>
 
-      <!-- 더보기 액션 시트 (신고/차단/차단 해제) -->
-      <IonActionSheet
-        :is-open="showMoreSheet"
-        :buttons="moreButtons"
-        @did-dismiss="showMoreSheet = false"
-      />
+      <!-- 더보기 시트 (신고/차단/차단 해제) -->
+      <BaseSheet :open="showMoreSheet" flush @close="showMoreSheet = false">
+        <p class="options-label micro-label">더보기</p>
+        <button class="option-row" aria-label="신고" @click="showMoreSheet = false; openReport()">
+          <IonIcon :icon="flagOutline" aria-hidden="true" />
+          <span>신고</span>
+        </button>
+        <button
+          class="option-row option-row--danger"
+          :aria-label="isBlocked ? '차단 해제' : '차단'"
+          @click="showMoreSheet = false; isBlocked ? handleUnblock() : handleBlock()"
+        >
+          <IonIcon :icon="banOutline" aria-hidden="true" />
+          <span>{{ isBlocked ? '차단 해제' : '차단' }}</span>
+        </button>
+      </BaseSheet>
 
       <!-- 사용자 신고 모달 -->
       <ReportModal :open="showReportModal" target-type="user" :target-id="userId" @close="showReportModal = false" />
@@ -274,6 +278,17 @@ async function handleFollow() {
 
 <style scoped>
 .more-btn { background: none; border: none; cursor: pointer; color: var(--fg); font-size: 22px; display: grid; place-items: center; padding: 6px; }
+
+.options-label { padding: 0 22px 8px; margin: 0; }
+.option-row {
+  display: flex; align-items: center; gap: 14px;
+  width: 100%; padding: 16px 22px;
+  background: none; border: none;
+  font-family: var(--font-sans); font-size: var(--fs-body); font-weight: var(--w-semibold);
+  color: var(--fg); cursor: pointer; text-align: left;
+}
+.option-row ion-icon { font-size: 20px; flex-shrink: 0; }
+.option-row--danger { color: var(--hold-pink); }
 
 .page-skeleton { display: flex; flex-direction: column; gap: 16px; padding-top: 16px; }
 

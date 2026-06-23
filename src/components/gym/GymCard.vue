@@ -47,7 +47,7 @@ async function handleFavorite(e: Event) {
     return;
   }
   try {
-    await gymStore.toggleFavorite(props.gym.id);
+    await gymStore.toggleFavorite(props.gym.id, props.gym);
   } catch {
     uiStore.showToast("즐겨찾기 처리 중 오류가 발생했어요.", "danger");
   }
@@ -85,7 +85,7 @@ function openDetail() {
       </div>
       <div class="chip-row">
         <span v-if="source === 'style_match'" class="chip chip-cyan">맞춤</span>
-        <span v-if="isOpen !== null" class="chip" :class="isOpen ? 'chip-lime' : 'chip-dark'">
+        <span v-if="isOpen !== null && gym.businessHours" class="chip" :class="isOpen ? 'chip-lime' : 'chip-dark'">
           {{ isOpen ? "OPEN" : "CLOSED" }}
         </span>
       </div>

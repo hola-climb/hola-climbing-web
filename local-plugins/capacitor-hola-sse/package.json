@@ -1,0 +1,15 @@
+{
+  "name": "capacitor-hola-sse",
+  "version": "1.0.0",
+  "description": "Native SSE (Server-Sent Events) bridge for Hola — streams AI analysis progress on iOS where WKWebView's fetch cannot.",
+  "private": true,
+  "capacitor": {
+    "ios": {
+      "src": "ios"
+    }
+  },
+  "files": [
+    "ios/Sources",
+    "Package.swift"
+  ]
+}

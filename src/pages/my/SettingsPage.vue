@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // imports → state → methods
 import { ref, onMounted } from "vue";
-import { IonPage, IonContent } from "@ionic/vue";
+import { IonPage, IonContent, useIonRouter } from "@ionic/vue";
 import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
 import AppHeader from "@/components/common/AppHeader.vue";
 import { useRouter } from "vue-router";
@@ -12,6 +12,7 @@ import { notificationService } from "@/services/notification";
 import type { NotificationSettings } from "@/services/notification";
 
 const router = useRouter();
+const ionRouter = useIonRouter();
 const authStore = useAuthStore();
 const uiStore = useUIStore();
 
@@ -70,7 +71,8 @@ onMounted(async () => {
 
 async function handleLogout() {
   await authStore.logout();
-  router.replace("/feed");
+  // 로그아웃 후 피드로 — Ionic 라우터로 스택을 'root'로 리셋 (탭 전환 보존).
+  ionRouter.navigate("/feed", "root", "replace");
   uiStore.showToast("로그아웃되었어요.");
 }
 

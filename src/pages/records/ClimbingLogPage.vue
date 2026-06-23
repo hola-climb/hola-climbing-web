@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // imports → router → state → computed → methods → lifecycle
 import { ref, computed, onMounted } from "vue";
-import { IonPage, IonContent } from "@ionic/vue";
+import { IonPage, IonContent, useIonRouter } from "@ionic/vue";
 import { useRouter, useRoute } from "vue-router";
 import LoadingState from "@/components/common/LoadingState.vue";
 import BaseButton from "@/components/common/BaseButton.vue";
@@ -13,6 +13,7 @@ import { getErrorMessage } from "@/utils/apiError";
 import type { Gym, GymGrade } from "@/types/api";
 
 const router = useRouter();
+const ionRouter = useIonRouter();
 const route = useRoute();
 const uiStore = useUIStore();
 
@@ -132,7 +133,7 @@ async function handleSubmit() {
       await climbingLogService.create(payload);
       uiStore.showToast("클라이밍 기록을 저장했어요.");
     }
-    router.replace("/records");
+    ionRouter.navigate("/records", "root", "replace");
   } catch (err: unknown) {
     uiStore.showToast(getErrorMessage(err, "저장에 실패했어요."), "danger");
   } finally {
@@ -172,7 +173,7 @@ async function loadForEdit() {
   } catch (err: unknown) {
     if (import.meta.env.DEV) console.error(err);
     uiStore.showToast("기록을 불러오지 못했어요.", "danger");
-    router.replace("/records");
+    ionRouter.navigate("/records", "root", "replace");
   } finally {
     isLoading.value = false;
   }
