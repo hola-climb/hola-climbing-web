@@ -21,7 +21,6 @@ type UploadState = "idle" | "uploading" | "failed";
 const uploadState = ref<UploadState>("idle");
 
 const fileInput = ref<HTMLInputElement | null>(null);
-const cameraInput = ref<HTMLInputElement | null>(null);
 const selectedFile = ref<File | null>(null);
 const durationSeconds = ref<number | null>(null);
 
@@ -54,10 +53,6 @@ const canSubmit = computed(() => !videoStore.isUploading && !!selectedFile.value
 
 function openFilePicker() {
   fileInput.value?.click();
-}
-
-function openCamera() {
-  cameraInput.value?.click();
 }
 
 function onFileChange(e: Event) {
@@ -183,7 +178,6 @@ async function handleSubmit() {
           <!-- Upload picker zone -->
           <div class="picker-zone" @click="openFilePicker" role="button" tabindex="0" aria-label="영상 파일 선택" @keydown.enter="openFilePicker">
             <input ref="fileInput" type="file" accept="video/*" class="hidden-input" @change="onFileChange" />
-            <input ref="cameraInput" type="file" accept="video/*" capture="environment" class="hidden-input" @change="onFileChange" />
             <div class="picker-icon-wrap">
               <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M12 3v13M5 10l7-7 7 7M5 21h14" />
@@ -192,12 +186,6 @@ async function handleSubmit() {
             <div class="picker-text">{{ selectedFile ? selectedFile.name : "영상 선택" }}</div>
             <div class="picker-hint">최대 60초 · MP4 / MOV</div>
             <div class="picker-btns">
-              <button class="picker-btn secondary" aria-label="촬영" @click.stop="openCamera">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M14 4h-4l-1.5 2.5H5a2 2 0 0 0-2 2V18a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.5a2 2 0 0 0-2-2h-3.5L14 4Z M16 13a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" />
-                </svg>
-                촬영
-              </button>
               <button class="picker-btn primary" @click.stop="openFilePicker" aria-label="라이브러리에서 선택">라이브러리</button>
             </div>
           </div>
@@ -414,11 +402,6 @@ async function handleSubmit() {
 }
 .picker-btn:active {
   opacity: 0.8;
-}
-.picker-btn.secondary {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--fg);
 }
 .picker-btn.primary {
   background: var(--hold-dark);
