@@ -26,6 +26,7 @@ function toGymVideo(raw: Omit<RawRecommendedVideo, "source">): FeedVideo {
   return {
     id: String(raw.id),
     userId: String(raw.userId),
+    user: { nickname: raw.nickname ?? "사용자", profileImage: raw.profileImage ?? null },
     gymId: raw.gymId != null ? String(raw.gymId) : null,
     gymName: raw.gymName !== null ? String(raw.gymName) : null,
     title: raw.title,
