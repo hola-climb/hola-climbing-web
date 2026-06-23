@@ -484,6 +484,7 @@ export enum ReportCategory {
   COPYRIGHT = "copyright",
   HATE = "hate",
   SPAM = "spam",
+  IRRELEVANT = "irrelevant",
   ETC = "etc",
 }
 
@@ -492,6 +493,7 @@ export const REPORT_CATEGORY_LABELS: Record<ReportCategory, string> = {
   [ReportCategory.COPYRIGHT]: "저작권 침해",
   [ReportCategory.HATE]: "욕설/혐오",
   [ReportCategory.SPAM]: "스팸/광고",
+  [ReportCategory.IRRELEVANT]: "관련 없는 영상",
   [ReportCategory.ETC]: "기타",
 };
 

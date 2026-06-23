@@ -484,7 +484,7 @@ function openVideo(id: string) {
             </span>
           </template>
         </div>
-        <p v-else class="no-info">정보 없음</p>
+        <p v-else class="no-info">운영시간 정보가 없어요.</p>
       </div>
 
       <!-- Live chat preview -->

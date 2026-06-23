@@ -10,6 +10,7 @@ import { authService } from "@/services/auth";
 import { useMediaQuery } from "@/composables/useMediaQuery";
 import { useGeolocation } from "@/composables/useGeolocation";
 import GymCard from "@/components/gym/GymCard.vue";
+import GymMap from "@/components/gym/GymMap.vue";
 import GymDetailView from "./GymDetailView.vue";
 import LoadingState from "@/components/common/LoadingState.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
@@ -55,9 +56,21 @@ const nearbyGyms = ref<Gym[]>([]);
 const nearestGym = ref<Gym | null>(null);
 const recommendedGyms = ref<RecommendedGym[]>([]);
 const isLocating = ref(false);
+// 위치서비스 활성화 시 현재 위치 좌표 — 지도 포커스를 현재 위치로 이동시킨다
+const userCoords = ref<{ lat: number; lng: number } | null>(null);
+// 캐러셀에서 현재 포커스된 암장 id — 지도 핀 강조 + 지도 중심 이동에 쓰인다
+const carouselActiveId = ref<string | null>(null);
 
-// 위치기반서비스 약관 미동의 시 안내 다이얼로그
+// 실제 카카오맵 사용 여부. VITE_KAKAO_MAP_KEY가 비어 있으면 자동으로 mock 지도로
+// 폴백한다. mock으로 손쉽게 되돌리려면 키를 비우거나 아래를 false로 둔다.
+const useRealMap = !!import.meta.env.VITE_KAKAO_MAP_KEY;
+
+// 로그인 유저용 — 위치기반서비스 약관 미동의 시 설정 유도 다이얼로그
 const showLocationConsent = ref(false);
+
+// 비로그인 유저용 — 위치 일시 이용·미저장 1회성 안내
+const LOCATION_NOTICE_KEY = "hola_location_notice_ack";
+const showLocationNotice = ref(false);
 
 function sortFavoritesFirst<T extends { isFavorited: boolean }>(list: T[]): T[] {
   return [...list].sort((a, b) => (b.isFavorited ? 1 : 0) - (a.isFavorited ? 1 : 0));
@@ -70,14 +83,91 @@ const showRecoSection = computed(() => isNearbyMode.value);
 // 이름 검색 중에는 지도(위치 기반 탐색용)를 숨겨 검색 결과를 바로 노출한다
 const isSearching = computed(() => searchQuery.value.trim().length > 0);
 
+// 지도에 넘길 암장 목록 — 목록 API에 없는 lat/lng를 좌표 캐시에서 보강한다.
+// coordsVersion에 의존시켜 캐시가 채워질 때마다 핀이 점진적으로 나타나게 한다.
+const mapGyms = computed<Gym[]>(() => {
+  void gymStore.coordsVersion;
+  return displayGyms.value.map((g) => {
+    if (g.latitude && g.longitude) return g;
+    const c = gymStore.getCoords(g.id);
+    return c ? { ...g, latitude: c.lat, longitude: c.lng } : g;
+  });
+});
+
+// 좌표가 비어 있는 암장은 상세 엔드포인트에서 좌표를 보강 요청한다.
+watch(
+  displayGyms,
+  (list) => {
+    if (useRealMap && list.length) gymStore.ensureCoords(list);
+  },
+  { immediate: true },
+);
+
+// 지도 포커스: 근처 모드 → 캐러셀 활성 암장 / 없으면 현재 위치
+//              전체 모드 → 리스트 최상단 암장
+const mapCenter = computed(() => {
+  if (isNearbyMode.value) {
+    if (carouselActiveId.value) {
+      const g = mapGyms.value.find((x) => x.id === carouselActiveId.value);
+      if (g?.latitude && g?.longitude) return { lat: g.latitude, lng: g.longitude };
+    }
+    return userCoords.value;
+  }
+  const g = mapGyms.value.find((x) => x.latitude && x.longitude);
+  return g ? { lat: g.latitude, lng: g.longitude } : null;
+});
+
 /** 근처/추천 상태 초기화 — 검색·새로고침·전체보기 시 호출 */
 function resetLocation() {
   nearbyGyms.value = [];
   nearestGym.value = null;
   recommendedGyms.value = [];
+  userCoords.value = null;
+  carouselActiveId.value = null;
 }
 
-onMounted(() => loadGyms(true));
+/** 캐러셀 아이템 탭: 해당 핀으로 지도 포커스만 이동 */
+function handleCarouselTap(gym: Gym) {
+  carouselActiveId.value = gym.id;
+}
+
+/** 좌표를 받아 근처 암장·추천을 로드하는 공통 로직 (수동·자동 위치 모두 사용) */
+async function fetchNearby(coords: { lat: number; lng: number }): Promise<void> {
+  userCoords.value = coords;
+  const { data } = await gymService.getNearby({ lat: coords.lat, lng: coords.lng, radius: 5, size: 20 });
+  nearbyGyms.value = data;
+  nearestGym.value = data[0] ?? null;
+  carouselActiveId.value = data[0]?.id ?? null;
+  searchQuery.value = "";
+  if (authStore.isAuthenticated) {
+    try {
+      const { data: reco } = await gymService.getRecommendations({ lat: coords.lat, lng: coords.lng, radius: 5, size: 20 });
+      recommendedGyms.value = reco;
+    } catch {
+      recommendedGyms.value = [];
+    }
+  }
+}
+
+/** 마운트 시 위치 동의 사용자에게 자동으로 내 주변 모드를 적용한다. 실패는 무시. */
+async function tryAutoLocate(): Promise<void> {
+  if (!(await hasLocationConsent())) return;
+  isLocating.value = true;
+  try {
+    const coords = await locate();
+    if (!coords) return;
+    await fetchNearby(coords);
+  } catch {
+    /* 자동 위치 실패는 무시 — 전체 목록 유지 */
+  } finally {
+    isLocating.value = false;
+  }
+}
+
+onMounted(async () => {
+  await loadGyms(true);
+  tryAutoLocate(); // 위치 동의 사용자는 자동으로 내 주변 모드
+});
 
 async function loadGyms(reset = false) {
   if (reset) currentPage.value = 0;
@@ -117,9 +207,11 @@ async function handleInfinite(event: CustomEvent) {
   (event.target as HTMLIonInfiniteScrollElement).complete();
 }
 
-/** 위치기반서비스(type: 'location') 약관 동의 여부.
- *  확인 불가(미로그인·네트워크 오류 등)는 미동의로 간주한다. */
+/** 로그인 유저의 위치기반서비스(type: 'location') 약관 동의 여부.
+ *  비로그인은 계정별 동의 레코드가 없으므로 false — 마운트 자동 위치(tryAutoLocate)를 막는다.
+ *  비로그인 수동 탐색은 handleLocate에서 익명·일시 위치 흐름으로 따로 처리한다. */
 async function hasLocationConsent(): Promise<boolean> {
+  if (!authStore.isAuthenticated) return false;
   try {
     const { data } = await authService.getAgreementStatus();
     const locationTerm = data.terms.find((t) => t.type === "location");
@@ -135,6 +227,30 @@ function goToLocationSettings() {
   router.push("/my/terms");
 }
 
+/** 실제 위치 측정 + 근처 암장 로드 (OS 위치 권한 프롬프트는 locate()가 담당). */
+async function runLocate() {
+  isLocating.value = true;
+  try {
+    const coords = await locate();
+    if (!coords) {
+      uiStore.showToast("위치 권한을 허용하면 주변 암장을 찾아드려요.", "warning");
+      return;
+    }
+    await fetchNearby(coords);
+  } catch {
+    uiStore.showToast("주변 암장을 불러오지 못했어요.", "danger");
+  } finally {
+    isLocating.value = false;
+  }
+}
+
+/** 비로그인 1회성 안내 확인 → 좌표 일시 이용 동의로 간주하고 진행. */
+function acceptLocationNotice() {
+  localStorage.setItem(LOCATION_NOTICE_KEY, "1");
+  showLocationNotice.value = false;
+  runLocate();
+}
+
 async function handleLocate() {
   // 이미 근처 모드이면 토글로 전체 목록으로 돌아간다
   if (isNearbyMode.value) {
@@ -143,43 +259,23 @@ async function handleLocate() {
     return;
   }
 
-  // 위치 탐색 전, 위치기반서비스 약관 동의 여부를 먼저 확인한다.
-  if (!(await hasLocationConsent())) {
-    showLocationConsent.value = true;
+  // 로그인 유저: 위치가 계정에 연결되는 개인위치정보 → location 약관 동의 확인.
+  if (authStore.isAuthenticated) {
+    if (!(await hasLocationConsent())) {
+      showLocationConsent.value = true;
+      return;
+    }
+    await runLocate();
     return;
   }
 
-  isLocating.value = true;
-  try {
-    const coords = await locate();
-    if (!coords) {
-      uiStore.showToast("위치 권한을 허용하면 주변 암장을 찾아드려요.", "warning");
-      return;
-    }
-
-    // 1) 공개 근처 암장 (거리순) — /gyms/nearby
-    try {
-      const { data } = await gymService.getNearby({ lat: coords.lat, lng: coords.lng, radius: 5, size: 20 });
-      nearbyGyms.value = data;
-      nearestGym.value = data[0] ?? null;
-      searchQuery.value = "";
-    } catch {
-      uiStore.showToast("주변 암장을 불러오지 못했어요.", "danger");
-      return;
-    }
-
-    // 2) 로그인 사용자 한정 개인화 추천 — /recommendations/gyms (실패해도 근처 목록은 유지)
-    if (authStore.isAuthenticated) {
-      try {
-        const { data } = await gymService.getRecommendations({ lat: coords.lat, lng: coords.lng, radius: 5, size: 20 });
-        recommendedGyms.value = data;
-      } catch {
-        recommendedGyms.value = [];
-      }
-    }
-  } finally {
-    isLocating.value = false;
+  // 비로그인: 익명·일시 위치 사용 → 서버 약관 동의 불필요(OS 권한으로 충분).
+  // 최초 1회만 "일시 이용·미저장" 안내 후 진행한다.
+  if (!localStorage.getItem(LOCATION_NOTICE_KEY)) {
+    showLocationNotice.value = true;
+    return;
   }
+  await runLocate();
 }
 </script>
 
@@ -240,8 +336,10 @@ async function handleLocate() {
           <!-- Map preview card (이름 검색 중에는 숨김) -->
           <div v-if="!isSearching" class="map-section page-padding" :class="{ 'nearby-active': isNearbyMode }">
             <div class="map-card hola-card">
-              <!-- SVG map backdrop -->
-              <svg viewBox="0 0 400 180" class="map-svg" aria-hidden="true" preserveAspectRatio="none">
+              <!-- 실제 카카오맵 (VITE_KAKAO_MAP_KEY 설정 시) -->
+              <GymMap v-if="useRealMap" :gyms="mapGyms" :center="mapCenter" :user-location="userCoords" :selected-id="carouselActiveId" @select="openGym" />
+              <!-- SVG map backdrop (mock · 키 미설정 시 폴백, 손쉽게 되돌리기용) -->
+              <svg v-else viewBox="0 0 400 180" class="map-svg" aria-hidden="true" preserveAspectRatio="none">
                 <rect width="400" height="180" fill="#EEF1F4" />
                 <path d="M0 70 L400 90" stroke="#DDE2E8" stroke-width="6" />
                 <path d="M0 120 L400 110" stroke="#DDE2E8" stroke-width="6" />
@@ -259,16 +357,41 @@ async function handleLocate() {
                 <circle cx="290" cy="60" r="6" fill="#22D3EE" />
                 <circle cx="90" cy="140" r="6" fill="#C8FF00" />
               </svg>
-              <!-- Nearest gym overlay -->
-              <div v-if="nearestGym" class="map-pill" role="button" tabindex="0" :aria-label="`${nearestGym.name} 상세 보기`" @click="openGym(nearestGym)">
-                <div>
-                  <div class="micro-label">NEAREST</div>
-                  <div class="map-gym-name">{{ nearestGym.name }}</div>
+              <!-- Nearby gyms carousel (근처 모드) -->
+              <div v-if="nearbyGyms.length" class="map-carousel-wrap" aria-label="주변 암장 목록">
+                <div class="map-carousel" role="list">
+                  <button
+                    v-for="gym in nearbyGyms"
+                    :key="gym.id"
+                    class="carousel-item"
+                    :class="{ active: carouselActiveId === gym.id }"
+                    role="listitem"
+                    :aria-label="`${gym.name}${gym.distanceKm !== null ? `, ${gym.distanceKm.toFixed(1)}km` : ''}`"
+                    :aria-pressed="carouselActiveId === gym.id"
+                    @click="handleCarouselTap(gym)"
+                    @mouseenter="carouselActiveId = gym.id"
+                  >
+                    <span v-if="gym.distanceKm !== null" class="carousel-dist">{{ gym.distanceKm.toFixed(1) }}km</span>
+                    <span class="carousel-name">{{ gym.name }}</span>
+                    <svg
+                      v-if="carouselActiveId === gym.id"
+                      viewBox="0 0 24 24"
+                      width="14"
+                      height="14"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                      class="carousel-arrow"
+                    >
+                      <path d="m9 5 7 7-7 7" />
+                    </svg>
+                  </button>
                 </div>
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="m9 5 7 7-7 7" />
-                </svg>
               </div>
+              <!-- Hint pill (위치 미설정) -->
               <div v-else class="map-pill map-pill-hint" aria-label="위치 버튼 안내">
                 <div>
                   <div class="micro-label">내 주변</div>
@@ -357,7 +480,7 @@ async function handleLocate() {
       </div>
       <!-- end .explore-layout -->
 
-      <!-- 위치기반서비스 약관 미동의 안내 -->
+      <!-- 로그인 유저: 위치기반서비스 약관 미동의 안내 -->
       <ConfirmDialog
         :open="showLocationConsent"
         title="위치 서비스 동의가 필요해요"
@@ -366,6 +489,17 @@ async function handleLocate() {
         cancel-text="닫기"
         @confirm="goToLocationSettings"
         @cancel="showLocationConsent = false"
+      />
+
+      <!-- 비로그인 유저: 위치 일시 이용 안내(1회성) -->
+      <ConfirmDialog
+        :open="showLocationNotice"
+        title="내 주변 암장을 찾을게요"
+        message="현재 위치는 가까운 암장을 찾는 데에만 일시적으로 사용됩니다."
+        confirm-text="위치 사용"
+        cancel-text="닫기"
+        @confirm="acceptLocationNotice"
+        @cancel="showLocationNotice = false"
       />
     </IonContent>
   </IonPage>
@@ -547,7 +681,7 @@ async function handleLocate() {
 }
 .map-card {
   padding: 0;
-  height: 180px;
+  height: 360px;
   overflow: hidden;
 }
 .map-svg {
@@ -558,6 +692,7 @@ async function handleLocate() {
 }
 .map-pill {
   position: absolute;
+  z-index: 2;
   left: 12px;
   right: 12px;
   bottom: 12px;
@@ -581,6 +716,66 @@ async function handleLocate() {
 .map-pill-hint .map-gym-name {
   color: var(--fg-muted);
   font-weight: 500;
+}
+
+/* ── Nearby gyms carousel ──────────────────────────── */
+.map-carousel-wrap {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  right: 0;
+  bottom: 12px;
+  padding: 0 12px;
+}
+.map-carousel {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 2px; /* prevent box-shadow clipping */
+}
+.map-carousel::-webkit-scrollbar {
+  display: none;
+}
+.carousel-item {
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1.5px solid transparent;
+  border-radius: var(--r-button);
+  padding: 9px 14px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  color: var(--fg);
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+  white-space: nowrap;
+}
+.carousel-item.active {
+  border-color: var(--hold-dark);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+}
+.carousel-dist {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  letter-spacing: 0.02em;
+}
+.carousel-name {
+  font-size: 13px;
+  font-weight: 700;
+}
+.carousel-arrow {
+  color: var(--fg-muted);
+  flex-shrink: 0;
 }
 
 /* ── 맞춤 추천 ───────────────────────────────────── */
