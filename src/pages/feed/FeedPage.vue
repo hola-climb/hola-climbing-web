@@ -333,6 +333,8 @@ watch(
   box-shadow: var(--shadow-card);
   cursor: pointer;
   text-align: left;
+  color: var(--fg);
+  font-family: var(--font-sans);
   transition: transform var(--dur-fast) var(--ease-state);
 }
 .video-grid-card:active {

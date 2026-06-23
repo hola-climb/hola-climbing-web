@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
-import { IonPage, IonContent, IonIcon, IonSpinner, IonModal } from "@ionic/vue";
+import { IonPage, IonContent, IonIcon, IonSpinner, IonModal, IonActionSheet } from "@ionic/vue";
 import { heartOutline, heart, shareOutline, chatbubbleOutline, refreshOutline, ellipsisVertical, createOutline, trashOutline } from "ionicons/icons";
 import AppHeader from "@/components/common/AppHeader.vue";
 import LoadingState from "@/components/common/LoadingState.vue";
@@ -37,6 +37,9 @@ const showActionSheet = ref(false);
 const showDeleteDialog = ref(false);
 const showEditModal = ref(false);
 const isDeleting = ref(false);
+
+// 비소유자 더보기 액션시트
+const showMoreSheet = ref(false);
 
 // 신고
 const showReportModal = ref(false);
@@ -256,7 +259,7 @@ onMounted(async () => {
         <button v-if="isOwner" class="more-btn" aria-label="더보기" @click="showActionSheet = true">
           <IonIcon :icon="ellipsisVertical" />
         </button>
-        <button v-else-if="video" class="more-btn" aria-label="영상 신고" @click="openReport('video', videoId)">
+        <button v-else-if="video" class="more-btn" aria-label="더보기" @click="showMoreSheet = true">
           <IonIcon :icon="ellipsisVertical" />
         </button>
       </template>
@@ -491,6 +494,16 @@ onMounted(async () => {
 
     <!-- 수정 모달 (내 영상 전용) -->
     <VideoEditModal v-if="isOwner" :open="showEditModal" :video="video" @save="onEditSave" @cancel="showEditModal = false" />
+
+    <!-- 비소유자 더보기 액션시트 -->
+    <IonActionSheet
+      :is-open="showMoreSheet"
+      :buttons="[
+        { text: '신고', handler: () => { showMoreSheet.value = false; openReport('video', videoId); } },
+        { text: '취소', role: 'cancel' },
+      ]"
+      @did-dismiss="showMoreSheet = false"
+    />
 
     <!-- 신고 모달 -->
     <ReportModal v-if="reportTarget" :open="showReportModal" :target-type="reportTarget.type" :target-id="reportTarget.id" @close="showReportModal = false" />

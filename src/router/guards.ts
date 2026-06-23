@@ -1,7 +1,14 @@
 import type { NavigationGuardNext, RouteLocationNormalized } from "vue-router";
+import { START_LOCATION } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
+import { useUIStore } from "@/stores/ui";
 
-export async function authGuard(to: RouteLocationNormalized, _from: RouteLocationNormalized, next: NavigationGuardNext) {
+// 탭바에서 직접 진입하는 인증 필요 루트. 비로그인 시 /auth/login 으로 리다이렉트하지 않고
+// (탭 전환이 무산되는 것처럼 보이므로) 로그인 바텀시트를 띄운다. 탭바가 모두 동일한
+// Ionic 네이티브 href 네비게이션을 쓸 수 있게 해 selectedTab desync 를 막는다.
+const sheetGuardedTabPaths = ["/records", "/my"];
+
+export async function authGuard(to: RouteLocationNormalized, from: RouteLocationNormalized, next: NavigationGuardNext) {
   const authStore = useAuthStore();
 
   // Wait for session restoration (page refresh) before evaluating auth state,
@@ -30,6 +37,14 @@ export async function authGuard(to: RouteLocationNormalized, _from: RouteLocatio
   // Admin-only routes require ADMIN role
   if (to.meta.requiresAdmin && authStore.user?.role !== "ADMIN") {
     return next(authStore.isAuthenticated ? "/feed" : "/auth/login");
+  }
+
+  // Tab roots (기록/마이): show the login bottom sheet instead of redirecting,
+  // so the tab bar can stay on Ionic's native href navigation everywhere.
+  if (sheetGuardedTabPaths.includes(to.path) && !authStore.isAuthenticated) {
+    useUIStore().openLoginSheet();
+    // 앱 내 탭 전환이면 현재 화면 유지(next(false)), 콜드 스타트/딥링크면 공개 피드로.
+    return from === START_LOCATION ? next("/feed") : next(false);
   }
 
   // Private routes require authentication; preserve intended destination

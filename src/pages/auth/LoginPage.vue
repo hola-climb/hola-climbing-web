@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
 import { IonPage, IonContent, IonIcon, IonInput } from "@ionic/vue";
 import { eyeOutline, eyeOffOutline } from "ionicons/icons";
 import BaseButton from "@/components/common/BaseButton.vue";
@@ -11,6 +11,8 @@ import { useOAuth } from "@/composables/useOAuth";
 import { OAuthProvider } from "@/types/api";
 import { getErrorMessage, getErrorCode } from "@/utils/apiError";
 
+const REMEMBER_KEY = "hola_remembered_email";
+
 const router = useRouter();
 const route = useRoute();
 const authStore = useAuthStore();
@@ -21,6 +23,15 @@ const email = ref("");
 const password = ref("");
 const showPw = ref(false);
 const isLoading = ref(false);
+const rememberMe = ref(false);
+
+onMounted(() => {
+  const saved = localStorage.getItem(REMEMBER_KEY);
+  if (saved) {
+    email.value = saved;
+    rememberMe.value = true;
+  }
+});
 
 // 이메일 미인증 등으로 로그인 실패 시 재발송 안내 노출
 const showResend = ref(false);
@@ -55,6 +66,11 @@ async function handleLogin() {
   isLoading.value = true;
   try {
     await authStore.login(email.value.trim(), password.value);
+    if (rememberMe.value) {
+      localStorage.setItem(REMEMBER_KEY, email.value.trim());
+    } else {
+      localStorage.removeItem(REMEMBER_KEY);
+    }
     const redirect = (route.query.redirect as string) || "/feed";
     router.replace(redirect);
   } catch (err: unknown) {
@@ -99,7 +115,13 @@ async function handleLogin() {
             </div>
           </div>
 
-          <button class="forgot-link" @click="router.push('/auth/password-reset')">비밀번호를 잊으셨나요?</button>
+          <div class="remember-row">
+            <label class="remember-label">
+              <input type="checkbox" v-model="rememberMe" class="remember-checkbox" aria-label="이메일 기억하기" />
+              <span class="remember-text">이메일 기억하기</span>
+            </label>
+            <button class="forgot-link" @click="router.push('/auth/password-reset')">비밀번호를 잊으셨나요?</button>
+          </div>
 
           <BaseButton variant="primary" block :loading="isLoading" class="submit-btn" @click="handleLogin">로그인</BaseButton>
 
@@ -224,6 +246,30 @@ async function handleLogin() {
   z-index: 2;
 }
 
+.remember-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: -4px;
+}
+.remember-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.remember-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--hold-dark);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.remember-text {
+  font-size: var(--fs-caption);
+  font-weight: var(--w-semibold);
+  color: var(--fg-muted);
+}
 .forgot-link {
   background: none;
   border: none;
@@ -233,7 +279,6 @@ async function handleLogin() {
   cursor: pointer;
   text-align: right;
   padding: 0;
-  margin-top: -4px;
 }
 
 .submit-btn {

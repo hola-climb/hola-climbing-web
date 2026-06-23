@@ -17,6 +17,7 @@ import { App as CapacitorApp } from '@capacitor/app';
 import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { useUIStore } from '@/stores/ui';
 import { pushService } from '@/services/push';
+import { notificationService } from '@/services/notification';
 
 const uiStore = useUIStore();
 const router = useRouter();
@@ -48,9 +49,13 @@ async function registerPushListeners() {
     }),
   );
 
-  // 알림 탭 → 대상 화면으로 이동.
+  // 알림 탭 → 읽음 처리 후 대상 화면으로 이동.
   pushHandles.push(
     await FirebaseMessaging.addListener('notificationActionPerformed', ({ notification }) => {
+      const d = (notification.data ?? {}) as { notificationId?: string | number };
+      if (d.notificationId != null) {
+        notificationService.markRead(String(d.notificationId)).catch(() => {/* best-effort */});
+      }
       const path = routeForNotification(notification.data);
       if (path) router.push(path);
       uiStore.refreshUnreadCount();

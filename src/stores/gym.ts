@@ -10,6 +10,49 @@ export const useGymStore = defineStore("gym", () => {
   const isLoading = ref(false);
   const totalPages = ref(0);
 
+  // 좌표 캐시 — 목록(/gyms)·근처(/gyms/nearby) 응답은 lat/lng를 주지 않으므로
+  // 상세(/gyms/{id})에서 좌표만 보강해 지도 핀에 쓴다. 세션 동안 재사용.
+  const coordsMap = new Map<string, { lat: number; lng: number }>();
+  const coordsVersion = ref(0); // 캐시 갱신 시 증가 → computed 재계산 트리거
+  const inFlightCoords = new Set<string>();
+
+  /** 캐시된 좌표 조회 (없으면 null) */
+  function getCoords(id: string): { lat: number; lng: number } | null {
+    return coordsMap.get(id) ?? null;
+  }
+
+  /**
+   * 좌표가 없는 암장들의 lat/lng를 상세 엔드포인트에서 채워 캐시한다.
+   * 호출당 최대 `cap`개, 동시 요청 6개로 제한한다. 개별 실패는 무시(핀만 누락).
+   */
+  async function ensureCoords(list: Gym[], cap = 24): Promise<void> {
+    const targets = list
+      .filter((g) => (!g.latitude || !g.longitude) && !coordsMap.has(g.id) && !inFlightCoords.has(g.id))
+      .slice(0, cap)
+      .map((g) => g.id);
+    if (!targets.length) return;
+    targets.forEach((id) => inFlightCoords.add(id));
+
+    let i = 0;
+    const worker = async () => {
+      while (i < targets.length) {
+        const id = targets[i++];
+        try {
+          const { data } = await gymService.getGym(id);
+          if (data.latitude && data.longitude) {
+            coordsMap.set(id, { lat: data.latitude, lng: data.longitude });
+            coordsVersion.value++;
+          }
+        } catch {
+          /* 개별 상세 실패는 무시 — 해당 암장 핀만 표시되지 않는다 */
+        } finally {
+          inFlightCoords.delete(id);
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(6, targets.length) }, worker));
+  }
+
   // 검색 요청 시퀀스 — out-of-order 응답이 최신 결과를 덮어쓰지 않도록 가드
   let searchSeq = 0;
 
@@ -65,6 +108,9 @@ export const useGymStore = defineStore("gym", () => {
     currentGym,
     isLoading,
     totalPages,
+    coordsVersion,
+    getCoords,
+    ensureCoords,
     search,
     fetchGym,
     toggleFavorite,

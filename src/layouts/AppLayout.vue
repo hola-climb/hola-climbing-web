@@ -32,14 +32,6 @@ function handleFabChoice(choice: "upload" | "record") {
   router.push(choice === "upload" ? "/upload" : "/climbing-log");
 }
 
-function guardedNav(path: string) {
-  if (!authStore.isAuthenticated && path !== "/feed" && path !== "/explore") {
-    uiStore.openLoginSheet();
-    return;
-  }
-  router.push(path);
-}
-
 function handleTabBarScroll(event: Event) {
   const detail = (event as CustomEvent<{ scrolled: boolean }>).detail;
   isTabBarScrolled.value = Boolean(detail?.scrolled);
@@ -84,7 +76,7 @@ watch(
           <span class="tab-label">피드</span>
         </IonTabButton>
 
-        <IonTabButton tab="records" href="/records" @click.prevent="guardedNav('/records')" aria-label="기록">
+        <IonTabButton tab="records" href="/records" aria-label="기록">
           <IonIcon :icon="calendarOutline" />
           <span class="tab-label">기록</span>
         </IonTabButton>
@@ -97,7 +89,7 @@ watch(
           <span class="tab-label">암장</span>
         </IonTabButton>
 
-        <IonTabButton tab="me" href="/my" @click.prevent="guardedNav('/my')" aria-label="마이">
+        <IonTabButton tab="me" href="/my" aria-label="마이">
           <IonIcon :icon="personOutline" />
           <span class="tab-label">마이</span>
         </IonTabButton>
