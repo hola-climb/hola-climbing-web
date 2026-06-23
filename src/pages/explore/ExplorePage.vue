@@ -134,7 +134,7 @@ function handleCarouselTap(gym: Gym) {
 /** 좌표를 받아 근처 암장·추천을 로드하는 공통 로직 (수동·자동 위치 모두 사용) */
 async function fetchNearby(coords: { lat: number; lng: number }): Promise<void> {
   userCoords.value = coords;
-  const { data } = await gymService.getNearby({ lat: coords.lat, lng: coords.lng, radius: 5, size: 20 });
+  const { data } = await gymService.getNearby({ lat: coords.lat, lng: coords.lng, radius: 3, size: 20 });
   nearbyGyms.value = data;
   nearestGym.value = data[0] ?? null;
   carouselActiveId.value = data[0]?.id ?? null;
@@ -307,7 +307,7 @@ async function handleLocate() {
           <div class="explore-hero page-padding">
             <h1 class="hero-title">{{ isNearbyMode ? "내 주변 암장" : "암장 탐색" }}</h1>
             <div class="micro-label">
-              <span v-if="isNearbyMode">반경 5km · 가까운 순 · {{ nearbyGyms.length }}개</span>
+              <span v-if="isNearbyMode">반경 3km · 가까운 순 · {{ nearbyGyms.length }}개</span>
               <span v-else>{{ gymStore.gyms.length }}개의 암장</span>
             </div>
           </div>

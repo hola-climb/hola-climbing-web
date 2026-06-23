@@ -499,7 +499,7 @@ onMounted(async () => {
     <IonActionSheet
       :is-open="showMoreSheet"
       :buttons="[
-        { text: '신고', handler: () => { showMoreSheet.value = false; openReport('video', videoId); } },
+        { text: '신고', handler: () => { showMoreSheet = false; openReport('video', videoId); } },
         { text: '취소', role: 'cancel' },
       ]"
       @did-dismiss="showMoreSheet = false"
