@@ -86,13 +86,13 @@ async function handleLogin() {
         <div class="auth-form">
           <div class="field">
             <label class="field-label" for="login-email">이메일</label>
-            <IonInput id="login-email" v-model="email" type="email" placeholder="hello@climbing.kr" class="hola-input" autocomplete="email" @keydown.enter="handleLogin" />
+            <IonInput id="login-email" v-model="email" type="email" placeholder="이메일을 입력하세요" class="hola-input" autocomplete="email" @keydown.enter="handleLogin" />
           </div>
 
           <div class="field">
             <label class="field-label" for="login-pw">비밀번호</label>
             <div class="pw-wrap">
-              <IonInput id="login-pw" v-model="password" :type="showPw ? 'text' : 'password'" placeholder="••••••••" class="hola-input" autocomplete="current-password" @keydown.enter="handleLogin" />
+              <IonInput id="login-pw" v-model="password" :type="showPw ? 'text' : 'password'" placeholder="비밀번호를 입력하세요" class="hola-input" autocomplete="current-password" @keydown.enter="handleLogin" />
               <button class="pw-toggle" @click="showPw = !showPw" :aria-label="showPw ? '비밀번호 숨기기' : '비밀번호 보기'">
                 <IonIcon :icon="showPw ? eyeOffOutline : eyeOutline" />
               </button>

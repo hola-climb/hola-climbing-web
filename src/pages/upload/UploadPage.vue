@@ -21,6 +21,7 @@ type UploadState = "idle" | "uploading" | "failed";
 const uploadState = ref<UploadState>("idle");
 
 const fileInput = ref<HTMLInputElement | null>(null);
+const cameraInput = ref<HTMLInputElement | null>(null);
 const selectedFile = ref<File | null>(null);
 const durationSeconds = ref<number | null>(null);
 
@@ -53,6 +54,10 @@ const canSubmit = computed(() => !videoStore.isUploading && !!selectedFile.value
 
 function openFilePicker() {
   fileInput.value?.click();
+}
+
+function openCamera() {
+  cameraInput.value?.click();
 }
 
 function onFileChange(e: Event) {
@@ -178,6 +183,7 @@ async function handleSubmit() {
           <!-- Upload picker zone -->
           <div class="picker-zone" @click="openFilePicker" role="button" tabindex="0" aria-label="영상 파일 선택" @keydown.enter="openFilePicker">
             <input ref="fileInput" type="file" accept="video/*" class="hidden-input" @change="onFileChange" />
+            <input ref="cameraInput" type="file" accept="video/*" capture="environment" class="hidden-input" @change="onFileChange" />
             <div class="picker-icon-wrap">
               <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M12 3v13M5 10l7-7 7 7M5 21h14" />
@@ -186,7 +192,7 @@ async function handleSubmit() {
             <div class="picker-text">{{ selectedFile ? selectedFile.name : "영상 선택" }}</div>
             <div class="picker-hint">최대 60초 · MP4 / MOV</div>
             <div class="picker-btns">
-              <button class="picker-btn secondary" aria-label="촬영">
+              <button class="picker-btn secondary" aria-label="촬영" @click.stop="openCamera">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M14 4h-4l-1.5 2.5H5a2 2 0 0 0-2 2V18a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.5a2 2 0 0 0-2-2h-3.5L14 4Z M16 13a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" />
                 </svg>
@@ -275,6 +281,22 @@ async function handleSubmit() {
           <div class="micro-label mt-6">UPLOADING</div>
           <div class="state-title">클립을 전송하는 중…</div>
           <div class="state-sub">업로드가 끝나면 AI 분석이 시작돼요.</div>
+        </div>
+
+        <!-- ── FAILED STATE ───────────────────────────── -->
+        <div v-else-if="uploadState === 'failed'" class="state-pad center-state">
+          <div class="fail-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 9v4M12 17h.01M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0Z" />
+            </svg>
+          </div>
+          <div class="micro-label mt-6">FAILED</div>
+          <div class="state-title">업로드에 실패했어요</div>
+          <div class="state-sub">네트워크 상태를 확인하고 다시 시도해 주세요.</div>
+          <div class="done-actions">
+            <button class="action-btn secondary" @click="uploadState = 'idle'">처음으로</button>
+            <button class="action-btn primary" :disabled="!canSubmit" @click="handleSubmit">다시 시도</button>
+          </div>
         </div>
       </div>
     </IonContent>
@@ -711,6 +733,22 @@ async function handleSubmit() {
 }
 .action-btn:active {
   transform: scale(0.97);
+}
+.action-btn:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* ── Failed ──────────────────────────────────────── */
+.fail-icon {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  margin: 10px auto 0;
+  border-radius: 50%;
+  background: var(--tint-pink);
+  color: var(--on-tint-pink);
 }
 .action-btn.secondary {
   background: var(--surface);
