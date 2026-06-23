@@ -187,6 +187,7 @@ export interface RawRecommendedVideo {
 export interface FeedVideo {
   id: string;
   userId: string;
+  user: { nickname: string; profileImage: string | null };
   gymId: string | null;
   title: string | null;
   gymName: string | null;
@@ -262,6 +263,9 @@ export interface UpdateVideoPayload {
   title?: string | null;
   description?: string | null;
   isPublic?: boolean;
+  gymId?: number | null;
+  gymGradeId?: number | null;
+  recordedDate?: string | null; // YYYY-MM-DD
 }
 
 /** POST /api/videos/thumbnail 응답 */
@@ -572,6 +576,7 @@ export interface PageResponse<T> {
   totalElements: number;
   totalPages: number;
   hasNext: boolean;
+  nextCursor?: string | null;
 }
 
 // ── API error ─────────────────────────────────────────────────────────────────

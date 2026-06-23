@@ -877,6 +877,7 @@ onMounted(load);
   height: 12px;
   border-radius: 50%;
   flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
 }
 .grade-name {
   font-size: 13px;
@@ -897,6 +898,7 @@ onMounted(load);
   border-radius: 999px;
   transition: width 0.4s var(--ease-state);
   min-width: 0;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
 .grade-count {
   font-size: 12px;

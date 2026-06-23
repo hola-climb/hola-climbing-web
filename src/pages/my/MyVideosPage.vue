@@ -119,7 +119,7 @@ onMounted(async () => {
                   </svg>
                   {{ video.likeCount }}
                 </span>
-                <span class="meta-date">{{ formatDate(video.createdAt) }}</span>
+                <span class="meta-date">{{ formatDate(video.recordedDate || video.createdAt) }}</span>
               </div>
             </div>
           </button>
@@ -202,9 +202,21 @@ onMounted(async () => {
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
 }
-@media (min-width: 600px)  { .video-grid { grid-template-columns: repeat(3, 1fr); } }
-@media (min-width: 900px)  { .video-grid { grid-template-columns: repeat(4, 1fr); } }
-@media (min-width: 1200px) { .video-grid { grid-template-columns: repeat(5, 1fr); } }
+@media (min-width: 600px) {
+  .video-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (min-width: 900px) {
+  .video-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+@media (min-width: 1200px) {
+  .video-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
 
 .video-item {
   background: none;

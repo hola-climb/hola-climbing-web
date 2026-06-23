@@ -138,6 +138,13 @@ export const gymService = {
       data: { ...res.data, content: res.data.content.map(toGym) },
     })) as Promise<{ data: PageResponse<Gym> }>,
 
+  /** store를 거치지 않고 Gym[] 직접 반환 — 암장 검색 UI 전용 */
+  searchRaw: (params: { keyword?: string; page?: number; size?: number }) =>
+    api.get<PageResponse<RawGymSummary>>("/gyms", { params }).then((res) => ({
+      ...res,
+      data: res.data.content.map(toGym),
+    })) as Promise<{ data: Gym[] }>,
+
   getNearby: (params: { lat: number; lng: number; radius?: number; size?: number }) =>
     api.get<RawGymSummary[]>("/gyms/nearby", { params }).then((res) => ({ ...res, data: res.data.map(toGym) })) as Promise<{ data: Gym[] }>,
 

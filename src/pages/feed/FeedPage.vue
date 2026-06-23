@@ -153,6 +153,13 @@ watch(
 
           <!-- Meta -->
           <div class="card-meta">
+            <div class="card-author">
+              <div class="card-avatar" aria-hidden="true">
+                <img v-if="video.user.profileImage" :src="video.user.profileImage" :alt="`${video.user.nickname} 프로필`" class="card-avatar-img" />
+                <span v-else class="card-avatar-initial">{{ video.user.nickname.charAt(0).toUpperCase() }}</span>
+              </div>
+              <span class="card-nickname">{{ video.user.nickname }}</span>
+            </div>
             <div v-if="video.title" class="card-title">{{ video.title }}</div>
             <div class="card-stats">
               <span class="stat">
@@ -415,6 +422,40 @@ watch(
 
 .card-meta {
   padding: 10px 12px 12px;
+}
+.card-author {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.card-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--tint-cyan);
+  color: var(--on-tint-cyan);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.card-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.card-avatar-initial {
+  font-size: 10px;
+  font-weight: 700;
+}
+.card-nickname {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .card-title {
   font-size: 13px;

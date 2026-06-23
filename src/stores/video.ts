@@ -4,6 +4,7 @@ import type { AnalysisStatus, FeedVideo, UpdateVideoPayload, Video } from '@/typ
 import { parseTechniqueTags } from '@/types/api'
 import { videoService } from '@/services/video'
 import { useUIStore } from '@/stores/ui'
+import { useAuthStore } from '@/stores/auth'
 
 interface AnalysisProgress {
   progress: number
@@ -14,7 +15,7 @@ interface AnalysisProgress {
 export const useVideoStore = defineStore('video', () => {
   // state
   const feedVideos = ref<FeedVideo[]>([])
-  const feedPage = ref(0)
+  const feedCursor = ref<string | null>(null)
   const feedHasNext = ref(true)
   const isLoadingFeed = ref(false)
 
@@ -38,20 +39,36 @@ export const useVideoStore = defineStore('video', () => {
     if (!reset && !feedHasNext.value) return
 
     if (reset) {
-      feedPage.value = 0
+      feedCursor.value = null
       feedVideos.value = []
       feedHasNext.value = true
     }
 
     isLoadingFeed.value = true
     try {
-      const { data } = await videoService.getFeed({
-        page: feedPage.value,
-        size: 10,
-      })
-      feedVideos.value.push(...data.content)
-      feedPage.value++
-      feedHasNext.value = data.hasNext
+      const authStore = useAuthStore()
+      let content: FeedVideo[]
+      let nextCursor: string | null
+      let hasNext: boolean
+
+      if (authStore.isAuthenticated) {
+        const { data } = await videoService.getFeed({
+          cursor: feedCursor.value,
+          size: 20,
+        })
+        content = data.content
+        nextCursor = data.nextCursor ?? null
+        hasNext = data.hasNext
+      } else {
+        const result = await videoService.getPublicVideos(feedCursor.value, 20)
+        content = result.content
+        nextCursor = result.nextCursor
+        hasNext = result.hasNext
+      }
+
+      feedVideos.value.push(...content)
+      feedCursor.value = nextCursor
+      feedHasNext.value = hasNext
     } finally {
       isLoadingFeed.value = false
     }

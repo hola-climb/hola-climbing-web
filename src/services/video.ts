@@ -1,4 +1,7 @@
+import { Capacitor } from "@capacitor/core";
+import type { PluginListenerHandle } from "@capacitor/core";
 import api from "./client";
+import { HolaSse } from "./sseClient";
 import type {
   AnalysisResult,
   AnalysisStatus,
@@ -26,6 +29,7 @@ function toFeedVideo(raw: RawRecommendedVideo): FeedVideo {
   return {
     id: String(raw.id),
     userId: String(raw.userId),
+    user: { nickname: raw.nickname ?? '사용자', profileImage: raw.profileImage ?? null },
     gymId: raw.gymId != null ? String(raw.gymId) : null,
     title: raw.title,
     gymName: raw.gymName,
@@ -94,14 +98,206 @@ function toComment(raw: RawComment): Comment {
   };
 }
 
+// ── SSE (분석 진행률 스트리밍) ──────────────────────────────────────────────────
+
+type OnProgress = (status: AnalysisStatus, progress: number, stage: string, message: string) => void;
+
+interface SseProgressPayload {
+  videoId: number;
+  status: AnalysisStatus;
+  progress: number;
+  stage: string;
+  message: string;
+  updatedAt: string;
+}
+
+/**
+ * 분석 스트림 URL. 네이티브는 절대경로(VITE_API_BASE_URL, `.../api/` 로 끝남),
+ * 웹은 dev 프록시/직결되는 상대경로 `/api`.
+ */
+function analysisStreamUrl(videoId: string): string {
+  return Capacitor.isNativePlatform()
+    ? `${import.meta.env.VITE_API_BASE_URL}videos/${videoId}/analysis/stream`
+    : `/api/videos/${videoId}/analysis/stream`;
+}
+
+/** SSE 프레임에서 event/data 라인 추출 (웹·네이티브 공용). */
+function parseSseFrame(msg: string): { event: string; dataLine: string } {
+  let event = "";
+  let dataLine = "";
+  for (const line of msg.split("\n")) {
+    if (line.startsWith("event:")) event = line.slice(6).trim();
+    else if (line.startsWith("data:")) dataLine = line.slice(5).trim();
+  }
+  return { event, dataLine };
+}
+
+/**
+ * 완성된 SSE 프레임 1개 처리. terminal(done/failed)이면 해당 status 반환,
+ * 진행 이벤트면 onProgress 호출 후 null 반환. (웹·네이티브 공용)
+ */
+function handleSseFrame(msg: string, onProgress: OnProgress): AnalysisStatus | null {
+  const { event, dataLine } = parseSseFrame(msg);
+  if (event !== "progress" || !dataLine) return null;
+  try {
+    const payload = JSON.parse(dataLine) as SseProgressPayload;
+    if (payload.status === "done" || payload.status === "failed") return payload.status;
+    onProgress(payload.status, payload.progress ?? 0, payload.stage ?? "", payload.message ?? "");
+  } catch {
+    // malformed SSE line — skip
+  }
+  return null;
+}
+
+/** 웹: fetch + ReadableStream 으로 SSE 직접 읽기. */
+function streamAnalysisWeb(url: string, token: string | null, onProgress: OnProgress, externalController?: AbortController): Promise<AnalysisStatus> {
+  return new Promise((resolve, reject) => {
+    const headers: Record<string, string> = { Accept: "text/event-stream" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    // store가 워처 정리/중단을 위해 controller를 주입할 수 있다. 없으면 자체 생성.
+    const controller = externalController ?? new AbortController();
+
+    fetch(url, { headers, signal: controller.signal })
+      .then((res) => {
+        if (!res.ok || !res.body) {
+          reject(new Error(`SSE error: ${res.status}`));
+          return;
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        const read = () => {
+          reader
+            .read()
+            .then(({ done, value }) => {
+              if (done) {
+                resolve("done");
+                return;
+              }
+
+              buffer += decoder.decode(value, { stream: true });
+              const messages = buffer.split("\n\n");
+              buffer = messages.pop() ?? "";
+
+              for (const msg of messages) {
+                const terminal = handleSseFrame(msg, onProgress);
+                if (terminal) {
+                  controller.abort();
+                  resolve(terminal);
+                  return;
+                }
+              }
+
+              read();
+            })
+            .catch((err: unknown) => {
+              if ((err as Error)?.name !== "AbortError") reject(err);
+            });
+        };
+
+        read();
+      })
+      .catch((err: unknown) => {
+        if ((err as Error)?.name !== "AbortError") reject(err);
+      });
+  });
+}
+
+/** 네이티브(iOS): HolaSse 플러그인이 URLSession 으로 스트리밍하고 프레임을 이벤트로 전달. */
+function streamAnalysisNative(url: string, token: string | null, onProgress: OnProgress, externalController?: AbortController): Promise<AnalysisStatus> {
+  return new Promise((resolve, reject) => {
+    let streamId: string | null = null;
+    let settled = false;
+    const handles: PluginListenerHandle[] = [];
+
+    const cleanup = async () => {
+      for (const h of handles) {
+        try {
+          await h.remove();
+        } catch {
+          /* ignore */
+        }
+      }
+      if (streamId) {
+        try {
+          await HolaSse.disconnect({ id: streamId });
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+
+    const finish = (status: AnalysisStatus) => {
+      if (settled) return;
+      settled = true;
+      void cleanup();
+      resolve(status);
+    };
+    const fail = (err: unknown) => {
+      if (settled) return;
+      settled = true;
+      void cleanup();
+      // 명시적 중단은 웹 경로의 AbortError 와 동일하게 처리되도록 전달.
+      reject(err instanceof Error ? err : new Error(String(err)));
+    };
+
+    externalController?.signal.addEventListener("abort", () => {
+      fail(new DOMException("Aborted", "AbortError"));
+    });
+
+    void (async () => {
+      try {
+        handles.push(
+          await HolaSse.addListener("sseMessage", (e) => {
+            if (e.id !== streamId || !e.data) return;
+            const terminal = handleSseFrame(e.data, onProgress);
+            if (terminal) finish(terminal);
+          }),
+          // 서버가 terminal 이벤트 없이 닫으면 done 으로 간주(웹 reader done 과 동일).
+          await HolaSse.addListener("sseClose", (e) => {
+            if (e.id === streamId) finish("done");
+          }),
+          await HolaSse.addListener("sseError", (e) => {
+            if (e.id === streamId) fail(new Error(e.message ?? "sse_error"));
+          }),
+        );
+
+        if (externalController?.signal.aborted) {
+          void cleanup();
+          return;
+        }
+
+        const { id } = await HolaSse.connect({ url, token: token ?? undefined });
+        streamId = id;
+      } catch (err) {
+        fail(err);
+      }
+    })();
+  });
+}
+
 // ── Feed / Listing ────────────────────────────────────────────────────────────
 
 export const videoService = {
-  getFeed: (params: { page?: number; size?: number }) =>
-    api.get<PageResponse<RawRecommendedVideo>>("/recommendations/videos", { params }).then((res) => ({
+  getFeed: (params: { cursor?: string | null; size?: number }) =>
+    api.get<PageResponse<RawRecommendedVideo>>("/recommendations/videos", { params: { ...(params.cursor ? { cursor: params.cursor } : {}), size: params.size } }).then((res) => ({
       ...res,
       data: { ...res.data, content: res.data.content.map(toFeedVideo) },
     })) as Promise<{ data: PageResponse<FeedVideo> }>,
+
+  getPublicVideos: async (cursor?: string | null, size = 20): Promise<{ content: FeedVideo[]; nextCursor: string | null; hasNext: boolean }> => {
+    const params: Record<string, unknown> = { size };
+    if (cursor) params.cursor = cursor;
+    const { data } = await api.get<{ content: RawRecommendedVideo[]; nextCursor: string | null; hasNext: boolean }>("/videos", { params });
+    return {
+      content: data.content.map((raw) => toFeedVideo({ ...raw, source: "feed" })),
+      nextCursor: data.nextCursor,
+      hasNext: data.hasNext,
+    };
+  },
 
   getVideo: async (id: string): Promise<{ data: Video }> => {
     const { data: raw } = await api.get<RawVideoDetail>(`/videos/${id}`);
@@ -163,86 +359,13 @@ export const videoService = {
    * Terminal events resolve the promise without calling onProgress so the caller
    * can set status + analysis atomically and avoid a blank-state flash.
    */
-  streamAnalysis: (videoId: string, onProgress: (status: AnalysisStatus, progress: number, stage: string, message: string) => void, externalController?: AbortController): Promise<AnalysisStatus> => {
-    return new Promise((resolve, reject) => {
-      const token = localStorage.getItem("access_token");
-      const headers: Record<string, string> = { Accept: "text/event-stream" };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      // store가 워처 정리/중단을 위해 controller를 주입할 수 있다. 없으면 자체 생성.
-      const controller = externalController ?? new AbortController();
-
-      fetch(`/api/videos/${videoId}/analysis/stream`, { headers, signal: controller.signal })
-        .then((res) => {
-          if (!res.ok || !res.body) {
-            reject(new Error(`SSE error: ${res.status}`));
-            return;
-          }
-
-          const reader = res.body.getReader();
-          const decoder = new TextDecoder();
-          let buffer = "";
-          let currentEvent = "";
-
-          const read = () => {
-            reader
-              .read()
-              .then(({ done, value }) => {
-                if (done) {
-                  resolve("done");
-                  return;
-                }
-
-                buffer += decoder.decode(value, { stream: true });
-                const messages = buffer.split("\n\n");
-                buffer = messages.pop() ?? "";
-
-                for (const msg of messages) {
-                  currentEvent = "";
-                  let dataLine = "";
-
-                  for (const line of msg.split("\n")) {
-                    if (line.startsWith("event:")) currentEvent = line.slice(6).trim();
-                    else if (line.startsWith("data:")) dataLine = line.slice(5).trim();
-                  }
-
-                  if (currentEvent !== "progress" || !dataLine) continue;
-
-                  try {
-                    const payload = JSON.parse(dataLine) as {
-                      videoId: number;
-                      status: AnalysisStatus;
-                      progress: number;
-                      stage: string;
-                      message: string;
-                      updatedAt: string;
-                    };
-
-                    if (payload.status === "done" || payload.status === "failed") {
-                      controller.abort();
-                      resolve(payload.status);
-                      return;
-                    }
-
-                    onProgress(payload.status, payload.progress ?? 0, payload.stage ?? "", payload.message ?? "");
-                  } catch {
-                    // malformed SSE line — skip
-                  }
-                }
-
-                read();
-              })
-              .catch((err: unknown) => {
-                if ((err as Error)?.name !== "AbortError") reject(err);
-              });
-          };
-
-          read();
-        })
-        .catch((err: unknown) => {
-          if ((err as Error)?.name !== "AbortError") reject(err);
-        });
-    });
+  streamAnalysis: (videoId: string, onProgress: OnProgress, externalController?: AbortController): Promise<AnalysisStatus> => {
+    const url = analysisStreamUrl(videoId);
+    const token = localStorage.getItem("access_token");
+    // iOS WKWebView 는 fetch SSE 스트림을 버퍼링해 동작하지 않으므로 네이티브 플러그인 사용.
+    return Capacitor.isNativePlatform()
+      ? streamAnalysisNative(url, token, onProgress, externalController)
+      : streamAnalysisWeb(url, token, onProgress, externalController);
   },
 
   /** 내 영상 전체 목록 — GET /api/videos?userId={id}&cursor={cursor}&size=20

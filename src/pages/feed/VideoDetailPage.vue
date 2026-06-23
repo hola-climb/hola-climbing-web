@@ -194,7 +194,7 @@ async function retryAnalysis() {
   }
 }
 
-async function onEditSave(payload: { title: string | null; description: string | null; isPublic: boolean }) {
+async function onEditSave(payload: import("@/types/api").UpdateVideoPayload) {
   try {
     await videoStore.updateVideo(videoId, payload);
     showEditModal.value = false;
