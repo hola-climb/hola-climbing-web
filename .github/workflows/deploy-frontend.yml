@@ -37,6 +37,7 @@ jobs:
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
           VITE_KAKAO_CLIENT_ID: ${{ secrets.VITE_KAKAO_CLIENT_ID }}
           VITE_NAVER_CLIENT_ID: ${{ secrets.VITE_NAVER_CLIENT_ID }}
+          VITE_KAKAO_MAP_KEY: ${{secrets.VITE_KAKAO_MAP_KEY}}
           # Firebase 웹 푸시(FCM) — 모두 클라이언트 JS 에 노출되는 공개 식별자라 직접 주입.
           # (public/firebase-messaging-sw.js 에도 동일 값이 하드코딩돼 있어야 한다)
           VITE_FB_API_KEY: AIzaSyD4V6dZjM-ICFyVqH7oD9bXfuEyc-pqSmQ
