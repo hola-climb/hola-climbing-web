@@ -153,7 +153,7 @@ export const gymService = {
 
   getGym: (id: string) => api.get<RawGymDetail>(`/gyms/${id}`).then((res) => ({ ...res, data: toGymDetail(res.data) })) as Promise<{ data: GymDetail }>,
 
-  getGymVideos: (gymId: string, params?: { page?: number; size?: number; sort?: string }) =>
+  getGymVideos: (gymId: string, params?: { page?: number; size?: number; sort?: string; gymGradeId?: number | null }) =>
     api.get<PageResponse<Omit<RawRecommendedVideo, "source">>>(`/gyms/${gymId}/videos`, { params }).then((res) => ({
       ...res,
       data: { ...res.data, content: res.data.content.map(toGymVideo) },

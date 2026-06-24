@@ -46,6 +46,7 @@ const DAY_LABELS: Record<string, string> = {
 
 // ── Section data ───────────────────────────────────
 const videos = ref<FeedVideo[]>([]);
+const totalVideos = ref(0);
 const reviews = ref<GymReview[]>([]);
 const chatPreview = ref<ChatMessage[]>([]);
 const reviewPage = ref(0);
@@ -121,11 +122,14 @@ function formatTime(iso: string): string {
 // ── Loaders ────────────────────────────────────────
 async function loadSections() {
   const [vRes, rRes, cRes] = await Promise.allSettled([
-    gymService.getGymVideos(gymId, { page: 0, size: 10 }),
+    gymService.getGymVideos(gymId, { page: 0, size: 5 }),
     gymService.getReviews(gymId, { page: 0, size: 20 }),
     chatService.getMessages(gymId, { page: 0, size: 3 }),
   ]);
-  if (vRes.status === "fulfilled") videos.value = vRes.value.data.content;
+  if (vRes.status === "fulfilled") {
+    videos.value = vRes.value.data.content;
+    totalVideos.value = vRes.value.data.totalElements ?? vRes.value.data.content.length;
+  }
   if (rRes.status === "fulfilled") {
     reviews.value = rRes.value.data.content;
     reviewPage.value = 0;
@@ -462,11 +466,27 @@ function openVideo(id: string) {
       <div v-if="videos.length" class="section">
         <div class="section-head">
           <div class="section-title">관련 영상</div>
+          <button v-if="totalVideos >= 5" class="section-more" @click="router.push(`/gyms/${gymId}/videos`)">전체 보기</button>
         </div>
         <div class="video-row">
-          <button v-for="v in videos" :key="v.id" class="video-thumb" @click="openVideo(v.id)" :aria-label="v.title ?? '클라이밍 영상'">
-            <VideoThumbnail :title="v.title" :thumbnail-url="v.thumbnailUrl" :grade="v.grade" :alt="v.title ?? ''" />
-          </button>
+          <template v-for="(v, idx) in videos" :key="v.id">
+            <!-- 5번째 영상 (index 4): 더보기 오버레이 -->
+            <button
+              v-if="idx === 4 && totalVideos >= 5"
+              class="video-thumb video-thumb--more"
+              aria-label="영상 전체 보기"
+              @click="router.push(`/gyms/${gymId}/videos`)"
+            >
+              <VideoThumbnail :title="v.title" :thumbnail-url="v.thumbnailUrl" :grade="v.grade" :alt="''" />
+              <div class="video-more-overlay" aria-hidden="true">
+                <span class="video-more-label">더보기</span>
+              </div>
+            </button>
+            <!-- 1~4번째 영상 -->
+            <button v-else class="video-thumb" @click="openVideo(v.id)" :aria-label="v.title ?? '클라이밍 영상'">
+              <VideoThumbnail :title="v.title" :thumbnail-url="v.thumbnailUrl" :grade="v.grade" :alt="v.title ?? ''" />
+            </button>
+          </template>
         </div>
       </div>
 
@@ -874,6 +894,32 @@ function openVideo(id: string) {
   padding: 0;
   cursor: pointer;
   background: var(--surface-soft);
+}
+.video-thumb--more {
+  position: relative;
+}
+.video-more-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: grid;
+  place-items: center;
+  border-radius: inherit;
+}
+.video-more-label {
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.section-more {
+  background: none;
+  border: none;
+  color: var(--hold-cyan);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
 }
 
 /* Hours */

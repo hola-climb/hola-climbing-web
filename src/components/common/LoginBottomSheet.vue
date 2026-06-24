@@ -22,7 +22,7 @@ function goRegister() {
 </script>
 
 <template>
-  <BaseSheet :open="isOpen" :breakpoints="[0, 0.45]" :initial-breakpoint="0.45" :grabber="false" @close="emit('close')">
+  <BaseSheet :open="isOpen" :grabber="false" @close="emit('close')">
     <div class="sheet-content">
       <button class="sheet-close close-btn" @click="emit('close')" aria-label="닫기">
         <IonIcon :icon="closeOutline" />
@@ -41,7 +41,7 @@ function goRegister() {
 
 <style scoped>
 .sheet-content {
-  padding: 16px 0 calc(16px + env(safe-area-inset-bottom));
+  padding: 16px 0;
   text-align: center;
   position: relative;
 }

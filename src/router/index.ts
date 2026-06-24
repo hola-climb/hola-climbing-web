@@ -61,6 +61,10 @@ const routes: Array<RouteRecordRaw> = [
     path: '/gyms/:id',
     component: () => import('@/pages/explore/GymDetailPage.vue'),
   },
+  {
+    path: '/gyms/:id/videos',
+    component: () => import('@/pages/explore/GymVideosPage.vue'),
+  },
 
   // ── Auth ──────────────────────────────────────────────────────────────
   {

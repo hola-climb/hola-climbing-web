@@ -397,9 +397,11 @@ async function handleLocate() {
                   <div class="micro-label">내 주변</div>
                   <div class="map-gym-name">핀 버튼으로 근처 암장 검색</div>
                 </div>
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--fg-muted)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1 1 18 0Z M12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
-                </svg>
+                <button @click="handleLocate" class="icon-btn-muted">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--fg-muted)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1 1 18 0Z M12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+                  </svg>
+                </button>
               </div>
             </div>
           </div>
@@ -578,6 +580,9 @@ async function handleLocate() {
   place-items: center;
   border-radius: 999px;
   transition: background var(--dur-base) var(--ease-state);
+}
+.icon-btn-muted {
+  background-color: transparent;
 }
 /* Active (nearby mode): soft orange tint + pulsing halo to emphasize the on-state */
 .icon-btn.active {

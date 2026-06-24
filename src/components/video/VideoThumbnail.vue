@@ -15,6 +15,8 @@ const props = defineProps<{
   durationSeconds?: number | null;
   /** 중앙 재생 아이콘 오버레이 숨기기 (기본: 표시) */
   hidePlayIcon?: boolean;
+  /** 난이도 칩을 색상 도트만 표시 (텍스트 숨김) */
+  dotOnly?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -63,9 +65,9 @@ function onError() {
     <span v-if="durationLabel" class="vt-dur">{{ durationLabel }}</span>
 
     <!-- Grade chip (피드와 동일한 스타일) -->
-    <span v-if="grade || gymName" class="vt-grade-chip">
+    <span v-if="grade || gymName" class="vt-grade-chip" :class="{ 'vt-grade-chip--dot-only': dotOnly }">
       <span v-if="grade" class="vt-grade-dot" :style="{ background: gradeColor(grade) }" aria-hidden="true" />
-      {{ gymName ?? grade }}
+      <template v-if="!dotOnly">{{ gymName ?? grade }}</template>
     </span>
 
     <!-- Status badge (pending / analyzing / failed) -->
@@ -137,6 +139,9 @@ function onError() {
   flex: 0 0 7px;
   border: 1px solid rgba(21, 21, 21, 0.1);
   border-radius: 50%;
+}
+.vt-grade-chip--dot-only {
+  padding: 5px;
 }
 
 .vt-play {
