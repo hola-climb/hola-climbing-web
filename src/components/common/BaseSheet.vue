@@ -40,7 +40,7 @@ const emit = defineEmits<{ (e: "close"): void }>();
         <slot name="header" />
       </div>
 
-      <div class="sheet-body" :class="{ flush }">
+      <div class="sheet-body" :class="{ flush, 'safe-bottom': !$slots.footer }">
         <slot />
       </div>
 
@@ -56,14 +56,16 @@ const emit = defineEmits<{ (e: "close"): void }>();
   --border-radius: var(--r-sheet);
   --height: auto;
 }
-/* 콘텐츠 높이에 맞되, 90dvh 초과 시 body 스크롤 */
+/* 콘텐츠 높이에 맞되, 90dvh 초과 시 body 스크롤.
+   safe-area 패딩은 shell 이 아닌 body/footer 내부에 적용해야
+   --height:auto 계산에 포함되어 native iOS에서 잘리지 않는다. */
 .sheet-shell {
   display: flex;
   flex-direction: column;
+  max-height: 90vh;
   max-height: 90dvh;
   min-height: 0;
   background: var(--bg);
-  padding-bottom: env(safe-area-inset-bottom);
 }
 .sheet-grabber {
   flex-shrink: 0;
@@ -85,14 +87,22 @@ const emit = defineEmits<{ (e: "close"): void }>();
   -webkit-overflow-scrolling: touch;
   padding: 8px 20px;
 }
+/* footer 없는 시트: body 하단에 safe-area 반영 */
+.sheet-body.safe-bottom {
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+}
 .sheet-body.flush {
   padding-left: 0;
   padding-right: 0;
 }
-/* 고정 하단 영역 — 액션 버튼이 항상 보이도록 */
+.sheet-body.flush.safe-bottom {
+  padding-left: 0;
+  padding-right: 0;
+}
+/* 고정 하단 영역 — safe-area 포함해 항상 보이도록 */
 .sheet-footer {
   flex-shrink: 0;
-  padding: 12px 20px 16px;
+  padding: 12px 20px calc(16px + env(safe-area-inset-bottom));
 }
 .sheet-footer.flush {
   padding-left: 0;
