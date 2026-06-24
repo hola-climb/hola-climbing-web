@@ -12,6 +12,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useUIStore } from "@/stores/ui";
 import { gradeColor } from "@/utils/gradeColor";
 import VideoThumbnail from "@/components/video/VideoThumbnail.vue";
+import UserAvatar from "@/components/common/UserAvatar.vue";
 
 const router = useRouter();
 const videoStore = useVideoStore();
@@ -155,8 +156,7 @@ watch(
           <div class="card-meta">
             <div class="card-author">
               <div class="card-avatar" aria-hidden="true">
-                <img v-if="video.user.profileImage" :src="video.user.profileImage" :alt="`${video.user.nickname} 프로필`" class="card-avatar-img" />
-                <span v-else class="card-avatar-initial">{{ video.user.nickname.charAt(0).toUpperCase() }}</span>
+                <UserAvatar :src="video.user.profileImage" :nickname="video.user.nickname" />
               </div>
               <span class="card-nickname">{{ video.user.nickname }}</span>
             </div>

@@ -8,6 +8,7 @@ import { useUIStore } from "@/stores/ui";
 import { useRouter } from "vue-router";
 import { gradeColor, gradeTextColor } from "@/utils/gradeColor";
 import VideoThumbnail from "./VideoThumbnail.vue";
+import UserAvatar from "@/components/common/UserAvatar.vue";
 
 const props = defineProps<{ video: Video }>();
 
@@ -49,8 +50,7 @@ function openProfile() {
       <div class="author-row">
         <button class="author-link" @click.stop="openProfile" :aria-label="`${video.user.nickname} 프로필 보기`">
           <div class="avatar" :aria-hidden="true">
-            <img v-if="video.user.profileImage" :src="video.user.profileImage" :alt="`${video.user.nickname ?? ''} 프로필`" class="avatar-img" />
-            <span v-else class="avatar-initial">{{ video.user.nickname?.charAt(0).toUpperCase() }}</span>
+            <UserAvatar :src="video.user.profileImage" :nickname="video.user.nickname ?? '?'" />
           </div>
           <div class="author-info">
             <span class="author-name">{{ video.user.nickname }}</span>

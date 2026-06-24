@@ -19,6 +19,7 @@ import { useChatStore } from "@/stores/chat";
 import { gradeColor, gradeTextColor } from "@/utils/gradeColor";
 import { Geolocation } from "@capacitor/geolocation";
 import VideoThumbnail from "@/components/video/VideoThumbnail.vue";
+import UserAvatar from "@/components/common/UserAvatar.vue";
 import type { GymReview, FeedVideo, ChatMessage, BusinessHours } from "@/types/api";
 import { getErrorMessage } from "@/utils/apiError";
 
@@ -543,8 +544,7 @@ function openVideo(id: string) {
           <div v-for="r in reviews" :key="r.id" class="review-item hola-card">
             <div class="review-top">
               <div class="r-avatar">
-                <img v-if="r.user.profileImage" :src="r.user.profileImage" :alt="`${r.user.nickname} 프로필`" class="r-avatar-img" />
-                <template v-else>{{ r.user.nickname.charAt(0).toUpperCase() }}</template>
+                <UserAvatar :src="r.user.profileImage" :nickname="r.user.nickname" />
               </div>
               <div class="r-meta">
                 <div class="r-name">{{ r.user.nickname }}</div>

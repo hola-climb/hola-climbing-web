@@ -6,6 +6,7 @@ import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
 import LoadingState from "@/components/common/LoadingState.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
 import ProfileEditModal from "@/components/common/ProfileEditModal.vue";
+import UserAvatar from "@/components/common/UserAvatar.vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useUIStore } from "@/stores/ui";
@@ -93,7 +94,7 @@ const techniques = computed(() => {
 async function load() {
   isLoading.value = true;
   try {
-    if (!authStore.user) await authStore.fetchMe();
+    await authStore.fetchMe(); // 항상 재조회 — GCS 서명 URL 만료 대비
     const [statsRes, techRes] = await Promise.all([statsService.getStats(), statsService.getTechniques()]);
     stats.value = statsRes.data;
     techniqueStats.value = techRes.data;
@@ -142,8 +143,11 @@ onMounted(load);
 
           <div class="hero-top">
             <div class="avatar-dark" :aria-label="`${authStore.user?.nickname ?? ''} 아바타`">
-              <img v-if="authStore.user?.profileImageUrl" :src="authStore.user.profileImageUrl" :alt="`${authStore.user?.nickname ?? ''} 프로필`" class="avatar-img" />
-              <template v-else>{{ avatarInitial }}</template>
+              <UserAvatar
+                :src="authStore.user?.profileImageUrl"
+                :nickname="authStore.user?.nickname ?? '?'"
+                :on-image-error="authStore.fetchMe"
+              />
             </div>
             <div class="profile-info">
               <div class="profile-name">{{ authStore.user?.nickname ?? "—" }}</div>

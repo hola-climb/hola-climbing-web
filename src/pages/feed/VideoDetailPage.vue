@@ -23,6 +23,7 @@ import { videoService } from "@/services/video";
 import { gradeColor, gradeTextColor } from "@/utils/gradeColor";
 import type { Comment, ReportTargetType } from "@/types/api";
 import { useShare } from "@/composables/useShare";
+import UserAvatar from "@/components/common/UserAvatar.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -302,8 +303,7 @@ onMounted(async () => {
               <div v-if="!isOwner" class="author-row">
                 <button class="author-link" :aria-label="`${video.user.nickname} 프로필 보기`" @click="openProfile(video.user.id)">
                   <div class="avatar" aria-hidden="true">
-                    <img v-if="video.user.profileImage" :src="video.user.profileImage" :alt="`${video.user.nickname} 프로필`" class="avatar-img" />
-                    <template v-else>{{ video.user.nickname.charAt(0).toUpperCase() }}</template>
+                    <UserAvatar :src="video.user.profileImage" :nickname="video.user.nickname" />
                   </div>
                   <div class="author-meta">
                     <div class="author-name">{{ video.user.nickname }}</div>
@@ -389,8 +389,7 @@ onMounted(async () => {
                 <ul v-else class="comment-list">
                   <li v-for="c in comments" :key="c.id" class="comment-item">
                     <div class="avatar" aria-hidden="true">
-                      <img v-if="c.user.profileImage" :src="c.user.profileImage" :alt="`${c.user.nickname} 프로필`" class="avatar-img" />
-                      <template v-else>{{ video.user.nickname.charAt(0).toUpperCase() }}</template>
+                      <UserAvatar :src="c.user.profileImage" :nickname="c.user.nickname" />
                     </div>
                     <div class="c-body">
                       <div class="c-head">

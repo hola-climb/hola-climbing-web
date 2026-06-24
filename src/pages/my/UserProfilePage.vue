@@ -17,6 +17,7 @@ import type { Video } from '@/types/api'
 import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 import VideoThumbnail from '@/components/video/VideoThumbnail.vue'
+import UserAvatar from '@/components/common/UserAvatar.vue'
 
 interface ProfileView {
   id: string
@@ -179,8 +180,7 @@ async function handleFollow() {
         <!-- Profile header -->
         <div class="profile-header">
           <div class="avatar-lg">
-            <img v-if="user.profileImageUrl" :src="user.profileImageUrl" :alt="`${user.nickname} 프로필`" class="avatar-img" />
-            <template v-else>{{ user.nickname.charAt(0).toUpperCase() }}</template>
+            <UserAvatar :src="user.profileImageUrl" :nickname="user.nickname" />
           </div>
           <div class="profile-meta">
             <div class="user-name">{{ user.nickname }}</div>

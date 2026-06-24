@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // imports → props → methods
 import { useRouter } from "vue-router";
+import UserAvatar from "@/components/common/UserAvatar.vue";
 
 const props = defineProps<{
   id: string;
@@ -19,8 +20,7 @@ function openProfile() {
 <template>
   <div class="user-item" role="button" tabindex="0" :aria-label="`${nickname} 프로필 보기`" @click="openProfile">
     <div class="avatar" aria-hidden="true">
-      <img v-if="profileImageUrl" :src="profileImageUrl" :alt="`${nickname} 아바타`" class="avatar-img" />
-      <template v-else>{{ nickname.charAt(0).toUpperCase() }}</template>
+      <UserAvatar :src="profileImageUrl" :nickname="nickname" />
     </div>
 
     <div class="user-meta">
