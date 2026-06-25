@@ -93,10 +93,11 @@ watch(
         <IonRefresherContent />
       </IonRefresher>
 
+      <div class="glow glow-lime" aria-hidden="true" />
+      <div class="glow glow-pink" aria-hidden="true" />
+
       <!-- Greeting hero -->
       <div class="hero">
-        <div class="glow glow-lime" aria-hidden="true" />
-        <div class="glow glow-pink" aria-hidden="true" />
         <h1 class="greeting">
           <span v-if="authStore.user" v-html="`${greeting},<br/>${authStore.user.nickname}.`" />
           <span v-else>올라에 온 걸 환영해요.</span>
@@ -191,6 +192,15 @@ watch(
   justify-content: space-between;
   padding: 0 16px;
   height: 52px;
+}
+/* 데스크탑: 헤더 내용도 중앙 컬럼에 맞춰 정렬 */
+@media (min-width: 768px) {
+  .toolbar-inner {
+    max-width: var(--content-max);
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+  }
 }
 .transparent-header {
   position: absolute;
@@ -304,22 +314,20 @@ watch(
   gap: 12px;
   padding: 8px 16px 120px;
 }
+/* 데스크탑: 피드를 넓은 화면에 펼치지 않고 중앙 컬럼으로 모은다.
+   헤더(hero)·스켈레톤·그리드를 같은 폭으로 정렬하고, 카드는 모바일과
+   동일하게 2열을 유지해 세로 영상 카드가 과도하게 커지지 않게 한다. */
 @media (min-width: 768px) {
+  .hero,
+  .feed-skeleton,
   .video-grid {
-    grid-template-columns: repeat(3, 1fr);
+    max-width: var(--content-max);
+    margin-left: auto;
+    margin-right: auto;
   }
-}
-@media (min-width: 1024px) {
   .video-grid {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 16px;
-  }
-}
-@media (min-width: 1440px) {
-  .video-grid {
-    grid-template-columns: repeat(5, 1fr);
-    max-width: 1600px;
-    margin: 0 auto;
   }
 }
 .video-grid-card {

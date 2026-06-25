@@ -3,13 +3,14 @@
     <ion-router-outlet />
     <!-- Global toast — must live here (always mounted) so toasts fired from
          auth/standalone pages outside AppLayout still render. -->
-    <IonToast :is-open="uiStore.isToastOpen" :message="uiStore.toastMessage" :color="uiStore.toastColor" :duration="2500" position="top" @did-dismiss="uiStore.dismissToast" />
+    <IonToast :is-open="uiStore.isToastOpen" :message="uiStore.toastMessage" :color="uiStore.toastColor" :duration="toastDuration" :buttons="toastButtons" position="top" @did-dismiss="uiStore.dismissToast" />
   </ion-app>
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted } from 'vue';
 import { IonApp, IonRouterOutlet, IonToast } from '@ionic/vue';
+import type { ToastButton } from '@ionic/vue';
 import { useRouter } from 'vue-router';
 import { Capacitor } from '@capacitor/core';
 import type { PluginListenerHandle } from '@capacitor/core';
@@ -21,6 +22,19 @@ import { notificationService } from '@/services/notification';
 
 const uiStore = useUIStore();
 const router = useRouter();
+
+// 액션 버튼이 달린 토스트는 사용자가 누를 시간을 더 준다.
+const toastDuration = computed(() => (uiStore.toastAction ? 6000 : 2500));
+const toastButtons = computed<ToastButton[]>(() => {
+  const action = uiStore.toastAction;
+  if (!action) return [];
+  return [
+    {
+      text: action.text,
+      handler: () => action.handler(),
+    },
+  ];
+});
 
 // 네이티브 소셜 로그인 콜백: 백엔드가 com.hola.climbing://oauth/callback?oauthCode= 로
 // 돌려보내면 OS 가 이 리스너를 깨운다. 웹 콜백 페이지와 동일 라우트로 보내 처리 통일.

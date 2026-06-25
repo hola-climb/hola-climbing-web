@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { IonPage, IonContent } from "@ionic/vue";
+import { IonPage, IonContent, useIonRouter } from "@ionic/vue";
 import { useRouter } from "vue-router";
 import { useVideoStore } from "@/stores/video";
 import { useUIStore } from "@/stores/ui";
@@ -12,6 +12,7 @@ import BaseButton from "@/components/common/BaseButton.vue";
 import { getErrorMessage } from "@/utils/apiError";
 
 const router = useRouter();
+const ionRouter = useIonRouter();
 const videoStore = useVideoStore();
 const uiStore = useUIStore();
 
@@ -144,8 +145,14 @@ async function handleSubmit() {
       thumbnailFile: selectedThumbnail.value,
     });
 
-    uiStore.showToast("영상 업로드 완료! AI 분석을 시작해요.");
-    router.replace(`/my/videos/${video.id}`);
+    // 피드로 돌아가 분석이 도는 동안 계속 둘러볼 수 있게 하고,
+    // 토스트의 "결과 보기 →" 로 분석 화면에 바로 진입하도록 안내한다.
+    // 탭 루트 복귀는 Ionic 라우터로 스택을 'root'로 리셋해야 탭바가 정상 동작한다.
+    ionRouter.navigate("/feed", "root", "replace");
+    uiStore.showToast("영상 업로드 완료! AI 분석을 시작했어요.", "success", {
+      text: "결과 보기",
+      handler: () => router.push(`/my/videos/${video.id}`),
+    });
   } catch (err: unknown) {
     uploadState.value = "failed";
     uiStore.showToast(getErrorMessage(err, "업로드에 실패했어요."), "danger");

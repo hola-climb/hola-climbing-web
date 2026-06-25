@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import {
-  IonPage, IonContent, IonIcon,
+  IonPage, IonContent, IonIcon, IonRefresher, IonRefresherContent,
 } from '@ionic/vue'
 import { ellipsisHorizontal, flagOutline, banOutline } from 'ionicons/icons'
 import BaseSheet from '@/components/common/BaseSheet.vue'
@@ -82,7 +82,7 @@ async function loadBlockStatus() {
   }
 }
 
-onMounted(async () => {
+async function loadProfile() {
   try {
     // Backend UserProfileResponse: { userId, nickname, profileImage, bio, followerCount, followingCount, isFollowing }
     const [profileRes] = await Promise.all([
@@ -110,7 +110,14 @@ onMounted(async () => {
   } finally {
     isLoading.value = false
   }
-})
+}
+
+async function handleRefresh(event: CustomEvent) {
+  await loadProfile()
+  ;(event.target as HTMLIonRefresherElement).complete()
+}
+
+onMounted(loadProfile)
 
 async function handleBlock() {
   if (!authStore.isAuthenticated) { uiStore.openLoginSheet(); return }
@@ -171,6 +178,10 @@ async function handleFollow() {
     </AppHeader>
 
     <IonContent>
+      <IonRefresher slot="fixed" @ion-refresh="handleRefresh">
+        <IonRefresherContent />
+      </IonRefresher>
+
       <div v-if="isLoading" class="page-skeleton page-padding">
         <LoadingState variant="card" :count="1" label="프로필을 불러오는 중" />
         <LoadingState variant="list" :count="3" />

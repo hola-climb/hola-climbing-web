@@ -88,6 +88,40 @@ body {
   padding-bottom: 100px;
 }
 
+/* ── Desktop: 단일 컬럼 화면 중앙 정렬 ─────────────────
+   모바일 퍼스트 레이아웃이 넓은 화면에서 전체 폭으로 늘어나지 않도록
+   .page-padding 콘텐츠를 --content-max 폭으로 중앙 정렬한다.
+   탐색/기록은 자체 2-pane 레이아웃이 있어 .desktop-wide 로 이 캡을 해제한다. */
+@media (min-width: 768px) {
+  .page-padding {
+    max-width: var(--content-max);
+    margin-left: auto;
+    margin-right: auto;
+  }
+  /* 2-pane 데스크탑 레이아웃 내부에서는 중앙 컬럼 캡을 해제 */
+  .desktop-wide .page-padding,
+  .page-padding.desktop-wide {
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  /* 시트형 폼 화면(클라이밍 기록·업로드)도 중앙 컬럼으로 */
+  .sheet-bg {
+    max-width: var(--content-max);
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* page-padding 을 쓰지 않는 목록/단일 컬럼 화면은 IonContent 스크롤
+     영역에 좌우 패딩을 줘 콘텐츠를 중앙 --content-max 폭으로 모은다.
+     (형제 요소가 여러 개라 래퍼 단위로 캡하기 어려운 경우에 사용) */
+  ion-content.center-scroll::part(scroll) {
+    padding-left: calc((100% - var(--content-max)) / 2);
+    padding-right: calc((100% - var(--content-max)) / 2);
+  }
+}
+
 /* ── Spacing utilities (margin-top, on the 4/8/12/16/24 scale) ── */
 .mt-1 {
   margin-top: var(--s-1);
@@ -244,4 +278,15 @@ ion-tab-bar {
 ion-tab-button {
   --color: var(--fg-muted);
   --color-selected: var(--fg);
+}
+
+/* ── Desktop: 탭바를 중앙 컬럼 폭으로 모음 ─────────────────
+   1440px 같은 넓은 화면에서 탭 항목이 양 끝으로 벌어지지 않도록
+   좌우 패딩으로 버튼들을 중앙 --content-max 영역에 모은다.
+   중앙 FAB(viewport 중앙 고정)와 가운데 슬롯이 그대로 정렬된다. */
+@media (min-width: 768px) {
+  ion-tab-bar {
+    padding-left: max(0px, calc((100% - var(--content-max)) / 2));
+    padding-right: max(0px, calc((100% - var(--content-max)) / 2));
+  }
 }

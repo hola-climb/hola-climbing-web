@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // imports → state → computed → methods → lifecycle
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { IonPage, IonHeader, IonToolbar, IonContent, IonRefresher, IonRefresherContent } from "@ionic/vue";
 import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
 import VideoThumbnail from "@/components/video/VideoThumbnail.vue";
@@ -173,12 +173,37 @@ function formatLastClimbed(iso: string | null | undefined): string {
 function onPagerScroll(e: Event) {
   const el = e.currentTarget as HTMLElement;
   activeIndex.value = Math.round(el.scrollLeft / (el.clientWidth || 1));
+  if (el.scrollLeft > 4) dismissSwipeHint();
 }
 
 function goToPane(i: number) {
   const el = pagerEl.value;
   if (!el) return;
   el.scrollTo({ left: i * el.clientWidth, behavior: "smooth" });
+  dismissSwipeHint();
+}
+
+// ── 스와이프 힌트 (최초 1회) ─────────────────────────
+// 캘린더 ↔ 분석을 좌우로 넘길 수 있다는 걸 처음 진입한 사용자에게 안내한다.
+const SWIPE_HINT_KEY = "hola_records_swipe_hint_seen";
+const showSwipeHint = ref(false);
+
+function dismissSwipeHint() {
+  if (!showSwipeHint.value) return;
+  showSwipeHint.value = false;
+  try {
+    localStorage.setItem(SWIPE_HINT_KEY, "1");
+  } catch {
+    /* localStorage 비활성 환경 — 무시 */
+  }
+}
+
+function maybeShowSwipeHint() {
+  if (!pagerActive.value) return;
+  if (localStorage.getItem(SWIPE_HINT_KEY)) return;
+  showSwipeHint.value = true;
+  // 사용자가 직접 닫지 않아도 일정 시간 후 자동으로 사라진다.
+  window.setTimeout(dismissSwipeHint, 4000);
 }
 
 // 마우스 드래그로도 넘길 수 있게 — 터치는 네이티브 스크롤이 처리하므로 마우스만 가로챈다.
@@ -522,6 +547,12 @@ function handleScroll(event: CustomEvent<{ scrollTop: number }>) {
 onMounted(() => {
   load();
   loadAnalysis();
+  maybeShowSwipeHint();
+});
+
+// pagerActive 가 미디어쿼리 해석 이후 true 가 되는 경우(데스크톱→모바일 등)도 커버한다.
+watch(pagerActive, (active) => {
+  if (active) maybeShowSwipeHint();
 });
 </script>
 
@@ -552,6 +583,14 @@ onMounted(() => {
         <div v-if="pagerActive" class="pager-dots">
           <button class="dot" :class="{ active: activeIndex === 0 }" aria-label="캘린더 보기" @click="goToPane(0)"></button>
           <button class="dot" :class="{ active: activeIndex === 1 }" aria-label="분석 보기" @click="goToPane(1)"></button>
+
+          <!-- 최초 1회 스와이프 안내 -->
+          <transition name="swipe-hint-fade">
+            <button v-if="showSwipeHint" class="swipe-hint" aria-live="polite" @click="dismissSwipeHint">
+              <span class="swipe-hint-arrow" aria-hidden="true">←→</span>
+              좌우로 넘겨 분석을 볼 수 있어요
+            </button>
+          </transition>
         </div>
 
         <!-- 캘린더 ↔ 분석 가로 스크롤/드래그 페이저 (비활성 시 display:contents 라 기존 레이아웃 유지) -->
@@ -716,7 +755,7 @@ onMounted(() => {
         </div>
 
         <!-- ── DETAIL VIEW ─────────────────────────── -->
-        <div v-if="selectedDate || isDesktop" class="detail-pane">
+        <div v-if="selectedDate || isDesktop" class="detail-pane desktop-wide">
           <!-- Desktop placeholder (no date selected) -->
           <EmptyState v-if="!selectedDate" compact hold="cyan" title="날짜를 선택하세요" description="달력에서 기록이 있는 날짜를 누르면 상세를 볼 수 있어요." />
 
@@ -1184,10 +1223,47 @@ onMounted(() => {
 
 /* ── 페이저 인디케이터 (탭 대체) ───────────────────── */
 .pager-dots {
+  position: relative;
   display: flex;
   justify-content: center;
   gap: 7px;
   padding: 10px 0 6px;
+}
+
+/* ── 스와이프 힌트 (최초 1회) ───────────────────── */
+.swipe-hint {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 999px;
+  background: var(--hold-dark);
+  color: #fff;
+  font-family: var(--font-sans);
+  font-size: var(--fs-caption);
+  font-weight: var(--w-semibold);
+  box-shadow: var(--shadow-float);
+  cursor: pointer;
+  z-index: 5;
+}
+.swipe-hint-arrow {
+  font-weight: var(--w-bold);
+  letter-spacing: -0.02em;
+}
+.swipe-hint-fade-enter-active,
+.swipe-hint-fade-leave-active {
+  transition: opacity var(--dur-base) var(--ease-state), transform var(--dur-base) var(--ease-state);
+}
+.swipe-hint-fade-enter-from,
+.swipe-hint-fade-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-4px);
 }
 .dot {
   width: 7px;

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // imports → state → computed → methods → lifecycle
 import { ref, computed, onMounted } from "vue";
-import { IonPage, IonContent, IonInfiniteScroll, IonInfiniteScrollContent } from "@ionic/vue";
+import { IonPage, IonContent, IonInfiniteScroll, IonInfiniteScrollContent, IonRefresher, IonRefresherContent } from "@ionic/vue";
 import type { InfiniteScrollCustomEvent } from "@ionic/vue";
 import { useRoute } from "vue-router";
 import AppHeader from "@/components/common/AppHeader.vue";
@@ -83,6 +83,11 @@ async function toggleFollow(u: FollowUser) {
   }
 }
 
+async function handleRefresh(event: CustomEvent) {
+  await load(true);
+  (event.target as HTMLIonRefresherElement).complete();
+}
+
 onMounted(() => load(true));
 </script>
 
@@ -90,7 +95,11 @@ onMounted(() => load(true));
   <IonPage>
     <AppHeader title="팔로우" />
 
-    <IonContent>
+    <IonContent class="center-scroll">
+      <IonRefresher slot="fixed" @ion-refresh="handleRefresh">
+        <IonRefresherContent />
+      </IonRefresher>
+
       <!-- Tabs -->
       <div class="tabs">
         <button class="tab" :class="{ active: tab === 'followers' }" @click="switchTab('followers')">팔로워</button>

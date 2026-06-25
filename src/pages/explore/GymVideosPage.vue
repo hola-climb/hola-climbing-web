@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
-import { IonPage, IonHeader, IonToolbar, IonContent, IonButtons, IonBackButton, IonInfiniteScroll, IonInfiniteScrollContent } from "@ionic/vue";
+import { IonPage, IonHeader, IonToolbar, IonContent, IonButtons, IonBackButton, IonInfiniteScroll, IonInfiniteScrollContent, IonRefresher, IonRefresherContent } from "@ionic/vue";
 import { useRoute, useRouter } from "vue-router";
 import { gymService } from "@/services/gym";
 import VideoThumbnail from "@/components/video/VideoThumbnail.vue";
@@ -77,6 +77,11 @@ function selectGrade(gradeId: number | null) {
   loadVideos(true);
 }
 
+async function handleRefresh(event: CustomEvent) {
+  await loadVideos(true);
+  (event.target as HTMLIonRefresherElement).complete();
+}
+
 onMounted(async () => {
   const [gymRes, gradeRes] = await Promise.allSettled([gymService.getGym(gymId), gymService.getGrades(gymId)]);
   if (gymRes.status === "fulfilled") gymName.value = gymRes.value.data.name;
@@ -110,6 +115,10 @@ onMounted(async () => {
     </IonHeader>
 
     <IonContent fullscreen class="page-content" :scroll-events="true" @ion-scroll="handleScroll">
+      <IonRefresher slot="fixed" @ion-refresh="handleRefresh">
+        <IonRefresherContent />
+      </IonRefresher>
+
       <div class="page-inner page-padding">
         <LoadingState v-if="isLoading" variant="grid" :count="6" thumb-aspect="1/1" label="영상을 불러오는 중" />
 

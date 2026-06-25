@@ -161,7 +161,7 @@ onUnmounted(stopPolling);
 <template>
   <IonPage>
     <AppHeader :title="`${monthLabel} 리포트`" />
-    <IonContent>
+    <IonContent class="center-scroll">
       <!-- 로딩 -->
       <div v-if="view === 'loading'" class="center-state">
         <LoadingState variant="dot" label="리포트를 불러오는 중" />

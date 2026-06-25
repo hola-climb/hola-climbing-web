@@ -472,7 +472,7 @@ async function handleLocate() {
         <!-- end .list-pane -->
 
         <!-- Desktop detail pane -->
-        <div v-if="isDesktop" class="detail-pane">
+        <div v-if="isDesktop" class="detail-pane desktop-wide">
           <GymDetailView v-if="selectedGymId" :key="selectedGymId" :gym-id="selectedGymId" />
           <div v-else class="detail-placeholder">
             <p class="ph-title">암장을 선택하세요</p>

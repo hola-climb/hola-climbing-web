@@ -35,14 +35,32 @@ const HOLDS = [
 
 // 홀드 페블 원본 좌표계(200×180), 시각 중심 ≈ (108, 92)
 const PEBBLE = "M 38 92 C 22 60, 60 18, 108 22 C 158 26, 188 60, 178 110 C 168 158, 118 168, 78 158 C 44 150, 50 122, 38 92 Z";
-const PEBBLE_S = 0.3; // 스케일 (≈73px 폭)
+const PEBBLE_S = 0.3;
 
 function holdTransform(h: (typeof HOLDS)[number]): string {
-  // 페블 중심(108,92)을 점(x,y)에 맞추고 회전·스케일
   return `translate(${h.x} ${h.y}) rotate(${h.rot}) scale(${PEBBLE_S}) translate(-108 -92)`;
 }
 
-// 연결선 세그먼트 (홀드 i → i+1, 유기적 곡선)
+const LAST = HOLDS.length - 1;
+
+// 2차 베지어 곡선 길이(샘플링) — DOM(getTotalLength) 비의존이라 iOS에서도 안전.
+function bezierLen(ax: number, ay: number, cx: number, cy: number, bx: number, by: number): number {
+  let len = 0;
+  let px = ax;
+  let py = ay;
+  for (let i = 1; i <= 24; i++) {
+    const t = i / 24;
+    const mt = 1 - t;
+    const x = mt * mt * ax + 2 * mt * t * cx + t * t * bx;
+    const y = mt * mt * ay + 2 * mt * t * cy + t * t * by;
+    len += Math.hypot(x - px, y - py);
+    px = x;
+    py = y;
+  }
+  return len;
+}
+
+// 연결선 세그먼트 (홀드 i → i+1, 유기적 2차 베지어). 길이도 함께 계산.
 const SEGMENTS = HOLDS.slice(0, -1).map((a, i) => {
   const b = HOLDS[i + 1];
   const mx = (a.x + b.x) / 2;
@@ -50,15 +68,15 @@ const SEGMENTS = HOLDS.slice(0, -1).map((a, i) => {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   const len = Math.hypot(dx, dy) || 1;
-  const off = (i % 2 === 0 ? 1 : -1) * 24; // 좌우 번갈아 휘어짐
+  const off = (i % 2 === 0 ? 1 : -1) * 24;
   const cx = mx + (-dy / len) * off;
   const cy = my + (dx / len) * off;
-  return { id: i, d: `M ${a.x} ${a.y} Q ${cx} ${cy} ${b.x} ${b.y}` };
+  return { id: i, d: `M ${a.x} ${a.y} Q ${cx} ${cy} ${b.x} ${b.y}`, len: bezierLen(a.x, a.y, cx, cy, b.x, b.y) };
 });
 
 const clamped = computed(() => Math.min(100, Math.max(0, props.progress)));
 
-// ── 완료 시퀀스 상태머신 ───────────────────────────
+// ── 완료 시퀀스 ───────────────────────────────────
 const phase = ref<"run" | "success">("run");
 let outroStarted = false;
 let completeTimer: number | null = null;
@@ -66,10 +84,8 @@ let completeTimer: number | null = null;
 function runSuccess() {
   if (outroStarted) return;
   outroStarted = true;
-  phase.value = "success"; // 마지막 홀드 lime + 확대 + glow + 체크
-  completeTimer = window.setTimeout(() => {
-    emit("complete"); // 시퀀스 끝 → 페이지가 결과 카드로 전환
-  }, 1050);
+  phase.value = "success";
+  completeTimer = window.setTimeout(() => emit("complete"), 1050);
 }
 
 watch(
@@ -87,9 +103,11 @@ onUnmounted(() => {
   if (completeTimer !== null) clearTimeout(completeTimer);
 });
 
-// ── 현재 단계 인덱스 (stage 키 우선, 없으면 진행률로 폴백) ──────────
-const activeIndex = computed(() => {
-  if (phase.value === "success") return STAGES.length - 1;
+// ── 현재 단계 인덱스 (SSE stage 키 우선, 없으면 진행률 폴백) ──────────
+// 모든 시각 상태가 이 "이산" 값에만 의존 → 변할 때만 class/style 갱신
+// (홀드 색이 정상 동작하는 것과 동일한 메커니즘 = iOS 안전).
+const reachedIndex = computed(() => {
+  if (phase.value === "success") return LAST;
   const byKey = STAGES.findIndex((s) => s.key === props.stage);
   if (byKey >= 0) return byKey;
   const p = clamped.value;
@@ -100,21 +118,26 @@ const activeIndex = computed(() => {
   if (p >= 10) return 0;
   return -1; // 대기 중
 });
-
-// 강조(pulse) 대상: 대기 중엔 첫 홀드를 준비 상태로 점등
-const highlightIndex = computed(() => (activeIndex.value < 0 ? 0 : activeIndex.value));
+const isWaiting = computed(() => phase.value === "run" && reachedIndex.value < 0);
+const activeHold = computed(() => (reachedIndex.value < 0 ? 0 : reachedIndex.value));
 
 function holdClass(i: number): string {
-  if (phase.value === "success") return i === HOLDS.length - 1 ? "is-final" : "is-done";
-  const hi = highlightIndex.value;
-  if (i === hi && activeIndex.value >= 0) return "is-active";
-  if (i === hi) return "is-active is-waiting"; // 대기 중 첫 홀드 (옅은 pulse)
-  if (i < hi) return "is-done";
+  if (phase.value === "success") return i === LAST ? "is-final" : "is-done";
+  if (i === activeHold.value) return isWaiting.value && i === 0 ? "is-active is-waiting" : "is-active";
+  if (i < activeHold.value) return "is-done";
   return "is-todo";
 }
 
-function segmentLit(i: number): boolean {
-  return phase.value === "success" || activeIndex.value >= i + 1;
+// 세그먼트 i(홀드 i→i+1)는 홀드 i+1에 도달하면 채워진다.
+// 채워질 때 dashoffset 이 len→0 으로 CSS transition → 빛나는 선단이 다음 홀드로 이동.
+function segFilled(i: number): boolean {
+  return phase.value === "success" || reachedIndex.value > i;
+}
+function litStyle(seg: (typeof SEGMENTS)[number]) {
+  return {
+    strokeDasharray: `${seg.len}`,
+    strokeDashoffset: segFilled(seg.id) ? "0" : `${seg.len}`,
+  };
 }
 
 // ── 푸터 정보 ───────────────────────────────────────
@@ -122,10 +145,10 @@ const footer = computed(() => {
   if (phase.value === "success") {
     return { title: "완료", pct: 100, desc: "분석이 완료되었어요. 결과를 확인해 보세요." };
   }
-  if (activeIndex.value < 0) {
+  if (reachedIndex.value < 0) {
     return { title: "분석 대기 중", pct: clamped.value, desc: props.message || "분석 대기열에 등록되었어요." };
   }
-  const s = STAGES[activeIndex.value];
+  const s = STAGES[reachedIndex.value];
   return { title: s.title, pct: clamped.value, desc: props.message || s.desc };
 });
 
@@ -133,7 +156,14 @@ const finalHold = HOLDS[HOLDS.length - 1];
 </script>
 
 <template>
-  <div class="loader" role="progressbar" :aria-valuenow="footer.pct" aria-valuemin="0" aria-valuemax="100" :aria-label="`AI 분석 ${footer.pct}% — ${footer.title}`">
+  <div
+    class="loader"
+    role="progressbar"
+    :aria-valuenow="footer.pct"
+    aria-valuemin="0"
+    aria-valuemax="100"
+    :aria-label="`AI 분석 ${footer.pct}% — ${footer.title}`"
+  >
     <div class="wall">
       <svg class="route" viewBox="0 0 300 264" role="presentation" aria-hidden="true">
         <defs>
@@ -143,10 +173,17 @@ const finalHold = HOLDS[HOLDS.length - 1];
           </radialGradient>
         </defs>
 
-        <!-- 연결선: 베이스(옅음) + 점등(밝게 채워짐) -->
+        <!-- 연결선: 베이스(옅음) + 채워지는 점등 선(빛나는 선단이 다음 홀드로 이동) -->
         <g class="lines">
           <path v-for="seg in SEGMENTS" :key="`b${seg.id}`" class="line-base" :d="seg.d" />
-          <path v-for="seg in SEGMENTS" v-show="segmentLit(seg.id)" :key="`l${seg.id}`" class="line-lit" :class="{ 'is-final': phase === 'success' }" :d="seg.d" pathLength="1" />
+          <path
+            v-for="seg in SEGMENTS"
+            :key="`l${seg.id}`"
+            class="line-lit"
+            :class="{ 'is-final': phase === 'success', filled: segFilled(seg.id) }"
+            :d="seg.d"
+            :style="litStyle(seg)"
+          />
         </g>
 
         <!-- 완료 시 glow 확산 링 -->
@@ -158,7 +195,6 @@ const finalHold = HOLDS[HOLDS.length - 1];
             <path class="pebble" :d="PEBBLE" />
             <path class="gloss" :d="PEBBLE" fill="url(#arl-gloss)" />
             <circle class="dot" cx="108" cy="92" r="6" />
-            <!-- 마지막 홀드 완료 체크 -->
             <path v-if="i === HOLDS.length - 1" class="check" d="M 84 94 L 100 112 L 130 74" />
           </g>
         </g>
@@ -207,22 +243,23 @@ const finalHold = HOLDS[HOLDS.length - 1];
   stroke-width: 4;
   stroke-linecap: round;
 }
+/* 점등 선: 단계 변화(class/style)로만 갱신 + CSS transition 으로 채워짐.
+   dasharray/offset 은 인라인 style(이산 값) → iOS WKWebView 리페인트 보장. */
 .line-lit {
   fill: none;
   stroke: var(--hold-pink);
   stroke-width: 4;
   stroke-linecap: round;
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  animation: line-fill 0.55s var(--ease-soft) forwards;
+  transition: stroke-dashoffset 0.7s var(--ease-soft);
+}
+/* 채워지는 동안 빛나는 선단 — 이동하는 '빛' 효과 */
+.line-lit.filled {
+  filter: drop-shadow(0 0 5px rgba(255, 77, 148, 0.65));
 }
 .line-lit.is-final {
   stroke: var(--hold-lime-ink);
-}
-@keyframes line-fill {
-  to {
-    stroke-dashoffset: 0;
-  }
+  filter: drop-shadow(0 0 6px rgba(200, 255, 0, 0.7));
+  transition: stroke-dashoffset 0.7s var(--ease-soft), stroke 0.4s var(--ease-state);
 }
 
 /* ── 홀드 ─────────────────────────────────────── */
@@ -242,15 +279,12 @@ const finalHold = HOLDS[HOLDS.length - 1];
   transition: opacity 0.3s var(--ease-state);
 }
 
-/* 미완료(연한 회색) */
 .hold.is-todo .pebble {
   fill: #dfe2ea;
 }
-/* 완료(연한 핑크) */
 .hold.is-done .pebble {
   fill: #ffd3e4;
 }
-/* 현재 진행중(핑크 + glow + pulse) */
 .hold.is-active .pebble {
   fill: var(--hold-pink);
 }
@@ -258,7 +292,6 @@ const finalHold = HOLDS[HOLDS.length - 1];
   filter: drop-shadow(0 0 6px rgba(255, 77, 148, 0.5));
   animation: hold-pulse 2s ease-in-out infinite;
 }
-/* 대기 중 첫 홀드 — 더 옅게 */
 .hold.is-active.is-waiting .pebble {
   fill: #ffc2dc;
 }
@@ -275,7 +308,6 @@ const finalHold = HOLDS[HOLDS.length - 1];
   }
 }
 
-/* 최종 완료(lime + 확대 + glow) */
 .hold.is-final .pebble {
   fill: var(--hold-lime);
 }
@@ -412,6 +444,7 @@ const finalHold = HOLDS[HOLDS.length - 1];
   .check,
   .dot-led {
     animation: none;
+    transition: none;
   }
   .check {
     opacity: 1;

@@ -18,7 +18,11 @@ const uiStore = useUIStore();
 const nickname = ref("");
 const email = ref("");
 const password = ref("");
+const passwordConfirm = ref("");
 const isLoading = ref(false);
+
+// 비밀번호 확인 일치 여부 — 확인 필드에 입력이 있을 때만 노출
+const passwordMismatch = computed(() => passwordConfirm.value.length > 0 && passwordConfirm.value !== password.value);
 
 // 이메일 중복 확인 상태 — GET /api/auth/email-check
 type EmailStatus = "idle" | "checking" | "available" | "taken" | "invalid";
@@ -98,12 +102,24 @@ async function handleRegister() {
     pwErrors.value = errors;
     return;
   }
+  if (password.value !== passwordConfirm.value) {
+    uiStore.showToast("비밀번호가 일치하지 않아요.", "warning");
+    return;
+  }
   if (!allRequiredAgreed.value) {
     uiStore.showToast("필수 약관에 동의해주세요.", "warning");
     return;
   }
+  // blur 로 중복 확인을 못 거치고 바로 제출하는 경우 — 여기서 한 번 더 확인한다.
+  if (emailStatus.value === "idle") {
+    await checkEmailAvailability();
+  }
   if (emailStatus.value === "taken") {
     uiStore.showToast("이미 가입된 이메일이에요.", "warning");
+    return;
+  }
+  if (emailStatus.value === "invalid") {
+    uiStore.showToast("이메일 형식을 확인해주세요.", "warning");
     return;
   }
 
@@ -169,6 +185,12 @@ onMounted(loadTerms);
             </ul>
           </div>
 
+          <div class="field">
+            <label class="field-label" for="reg-pw-confirm">비밀번호 확인</label>
+            <IonInput id="reg-pw-confirm" v-model="passwordConfirm" type="password" placeholder="비밀번호를 다시 입력하세요" class="hola-input" autocomplete="new-password" />
+            <p v-if="passwordMismatch" class="field-hint err" aria-live="polite">비밀번호가 일치하지 않아요.</p>
+          </div>
+
           <div class="terms-group">
             <div v-for="term in terms" :key="term.termId" class="terms-row">
               <IonCheckbox v-model="agreed[term.termId]" />
@@ -177,7 +199,7 @@ onMounted(loadTerms);
             </div>
           </div>
 
-          <BaseButton variant="primary" block :loading="isLoading" :disabled="!nickname || !email || !password" class="submit-btn" @click="handleRegister">계정 만들기</BaseButton>
+          <BaseButton variant="primary" block :loading="isLoading" :disabled="!nickname || !email || !password || !passwordConfirm || passwordMismatch" class="submit-btn" @click="handleRegister">계정 만들기</BaseButton>
         </div>
 
         <div class="auth-footer">
@@ -197,6 +219,9 @@ onMounted(loadTerms);
   display: flex;
   flex-direction: column;
   padding: 0 20px;
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .auth-header {

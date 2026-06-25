@@ -73,7 +73,7 @@ async function handleSend() {
 </template>
 
 <style scoped>
-.auth-content { min-height: 100vh; display: flex; flex-direction: column; padding: 0 20px; }
+.auth-content { min-height: 100vh; display: flex; flex-direction: column; padding: 0 20px; max-width: 480px; margin: 0 auto; width: 100%; }
 .auth-header { padding-top: 60px; padding-bottom: 32px; }
 .back-btn {
   background: none; border: none; cursor: pointer; color: var(--fg);

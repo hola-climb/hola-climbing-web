@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // imports → state → computed → methods → lifecycle
 import { ref, computed, onMounted } from "vue";
-import { IonPage, IonHeader, IonToolbar, IonContent, useIonRouter } from "@ionic/vue";
+import { IonPage, IonHeader, IonToolbar, IonContent, IonRefresher, IonRefresherContent, useIonRouter } from "@ionic/vue";
 import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
 import LoadingState from "@/components/common/LoadingState.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
@@ -87,6 +87,11 @@ async function handleLogout() {
   uiStore.showToast("로그아웃되었어요.");
 }
 
+async function handleRefresh(event: CustomEvent) {
+  await Promise.all([load(), loadVideos()]);
+  (event.target as HTMLIonRefresherElement).complete();
+}
+
 onMounted(async () => {
   await load();
   await loadVideos();
@@ -112,6 +117,10 @@ onMounted(async () => {
     </IonHeader>
 
     <IonContent fullscreen class="my-page-content" :scroll-events="true" @ion-scroll="handleScroll">
+      <IonRefresher slot="fixed" @ion-refresh="handleRefresh">
+        <IonRefresherContent />
+      </IonRefresher>
+
       <div class="my-content page-padding">
         <!-- Profile hero card -->
         <div class="profile-hero">
@@ -200,6 +209,15 @@ onMounted(async () => {
   justify-content: space-between;
   padding: 0 20px;
   height: 52px;
+}
+/* 데스크탑: 헤더 내용도 중앙 컬럼에 맞춰 정렬 */
+@media (min-width: 768px) {
+  .toolbar-inner {
+    max-width: var(--content-max);
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+  }
 }
 .transparent-header {
   position: absolute;
@@ -291,7 +309,7 @@ onMounted(async () => {
 }
 .glow-lime {
   background: var(--hold-lime);
-  bottom: -80px;
+  bottom: -180px;
   left: -100px;
 }
 

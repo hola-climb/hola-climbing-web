@@ -139,7 +139,7 @@ onMounted(() => load(true));
       </template>
     </AppHeader>
 
-    <IonContent>
+    <IonContent class="center-scroll">
       <IonRefresher slot="fixed" @ion-refresh="handleRefresh">
         <IonRefresherContent />
       </IonRefresher>

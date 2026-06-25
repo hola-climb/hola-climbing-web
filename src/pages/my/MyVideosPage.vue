@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
-import { IonPage, IonHeader, IonToolbar, IonContent, IonButtons, IonBackButton, IonInfiniteScroll, IonInfiniteScrollContent } from "@ionic/vue";
+import { IonPage, IonHeader, IonToolbar, IonContent, IonButtons, IonBackButton, IonInfiniteScroll, IonInfiniteScrollContent, IonRefresher, IonRefresherContent } from "@ionic/vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useUIStore } from "@/stores/ui";
@@ -60,6 +60,11 @@ async function onInfiniteScroll(event: CustomEvent) {
   (event.target as HTMLIonInfiniteScrollElement).complete();
 }
 
+async function handleRefresh(event: CustomEvent) {
+  await load();
+  (event.target as HTMLIonRefresherElement).complete();
+}
+
 onMounted(async () => {
   isLoading.value = true;
   if (!authStore.user) await authStore.fetchMe();
@@ -83,6 +88,10 @@ onMounted(async () => {
     </IonHeader>
 
     <IonContent fullscreen class="videos-page-content" :scroll-events="true" @ion-scroll="handleScroll">
+      <IonRefresher slot="fixed" @ion-refresh="handleRefresh">
+        <IonRefresherContent />
+      </IonRefresher>
+
       <div class="page-inner page-padding">
         <!-- Loading -->
         <LoadingState v-if="isLoading" variant="grid" :count="6" thumb-aspect="1/1" label="영상을 불러오는 중" />

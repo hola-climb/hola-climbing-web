@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // imports → state → methods → lifecycle
 import { ref } from "vue";
-import { IonPage, IonContent, IonInfiniteScroll, IonInfiniteScrollContent, onIonViewWillEnter } from "@ionic/vue";
+import { IonPage, IonContent, IonInfiniteScroll, IonInfiniteScrollContent, IonRefresher, IonRefresherContent, onIonViewWillEnter } from "@ionic/vue";
 import type { InfiniteScrollCustomEvent } from "@ionic/vue";
 import AppHeader from "@/components/common/AppHeader.vue";
 import GymCard from "@/components/gym/GymCard.vue";
@@ -48,6 +48,11 @@ async function loadMore(event: InfiniteScrollCustomEvent) {
   event.target.complete();
 }
 
+async function handleRefresh(event: CustomEvent) {
+  await load(true);
+  (event.target as HTMLIonRefresherElement).complete();
+}
+
 // Refresh each time the page is shown so unfavorited gyms drop off.
 onIonViewWillEnter(() => load(true));
 </script>
@@ -56,7 +61,11 @@ onIonViewWillEnter(() => load(true));
   <IonPage>
     <AppHeader title="즐겨찾기 암장" />
 
-    <IonContent>
+    <IonContent class="center-scroll">
+      <IonRefresher slot="fixed" @ion-refresh="handleRefresh">
+        <IonRefresherContent />
+      </IonRefresher>
+
       <div v-if="initialLoading" class="gym-list">
         <LoadingState variant="list" :count="5" label="즐겨찾기를 불러오는 중" />
       </div>

@@ -88,6 +88,12 @@ function onLoadedMetadata() {
   startSec.value = 0;
   // 초기 선택 구간: 최대 maxDuration 까지.
   endSec.value = Math.min(el.duration, props.maxDuration);
+  // iOS WKWebView는 currentTime=0에서 검은 프레임을 렌더링하지 않으므로
+  // play/pause로 프레임을 강제 디코딩한 뒤 첫 프레임으로 시크한다.
+  el.play().catch(() => {}).finally(() => {
+    el.pause();
+    el.currentTime = Math.min(0.1, el.duration);
+  });
   metadataReady.value = true;
 }
 
@@ -199,7 +205,7 @@ onBeforeUnmount(cleanupUrl);
           ref="videoEl"
           class="preview-video"
           :src="objectUrl"
-          preload="metadata"
+          preload="auto"
           playsinline
           muted
           @loadedmetadata="onLoadedMetadata"

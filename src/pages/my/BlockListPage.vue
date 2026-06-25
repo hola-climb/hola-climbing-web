@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // imports → state → methods → lifecycle
 import { ref, onMounted } from "vue";
-import { IonPage, IonContent, IonInfiniteScroll, IonInfiniteScrollContent } from "@ionic/vue";
+import { IonPage, IonContent, IonInfiniteScroll, IonInfiniteScrollContent, IonRefresher, IonRefresherContent } from "@ionic/vue";
 import type { InfiniteScrollCustomEvent } from "@ionic/vue";
 import AppHeader from "@/components/common/AppHeader.vue";
 import UserListItem from "@/components/common/UserListItem.vue";
@@ -65,6 +65,11 @@ async function unblock(u: BlockedUser) {
   }
 }
 
+async function handleRefresh(event: CustomEvent) {
+  await load(true);
+  (event.target as HTMLIonRefresherElement).complete();
+}
+
 onMounted(() => load(true));
 </script>
 
@@ -72,7 +77,11 @@ onMounted(() => load(true));
   <IonPage>
     <AppHeader title="차단 관리" />
 
-    <IonContent>
+    <IonContent class="center-scroll">
+      <IonRefresher slot="fixed" @ion-refresh="handleRefresh">
+        <IonRefresherContent />
+      </IonRefresher>
+
       <div v-if="initialLoading" class="list-skeleton">
         <LoadingState variant="list" :count="6" label="차단 목록을 불러오는 중" />
       </div>
