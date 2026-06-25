@@ -459,7 +459,7 @@ onMounted(async () => {
   grid-template-columns: repeat(3, 1fr);
   gap: 3px;
   /* border-radius: var(--r-card); */
-  border-radius: 12px;
+  border-radius: 8px;
   overflow: hidden;
 }
 
