@@ -7,12 +7,14 @@ import LoadingState from "@/components/common/LoadingState.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
 import ProfileEditModal from "@/components/common/ProfileEditModal.vue";
 import UserAvatar from "@/components/common/UserAvatar.vue";
+import VideoThumbnail from "@/components/video/VideoThumbnail.vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useUIStore } from "@/stores/ui";
 import { statsService } from "@/services/stats";
+import { videoService } from "@/services/video";
 import { getTagLabel } from "@/utils/tagLabels";
-import type { UserStats, TechniqueStats } from "@/types/api";
+import type { UserStats, TechniqueStats, FeedVideo } from "@/types/api";
 
 const router = useRouter();
 const ionRouter = useIonRouter();
@@ -24,6 +26,9 @@ const isLoading = ref(true);
 const stats = ref<UserStats | null>(null);
 const techniqueStats = ref<TechniqueStats | null>(null);
 const hasScrolled = ref(false);
+
+const videos = ref<FeedVideo[]>([]);
+const videosLoading = ref(false);
 
 const avatarInitial = computed(() => authStore.user?.nickname?.charAt(0).toUpperCase() ?? "J");
 
@@ -46,50 +51,19 @@ function handleScroll(event: CustomEvent<{ scrollTop: number }>) {
   window.dispatchEvent(new CustomEvent("hola:tab-bar-scroll", { detail: { scrolled } }));
 }
 
-function formatLastClimbed(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  if (days === 0) return "오늘";
-  if (days === 1) return "어제";
-  if (days < 7) return `${days}일 전`;
-  const weeks = Math.floor(days / 7);
-  if (weeks < 5) return `${weeks}주 전`;
-  const months = Math.floor(days / 30);
-  if (months < 12) return `${months}달 전`;
-  return `${Math.floor(months / 12)}년 전`;
+async function loadVideos() {
+  const userId = authStore.user?.id;
+  if (!userId) return;
+  videosLoading.value = true;
+  try {
+    const result = await videoService.getMyVideos(userId);
+    videos.value = [...result.content].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  } catch (err: unknown) {
+    if (import.meta.env.DEV) console.error(err);
+  } finally {
+    videosLoading.value = false;
+  }
 }
-
-// Headline stats — derived from real /stats/me
-const headlineStats = computed(() => {
-  const s = stats.value;
-  // 1시간 이상이면 시간 단위(소수 1자리), 1시간 미만이면 분 단위로 표시
-  const sec = s?.totalClimbingSeconds ?? 0;
-  const climb = sec >= 3600 ? `${(sec / 3600).toFixed(1)}h` : `${Math.floor(sec / 60)}m`;
-  return [
-    { value: s?.isDynamic ? "다이나믹" : "스태틱", label: "STYLE" },
-    { value: climb, label: "CLIMB" },
-    { value: formatLastClimbed(s?.lastClimbedAt), label: "LAST" },
-  ];
-});
-
-// Technique frequency — derived from real /stats/me/techniques
-const techniques = computed(() => {
-  const counts = techniqueStats.value?.techniqueCounts ?? {};
-  const mostUsed = techniqueStats.value?.mostUsed;
-  const entries = Object.entries(counts)
-    .filter(([, c]) => c > 0)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 6);
-  const max = entries.length ? entries[0][1] : 1;
-  return entries.map(([key, count]) => ({
-    key,
-    label: getTagLabel(key),
-    count,
-    pct: (count / max) * 100,
-    color: key === mostUsed ? "var(--hold-lime)" : "var(--hold-pink)",
-  }));
-});
 
 async function load() {
   isLoading.value = true;
@@ -113,7 +87,10 @@ async function handleLogout() {
   uiStore.showToast("로그아웃되었어요.");
 }
 
-onMounted(load);
+onMounted(async () => {
+  await load();
+  await loadVideos();
+});
 </script>
 
 <template>
@@ -143,11 +120,7 @@ onMounted(load);
 
           <div class="hero-top">
             <div class="avatar-dark" :aria-label="`${authStore.user?.nickname ?? ''} 아바타`">
-              <UserAvatar
-                :src="authStore.user?.profileImageUrl"
-                :nickname="authStore.user?.nickname ?? '?'"
-                :on-image-error="authStore.fetchMe"
-              />
+              <UserAvatar :src="authStore.user?.profileImageUrl" :nickname="authStore.user?.nickname ?? '?'" :on-image-error="authStore.fetchMe" />
             </div>
             <div class="profile-info">
               <div class="profile-name">{{ authStore.user?.nickname ?? "—" }}</div>
@@ -171,60 +144,45 @@ onMounted(load);
               <span class="hs-val">{{ authStore.user?.followingCount ?? 0 }}</span>
               <span class="hs-lbl">팔로잉</span>
             </button>
-            <button class="hero-stat" @click="router.push('/my/videos')">
+            <button class="hero-stat" :style="{ cursor: 'default' }">
               <span class="hs-val">{{ stats?.totalVideos ?? authStore.user?.videoCount ?? 0 }}</span>
               <span class="hs-lbl">영상</span>
             </button>
           </div>
         </div>
 
-        <!-- Headline stats card (cyan glow) -->
-        <div class="stats-card hola-card">
-          <div class="stats-glow" aria-hidden="true" />
-
-          <!-- Loading skeleton (mirrors .stats-grid layout) -->
-          <div v-if="isLoading" class="stats-grid" role="status" aria-label="기록을 불러오는 중">
-            <div v-for="i in 3" :key="i" class="big-stat">
-              <div class="stat-sk stat-sk-val" />
-              <div class="stat-sk stat-sk-lbl" />
-            </div>
-          </div>
-
-          <div v-else class="stats-grid reveal-on-load">
-            <div v-for="stat in headlineStats" :key="stat.label" class="big-stat">
-              <div class="big-val">{{ stat.value }}</div>
-              <div class="big-lbl">{{ stat.label }}</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Technique frequency -->
-        <div class="pyramid-section">
+        <!-- Video grid section -->
+        <section class="video-grid-section">
           <div class="section-header">
-            <div class="section-title">기술 사용 빈도</div>
+            <span class="section-eyebrow">내 영상 · {{ stats?.totalVideos ?? authStore.user?.videoCount ?? videos.length }}</span>
+            <button v-if="videos.length" class="see-all" @click="router.push('/my/videos')">
+              전체보기
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </button>
           </div>
-          <div class="pyramid-card hola-card">
-            <LoadingState v-if="isLoading" variant="list" :count="3" label="기술 분석을 불러오는 중" />
-            <EmptyState v-else-if="techniques.length === 0" compact hold="cyan" title="아직 분석된 기술이 없어요" description="영상을 업로드하면 AI가 기술을 분석해요." />
-            <div v-else class="pyramid-rows reveal-on-load">
-              <div v-for="row in techniques" :key="row.key" class="pyr-row">
-                <div class="pyr-grade tech-label">{{ row.label }}</div>
-                <div class="pyr-track">
-                  <div class="pyr-fill" :style="{ width: `${row.pct}%`, background: row.color }" />
-                </div>
-                <div class="pyr-count">{{ row.count }}</div>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        <!-- Logout -->
-        <button class="logout-btn" @click="showLogoutAlert = true" aria-label="로그아웃">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
-          </svg>
-          로그아웃
-        </button>
+          <div v-if="videosLoading" class="insta-grid">
+            <div v-for="n in 9" :key="n" class="insta-cell insta-cell--skeleton" aria-hidden="true" />
+          </div>
+          <div v-else-if="videos.length === 0" class="insta-empty">
+            <p class="insta-empty-text">아직 업로드한 영상이 없어요</p>
+          </div>
+          <div v-else class="insta-grid">
+            <button v-for="video in videos" :key="video.id" class="insta-cell" :aria-label="`${video.title ?? '제목 없음'} 영상 보기`" @click="router.push(`/my/videos/${video.id}`)">
+              <VideoThumbnail
+                :title="video.title"
+                :thumbnail-url="video.thumbnailUrl"
+                :grade="video.grade"
+                :gym-name="video.gymName"
+                :duration-seconds="video.durationSeconds"
+                dot-only
+                :alt="`${video.title ?? '클라이밍 영상'} 썸네일`"
+              />
+            </button>
+          </div>
+        </section>
       </div>
 
       <ConfirmDialog :open="showLogoutAlert" title="로그아웃" message="정말 로그아웃하시겠어요?" confirm-text="로그아웃" @confirm="handleLogout" @cancel="showLogoutAlert = false" />
@@ -296,7 +254,7 @@ onMounted(load);
 /* ── Content ────────────────────────────────────── */
 .my-content {
   padding-top: calc(var(--ion-safe-area-top) + 68px);
-  padding-bottom: 40px;
+  padding-bottom: 20px;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -312,7 +270,7 @@ onMounted(load);
 .profile-hero {
   position: relative;
   padding-inline: 20px;
-  padding-bottom: 10px;
+  /* padding-bottom: 10px; */
   background: transparent;
 }
 
@@ -392,9 +350,9 @@ onMounted(load);
 }
 
 .profile-bio {
-  font-size: small;
+  font-size: var(--fs-caption);
   font-weight: 450;
-  color: #444;
+  color: var(--fg-muted);
   line-height: 1.5;
   margin: 4px 0 0;
   white-space: pre-wrap;
@@ -437,141 +395,94 @@ onMounted(load);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
-  /* color: var(--fg-muted); */
-  color: gray;
-}
-
-/* ── Headline stats ─────────────────────────────── */
-.stats-card {
-  padding: 20px;
-}
-.stats-glow {
-  position: absolute;
-  inset: -50px -50px auto auto;
-  width: 180px;
-  height: 180px;
-  border-radius: 50%;
-  background: var(--hold-cyan);
-  filter: blur(50px);
-  opacity: 0.35;
-  pointer-events: none;
-}
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 18px 12px;
-  position: relative;
-}
-.big-stat {
-  text-align: left;
-  min-width: 0;
-}
-.big-val {
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: -0.015em;
-  line-height: 1.15;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.big-lbl {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
   color: var(--fg-muted);
-  margin-top: 2px;
 }
 
-/* Headline stats skeleton — sized to .big-val / .big-lbl line boxes */
-.stat-sk {
-  position: relative;
-  overflow: hidden;
-  background: var(--surface-soft);
-  border-radius: var(--r-chip);
-}
-.stat-sk::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  transform: translateX(-100%);
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
-  animation: sk-shimmer 1400ms var(--ease-state) infinite;
-}
-@keyframes sk-shimmer {
-  100% {
-    transform: translateX(100%);
-  }
-}
-.stat-sk-val {
-  height: 18px;
-  width: 72%;
-  margin: 5px 0;
-}
-.stat-sk-lbl {
-  height: 9px;
-  width: 46%;
-  margin-top: 4px;
-}
-@media (prefers-reduced-motion: reduce) {
-  .stat-sk::after {
-    animation: none;
-  }
+/* ── Video grid (DS-toned gallery) ──────────────── */
+.video-grid-section {
+  margin-top: 16px;
+  padding-bottom: 24px;
 }
 
-/* ── Grade pyramid ──────────────────────────────── */
+/* Section header — eyebrow label + see-all link */
 .section-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 4px 12px;
+  padding: 0 2px 12px;
 }
-/* .section-title — canonical style in global.css */
-
-.pyramid-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+.section-eyebrow {
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-muted);
 }
-.pyr-row {
-  display: flex;
+.see-all {
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
-}
-.pyr-grade {
-  width: 30px;
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-  flex-shrink: 0;
-}
-.pyr-grade.tech-label {
-  width: 64px;
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.pyr-track {
-  flex: 1;
-  height: 16px;
-  background: var(--surface-soft);
-  border-radius: 999px;
-  overflow: hidden;
-}
-.pyr-fill {
-  height: 100%;
-  border-radius: 999px;
-  transition: width 600ms var(--ease-soft);
-}
-.pyr-count {
-  width: 28px;
-  text-align: right;
-  font-size: 12px;
+  gap: 2px;
+  background: none;
+  border: none;
+  padding: 4px;
+  margin: -4px;
+  cursor: pointer;
+  font-size: var(--fs-caption);
   font-weight: 600;
   color: var(--fg-muted);
+}
+.see-all:active {
+  opacity: 0.6;
+}
+
+/* Rounded gallery block — soft corners instead of full-bleed edges */
+.insta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  /* border-radius: var(--r-card); */
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.insta-cell {
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  background: var(--surface-soft);
+  padding: 0;
+  border: none;
+  cursor: pointer;
+  display: block;
+  transition: opacity var(--dur-fast) var(--ease-state);
+}
+.insta-cell:active {
+  opacity: 0.75;
+}
+
+.insta-cell--skeleton {
+  background: var(--surface-soft);
+  position: relative;
+  overflow: hidden;
+}
+.insta-cell--skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  animation: sk-shimmer 1400ms var(--ease-state) infinite;
+}
+
+.insta-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 20px;
+}
+.insta-empty-text {
+  font-size: 13px;
+  color: var(--fg-muted);
+  text-align: center;
 }
 
 /* ── Logout ─────────────────────────────────────── */

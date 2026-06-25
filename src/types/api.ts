@@ -554,6 +554,12 @@ export interface GymRanking {
   visitCount: number;
 }
 
+/** GET /api/stats/me/monthly-reports/available — 열람 가능한(이미 생성된) 리포트 월 목록.
+ *  리포트 API는 호출 시 생성을 트리거하므로, 존재 여부는 이 엔드포인트로만 확인한다. */
+export interface MonthlyReportAvailable {
+  periods: string[]; // 예: ["2026-05", "2026-06"]
+}
+
 /** POST /api/reports — 신고 대상 종류 */
 export type ReportTargetType = "video" | "comment" | "user";
 

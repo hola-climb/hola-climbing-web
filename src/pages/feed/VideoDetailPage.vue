@@ -9,7 +9,7 @@ import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
 import BaseButton from "@/components/common/BaseButton.vue";
 import AIResultBadge from "@/components/video/AIResultBadge.vue";
 import AIFeedbackModal from "@/components/video/AIFeedbackModal.vue";
-import AnalysisLoader from "@/components/video/AnalysisLoader.vue";
+import AnalysisLoader from "@/components/video/AnalysisRouteLoader.vue";
 import VideoPlayer from "@/components/video/VideoPlayer.vue";
 import VideoEditModal from "@/components/video/VideoEditModal.vue";
 import ReportModal from "@/components/common/ReportModal.vue";

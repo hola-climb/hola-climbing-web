@@ -6,6 +6,7 @@ import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
 import VideoThumbnail from "@/components/video/VideoThumbnail.vue";
 import LoadingState from "@/components/common/LoadingState.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
+import ReportPickerSheet from "@/components/common/ReportPickerSheet.vue";
 import { useRouter } from "vue-router";
 import { statsService } from "@/services/stats";
 import { gymService } from "@/services/gym";
@@ -14,9 +15,10 @@ import { climbingLogService } from "@/services/climbingLog";
 import { useAuthStore } from "@/stores/auth";
 import { useUIStore } from "@/stores/ui";
 import { useMediaQuery } from "@/composables/useMediaQuery";
-import { gradeColor, gradeTextColor, gradeDifficulty } from "@/utils/gradeColor";
+import { gradeColor, gradeDifficulty } from "@/utils/gradeColor";
 import { getTagLabel } from "@/utils/tagLabels";
-import type { FeedVideo, GymGrade, UserStats, TechniqueStats, MonthlyReport } from "@/types/api";
+import type { FeedVideo, GymGrade, UserStats, TechniqueStats } from "@/types/api";
+import HoldPebble from "@/components/common/HoldPebble.vue";
 
 // ── Types ──────────────────────────────────────────
 interface GradeRow {
@@ -88,37 +90,40 @@ const activeIndex = ref(0); // 0=캘린더, 1=분석
 const analysisStats = ref<UserStats | null>(null);
 const techniqueStats = ref<TechniqueStats | null>(null);
 
-// ── 월간 리포트 진입 카드 (분석 탭) — 기본 지난달 ───────
-const reportMonth = (() => {
+// ── 월간 리포트 진입 (분석 탭) ──────────────────
+// 분석 탭은 캘린더가 보고 있는 월과 무관하게 항상 동일하다.
+//  · "이번 달 리포트"   → 가장 최근 완료 월(지난달) 리포트
+//  · "지난 리포트 보기" → 열람 가능한 과거 월을 바텀시트로 선택
+function lastMonthStr(): string {
   const d = new Date();
   d.setDate(1);
   d.setMonth(d.getMonth() - 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-})();
-const reportMonthLabel = `${Number(reportMonth.split("-")[1])}월`;
-const reportInfo = ref<MonthlyReport | null>(null);
-const reportLoaded = ref(false);
+}
+const latestReportMonth = lastMonthStr();
 
-type ReportCardState = "loading" | "exists" | "generatable" | "generating" | "insufficient";
-const reportCardState = computed<ReportCardState>(() => {
-  if (!reportLoaded.value) return "loading";
-  const s = reportInfo.value?.status;
-  if (s === "ready") return "exists";
-  if (s === "insufficientData") return "insufficient";
-  if (s === "generating") return "generating";
-  return "generatable"; // failed · 미생성(404) 포함
-});
-const reportShortfall = computed(() => {
-  const m = reportInfo.value?.metrics;
-  const minA = reportInfo.value?.requirement?.minAnalyzedVideos ?? 3;
-  const minV = reportInfo.value?.requirement?.minVideos ?? 10;
-  if (!m) return null;
-  return { analyzed: Math.max(0, minA - m.analyzedVideos), videos: Math.max(0, minV - m.videos) };
-});
+// 열람 가능한 리포트 월 목록 — /available (생성 트리거 없음).
+const availablePeriods = ref<string[]>([]);
+// 지난 리포트 = 이번 달(=최신) 버튼 월을 뺀 나머지, 최신순.
+const pastPeriods = computed(() => availablePeriods.value.filter((p) => p !== latestReportMonth).sort((a, b) => b.localeCompare(a)));
+const pickerOpen = ref(false);
 
-function openReport() {
-  if (reportCardState.value === "loading" || reportCardState.value === "insufficient") return;
-  router.push(`/records/report?month=${reportMonth}`);
+async function fetchAvailableReports() {
+  try {
+    const { data } = await statsService.getMonthlyReportAvailable();
+    availablePeriods.value = data.periods ?? [];
+  } catch (err: unknown) {
+    if (import.meta.env.DEV) console.error(err);
+    availablePeriods.value = [];
+  }
+}
+
+function openThisMonthReport() {
+  router.push(`/records/report?month=${latestReportMonth}`);
+}
+function openPastReport(period: string) {
+  pickerOpen.value = false;
+  router.push(`/records/report?month=${period}`);
 }
 
 const headlineStats = computed(() => {
@@ -210,16 +215,8 @@ async function loadAnalysis() {
   } catch (err: unknown) {
     if (import.meta.env.DEV) console.error(err);
   }
-  // 리포트 상태 — gymId 생략이라 생성은 트리거되지 않는다(상태 조회용).
-  try {
-    const { data } = await statsService.getMonthlyReport(reportMonth);
-    reportInfo.value = data;
-  } catch (err: unknown) {
-    if (import.meta.env.DEV) console.error(err);
-    reportInfo.value = null; // 미생성 → generatable 로 처리
-  } finally {
-    reportLoaded.value = true;
-  }
+  // 리포트 존재 여부 — /available (생성 트리거 없음).
+  await fetchAvailableReports();
 }
 const selectedSessions = ref<Session[]>([]);
 
@@ -571,119 +568,113 @@ onMounted(() => {
           <div class="pager-track">
             <!-- ── CALENDAR VIEW ───────────────────────── -->
             <div v-if="!selectedDate || isDesktop" class="calendar-pane pager-pane">
-          <!-- Hero -->
-          <div class="hero page-padding">
-            <h1 class="hero-title">이번 달 기록</h1>
-          </div>
+              <!-- Hero -->
+              <div class="hero page-padding">
+                <h1 class="hero-title">이번 달 기록</h1>
+              </div>
 
-          <!-- Stats strip (이번 달 집계) -->
-          <div class="stats-strip page-padding">
-            <div class="mini-stat hola-card">
-              <div class="mini-lbl">VIDEOS</div>
-              <div class="mini-val">{{ monthSummary.totalVideos }}</div>
-            </div>
-            <div class="mini-stat hola-card">
-              <div class="mini-lbl">PROBLEMS</div>
-              <div class="mini-val">{{ monthSummary.totalProblems }}</div>
-            </div>
-            <div class="mini-stat hola-card">
-              <div class="mini-lbl">GYM VISITS</div>
-              <div class="mini-val">{{ monthSummary.totalGymVisits }}</div>
-            </div>
-          </div>
+              <!-- Stats strip (이번 달 집계) -->
+              <div class="stats-strip page-padding">
+                <div class="mini-stat hola-card">
+                  <div class="mini-lbl">VIDEOS</div>
+                  <div class="mini-val">{{ monthSummary.totalVideos }}</div>
+                </div>
+                <div class="mini-stat hola-card">
+                  <div class="mini-lbl">PROBLEMS</div>
+                  <div class="mini-val">{{ monthSummary.totalProblems }}</div>
+                </div>
+                <div class="mini-stat hola-card">
+                  <div class="mini-lbl">GYM VISITS</div>
+                  <div class="mini-val">{{ monthSummary.totalGymVisits }}</div>
+                </div>
+              </div>
 
-          <!-- Calendar section -->
-          <div class="calendar-section page-padding">
-            <!-- Month nav -->
-            <div class="month-nav">
-              <button class="nav-btn" aria-label="이전 달" @click="prevMonth">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M15 18l-6-6 6-6" />
-                </svg>
-              </button>
-              <span class="month-label">{{ monthLabel }}</span>
-              <button class="nav-btn" aria-label="다음 달" @click="nextMonth">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M9 18l6-6-6-6" />
-                </svg>
-              </button>
-            </div>
+              <!-- Calendar section -->
+              <div class="calendar-section page-padding">
+                <!-- Month nav -->
+                <div class="month-nav">
+                  <button class="nav-btn" aria-label="이전 달" @click="prevMonth">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M15 18l-6-6 6-6" />
+                    </svg>
+                  </button>
+                  <span class="month-label">{{ monthLabel }}</span>
+                  <button class="nav-btn" aria-label="다음 달" @click="nextMonth">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M9 18l6-6-6-6" />
+                    </svg>
+                  </button>
+                </div>
 
-            <!-- Day-of-week headers -->
-            <div class="cal-grid">
-              <div v-for="d in ['M', 'T', 'W', 'T', 'F', 'S', 'S']" :key="d" class="dow-cell">{{ d }}</div>
-            </div>
+                <!-- Day-of-week headers -->
+                <div class="cal-grid">
+                  <div v-for="d in ['M', 'T', 'W', 'T', 'F', 'S', 'S']" :key="d" class="dow-cell">{{ d }}</div>
+                </div>
 
-            <!-- Loading skeleton -->
-            <div v-if="isLoading" class="cal-grid">
-              <div v-for="i in 35" :key="i" class="day-cell skeleton" />
-            </div>
+                <!-- Loading skeleton -->
+                <div v-if="isLoading" class="cal-grid">
+                  <div v-for="i in 35" :key="i" class="day-cell skeleton" />
+                </div>
 
-            <!-- Calendar cells -->
-            <div v-else class="cal-grid reveal-on-load">
-              <button
-                v-for="cell in calendarCells"
-                :key="cell.date"
-                class="day-cell"
-                :class="{
-                  'has-record': cell.hasRecord && cell.isCurrentMonth,
-                  'is-today': cell.isToday,
-                  'other-month': !cell.isCurrentMonth,
-                  clickable: cell.hasRecord && cell.isCurrentMonth,
-                }"
-                :aria-label="cell.hasRecord ? `${cell.day}일, 기록 있음` : `${cell.day}일`"
-                :disabled="!cell.hasRecord || !cell.isCurrentMonth"
-                @click="selectDate(cell)"
-              >
-                <span class="day-num">{{ cell.day }}</span>
-                <span v-if="cell.videoCount > 0 && cell.isCurrentMonth" class="record-count" aria-hidden="true">{{ cell.videoCount }}</span>
-              </button>
+                <!-- Calendar cells -->
+                <div v-else class="cal-grid reveal-on-load">
+                  <button
+                    v-for="cell in calendarCells"
+                    :key="cell.date"
+                    class="day-cell"
+                    :class="{
+                      'has-record': cell.hasRecord && cell.isCurrentMonth,
+                      'is-today': cell.isToday,
+                      'other-month': !cell.isCurrentMonth,
+                      clickable: cell.hasRecord && cell.isCurrentMonth,
+                    }"
+                    :aria-label="cell.hasRecord ? `${cell.day}일, 기록 있음` : `${cell.day}일`"
+                    :disabled="!cell.hasRecord || !cell.isCurrentMonth"
+                    @click="selectDate(cell)"
+                  >
+                    <span class="day-num">{{ cell.day }}</span>
+                    <span v-if="cell.videoCount > 0 && cell.isCurrentMonth" class="record-count" aria-hidden="true">{{ cell.videoCount }}</span>
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
 
             <!-- ── ANALYSIS VIEW (모바일 페이저 전용) ──────── -->
             <div v-if="pagerActive" class="analysis-pane pager-pane">
               <div class="hero page-padding">
-                <h1 class="hero-title">이번 달 분석</h1>
+                <h1 class="hero-title">분석</h1>
               </div>
 
               <div class="page-padding">
-                <!-- 월간 리포트 진입 -->
-                <button
-                  v-if="reportCardState !== 'insufficient'"
-                  class="report-entry"
-                  :class="reportCardState"
-                  :disabled="reportCardState === 'loading'"
-                  @click="openReport"
-                >
-                  <span class="re-icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M12 3l1.9 4.6L18.5 9l-3.7 3 1.1 4.8L12 14.6 8.1 16.8 9.2 12 5.5 9l4.6-1.4L12 3z" />
-                    </svg>
-                  </span>
-                  <span class="re-meta">
-                    <span class="re-title">{{ reportCardState === "exists" ? `${reportMonthLabel} 리포트 도착` : reportCardState === "generating" ? `${reportMonthLabel} 리포트 생성 중…` : "리포트 생성하기" }}</span>
-                    <span class="re-sub">AI가 분석한 {{ reportMonthLabel }} 성장 · 다음 목표</span>
-                  </span>
-                  <svg v-if="reportCardState !== 'loading'" class="re-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6" /></svg>
+                <!-- 월간 리포트 진입 (캘린더 월과 무관, 항상 동일) -->
+                <button class="report-entry hola-card" @click="openThisMonthReport">
+                  <div class="report-icon">
+                    <HoldPebble color="cyan" :size="32" />
+                  </div>
+
+                  <div class="report-content">
+                    <!-- <div class="micro-label">MONTHLY REPORT</div> -->
+
+                    <div class="report-title">지난 달 리포트</div>
+
+                    <div class="report-sub">한 달을 돌아보고 다음 목표를 세워요</div>
+                  </div>
+
+                  <svg class="report-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m9 18 6-6-6-6" />
+                  </svg>
                 </button>
 
-                <!-- 부족: 비활성 안내 -->
-                <div v-else class="report-entry insufficient" aria-disabled="true">
-                  <span class="re-icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-                      <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                    </svg>
-                  </span>
-                  <span class="re-meta">
-                    <span class="re-title">{{ reportMonthLabel }} 리포트</span>
-                    <span class="re-sub">
-                      <template v-if="reportShortfall && (reportShortfall.analyzed > 0 || reportShortfall.videos > 0)">분석 영상 {{ reportShortfall.analyzed }}개 · 영상 {{ reportShortfall.videos }}개 더 올리면 생성</template>
-                      <template v-else>지난달 데이터가 더 쌓이면 만들 수 있어요</template>
-                    </span>
-                  </span>
-                </div>
+                <!-- 지난 리포트 보기 -->
+                <button class="report-past" :disabled="!pastPeriods.length" @click="pickerOpen = true">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3 3v5h5" />
+                    <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" />
+                    <path d="M12 7v5l3 2" />
+                  </svg>
+                  <span>지난 리포트 보기</span>
+                  <span v-if="pastPeriods.length" class="rp-count">{{ pastPeriods.length }}</span>
+                </button>
 
                 <div class="stats-card hola-card">
                   <div class="stats-glow" aria-hidden="true" />
@@ -809,6 +800,9 @@ onMounted(() => {
         @confirm="confirmDeleteSession"
         @cancel="isDeleteAlertOpen = false"
       />
+
+      <!-- 지난 리포트 월 선택 -->
+      <ReportPickerSheet :open="pickerOpen" :periods="pastPeriods" @select="openPastReport" @close="pickerOpen = false" />
     </IonContent>
   </IonPage>
 </template>
@@ -1363,72 +1357,154 @@ onMounted(() => {
 }
 
 /* ── 월간 리포트 진입 카드 ─────────────────────────── */
+
 .report-entry {
+  position: relative;
+
+  width: 100%;
+  padding: var(--s-4);
+
   display: flex;
   align-items: center;
-  gap: 13px;
-  width: 100%;
+  gap: var(--s-4);
+
   text-align: left;
-  padding: 14px;
-  margin-bottom: 14px;
-  border-radius: var(--r-card);
-  border: 1px solid var(--hold-cyan, #9fe1cb);
-  background: var(--tint-cyan);
+  border: none;
   cursor: pointer;
-  transition: opacity var(--dur-fast) var(--ease-state);
+
+  overflow: hidden;
+  margin-top: 12px;
+  margin-bottom: 2px;
 }
-.report-entry:active {
-  opacity: 0.85;
-}
-.report-entry.loading {
-  opacity: 0.6;
+
+.report-entry::after {
+  content: "";
+
+  position: absolute;
+  top: -40px;
+  right: -40px;
+
+  width: 120px;
+  height: 120px;
+
+  border-radius: 999px;
+
+  background: var(--hold-cyan);
+  opacity: 0.1;
+  filter: blur(32px);
+
   pointer-events: none;
 }
-.report-entry.insufficient {
-  border-color: var(--border);
+
+.report-icon {
+  flex-shrink: 0;
+
+  width: 48px;
+  height: 48px;
+
+  border-radius: 16px;
+
+  display: grid;
+  place-items: center;
+
+  background: var(--tint-cyan);
+  color: #066a78;
+
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.report-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.report-title {
+  margin-top: 4px;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.report-sub {
+  margin-top: 4px;
+
+  font-size: 13px;
+  line-height: 1.4;
+
+  color: var(--fg-muted);
+}
+
+.report-chevron {
+  color: var(--fg-muted);
+  flex-shrink: 0;
+}
+/* 지난 리포트 보기 — 보조 액션 */
+.report-past {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  width: 100%;
+  margin-bottom: var(--s-6);
+  padding: var(--s-3) var(--s-4);
+  /* border: 1px solid var(--border); */
+  border-radius: var(--r-button);
+  /* background: var(--surface); */
+  color: var(--fg);
+  font-size: var(--fs-body);
+  font-weight: var(--w-semibold);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-state);
+}
+.report-past:active:not(:disabled) {
   background: var(--surface-soft);
+}
+.report-past:disabled {
+  opacity: 0.4;
   cursor: default;
+}
+.report-past > span:first-of-type {
+  flex: 1;
+  text-align: left;
+}
+.report-past svg {
+  color: var(--fg-muted);
+  flex-shrink: 0;
+}
+.rp-count {
+  font-size: var(--fs-caption);
+  font-weight: var(--w-bold);
+  color: var(--fg-muted);
 }
 .re-icon {
   display: grid;
   place-items: center;
   width: 40px;
   height: 40px;
-  border-radius: 11px;
+  border-radius: var(--r-button);
   flex-shrink: 0;
-  background: var(--hold-cyan, #5dcaa5);
-  color: var(--on-tint-cyan, #04342c);
-}
-.report-entry.insufficient .re-icon {
-  background: var(--surface);
-  color: var(--fg-muted);
+  background: var(--hold-cyan);
+  color: var(--fg);
 }
 .re-meta {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--s-1);
   flex: 1;
   min-width: 0;
 }
 .re-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--on-tint-cyan, var(--fg));
-}
-.report-entry.insufficient .re-title {
-  color: var(--fg);
+  font-size: var(--fs-body);
+  font-weight: var(--w-bold);
+  color: var(--on-tint-cyan);
 }
 .re-sub {
-  font-size: 12px;
-  color: var(--on-tint-cyan, var(--fg-muted));
+  font-size: var(--fs-caption);
+  color: var(--on-tint-cyan);
   opacity: 0.85;
 }
-.report-entry.insufficient .re-sub {
-  color: var(--fg-muted);
-  opacity: 1;
-}
 .re-chevron {
-  color: var(--on-tint-cyan, var(--fg-muted));
+  color: var(--on-tint-cyan);
   flex-shrink: 0;
 }
 </style>

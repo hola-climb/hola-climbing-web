@@ -2,7 +2,7 @@ import api from './client'
 import type {
   CalendarDay, CalendarDayRecord, CalendarMonth, CalendarMonthItem,
   PublicUserStats, TechniqueStats, UserStats,
-  MonthlyReport, GymRanking,
+  MonthlyReport, MonthlyReportAvailable, GymRanking,
 } from '@/types/api'
 
 /** Map raw calendar month item to the UI CalendarDay shape.
@@ -45,11 +45,16 @@ export const statsService = {
     api.get<PublicUserStats>(`/stats/users/${userId}`),
 
   /** 월간 리포트 — GET /api/stats/me/monthly-reports?month=YYYY-MM[&gymId=]
-   *  gymId 생략: 생성 없이 현재 status 조회 / gymId 포함: 생성 요청 + polling */
+   *  ⚠️ 호출 시 생성을 트리거한다. 사용자가 명시적으로 요청(리포트 페이지 진입)한 뒤에만 호출할 것. */
   getMonthlyReport: (month: string, gymId?: number) =>
     api.get<MonthlyReport>('/stats/me/monthly-reports', {
       params: gymId != null ? { month, gymId } : { month },
     }),
+
+  /** 열람 가능한 리포트 월 목록 — GET /api/stats/me/monthly-reports/available
+   *  생성을 트리거하지 않으므로 카드 상태(존재 여부) 판별에 사용. */
+  getMonthlyReportAvailable: () =>
+    api.get<MonthlyReportAvailable>('/stats/me/monthly-reports/available'),
 
   /** 방문수 순 암장 랭킹(난이도 기준 선택용) — GET /api/stats/me/gyms/rankings?month=&limit= */
   getGymRankings: (month: string, limit = 10) =>
