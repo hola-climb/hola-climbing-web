@@ -121,7 +121,27 @@ onMounted(async () => {
         <IonRefresherContent />
       </IonRefresher>
 
-      <div class="my-content page-padding">
+      <!-- 로딩 스켈레톤 -->
+      <div v-if="isLoading" class="my-content page-padding my-skeleton">
+        <div class="sk-hero">
+          <div class="sk-avatar" aria-hidden="true" />
+          <div class="sk-profile-info">
+            <div class="sk-line sk-line--name" aria-hidden="true" />
+            <div class="sk-line sk-line--bio" aria-hidden="true" />
+          </div>
+        </div>
+        <div class="sk-stats" aria-hidden="true">
+          <div class="sk-stat" />
+          <div class="sk-stat" />
+          <div class="sk-stat" />
+        </div>
+        <div class="sk-section-label" aria-hidden="true" />
+        <div class="insta-grid">
+          <div v-for="n in 9" :key="n" class="insta-cell insta-cell--skeleton" aria-hidden="true" />
+        </div>
+      </div>
+
+      <div v-else class="my-content page-padding">
         <!-- Profile hero card -->
         <div class="profile-hero">
           <div class="glow glow-pink" aria-hidden="true" />
@@ -192,7 +212,7 @@ onMounted(async () => {
             </button>
           </div>
         </section>
-      </div>
+      </div><!-- /v-else -->
 
       <ConfirmDialog :open="showLogoutAlert" title="로그아웃" message="정말 로그아웃하시겠어요?" confirm-text="로그아웃" @confirm="handleLogout" @cancel="showLogoutAlert = false" />
 
@@ -501,6 +521,81 @@ onMounted(async () => {
   font-size: 13px;
   color: var(--fg-muted);
   text-align: center;
+}
+
+/* ── Page skeleton ──────────────────────────────── */
+@keyframes sk-shimmer {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+.my-skeleton {
+  padding-top: calc(var(--ion-safe-area-top, 0px) + 72px);
+}
+.sk-hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: var(--surface);
+  border-radius: var(--r-card);
+  margin-bottom: 12px;
+}
+.sk-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--surface-soft);
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+.sk-avatar::after,
+.sk-line::after,
+.sk-stat::after,
+.sk-section-label::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.45), transparent);
+  animation: sk-shimmer 1400ms var(--ease-state) infinite;
+}
+.sk-profile-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sk-line {
+  border-radius: 6px;
+  background: var(--surface-soft);
+  height: 14px;
+  position: relative;
+  overflow: hidden;
+}
+.sk-line--name { width: 60%; }
+.sk-line--bio  { width: 80%; }
+.sk-stats {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.sk-stat {
+  flex: 1;
+  height: 56px;
+  border-radius: var(--r-card);
+  background: var(--surface-soft);
+  position: relative;
+  overflow: hidden;
+}
+.sk-section-label {
+  width: 100px;
+  height: 11px;
+  border-radius: 6px;
+  background: var(--surface-soft);
+  margin-bottom: 12px;
+  position: relative;
+  overflow: hidden;
 }
 
 /* ── Logout ─────────────────────────────────────── */

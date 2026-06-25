@@ -306,6 +306,10 @@ watch(
 .feed-skeleton {
   padding: 8px 16px;
 }
+/* 피드 그리드는 데스크탑에서도 2열 고정 — 스켈레톤도 동일하게 */
+.feed-skeleton :deep(.sk-grid) {
+  grid-template-columns: repeat(2, 1fr) !important;
+}
 
 /* ── Video grid (uniform 9:16) ──────────────────── */
 .video-grid {

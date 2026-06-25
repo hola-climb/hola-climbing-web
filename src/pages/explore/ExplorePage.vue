@@ -149,9 +149,15 @@ async function fetchNearby(coords: { lat: number; lng: number }): Promise<void> 
   }
 }
 
+// 위치 확정 전까지 지도를 숨겨 center 변경에 의한 깜박거림을 방지
+const mapSettled = ref(false);
+
 /** 마운트 시 위치 동의 사용자에게 자동으로 내 주변 모드를 적용한다. 실패는 무시. */
 async function tryAutoLocate(): Promise<void> {
-  if (!(await hasLocationConsent())) return;
+  if (!(await hasLocationConsent())) {
+    mapSettled.value = true; // 위치 동의 없음 — 기본 중심으로 바로 표시
+    return;
+  }
   isLocating.value = true;
   try {
     const coords = await locate();
@@ -161,6 +167,7 @@ async function tryAutoLocate(): Promise<void> {
     /* 자동 위치 실패는 무시 — 전체 목록 유지 */
   } finally {
     isLocating.value = false;
+    mapSettled.value = true;
   }
 }
 
@@ -336,8 +343,12 @@ async function handleLocate() {
           <!-- Map preview card (이름 검색 중에는 숨김) -->
           <div v-if="!isSearching" class="map-section page-padding" :class="{ 'nearby-active': isNearbyMode }">
             <div class="map-card hola-card">
-              <!-- 실제 카카오맵 (VITE_KAKAO_MAP_KEY 설정 시) -->
-              <GymMap v-if="useRealMap" :gyms="mapGyms" :center="mapCenter" :user-location="userCoords" :selected-id="carouselActiveId" @select="openGym" />
+              <!-- 위치 확정 전 플레이스홀더 — center 변경에 의한 깜박거림 방지 -->
+              <div v-if="!mapSettled" class="map-placeholder" aria-hidden="true">
+                <div class="map-placeholder-shimmer" />
+              </div>
+              <!-- 실제 카카오맵 (VITE_KAKAO_MAP_KEY 설정 시, 위치 확정 후) -->
+              <GymMap v-else-if="useRealMap" :gyms="mapGyms" :center="mapCenter" :user-location="userCoords" :selected-id="carouselActiveId" @select="openGym" />
               <!-- SVG map backdrop (mock · 키 미설정 시 폴백, 손쉽게 되돌리기용) -->
               <svg v-else viewBox="0 0 400 180" class="map-svg" aria-hidden="true" preserveAspectRatio="none">
                 <rect width="400" height="180" fill="#EEF1F4" />
@@ -598,6 +609,10 @@ async function handleLocate() {
   pointer-events: none;
   animation: locate-pulse 2.4s var(--ease-state) infinite;
 }
+@keyframes sk-shimmer {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
 @keyframes locate-pulse {
   0%,
   100% {
@@ -694,6 +709,19 @@ async function handleLocate() {
   inset: 0;
   width: 100%;
   height: 100%;
+}
+.map-placeholder {
+  position: absolute;
+  inset: 0;
+  background: var(--surface-soft);
+  overflow: hidden;
+}
+.map-placeholder-shimmer {
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  animation: sk-shimmer 1600ms ease-in-out infinite;
 }
 .map-pill {
   position: absolute;
