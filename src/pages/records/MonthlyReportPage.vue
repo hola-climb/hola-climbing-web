@@ -390,8 +390,8 @@ onUnmounted(stopPolling);
 }
 .rp-head {
   padding: var(--s-4) 20px var(--s-8);
-  border-bottom: 1px solid var(--border);
-  margin-bottom: var(--s-8);
+  /* border-bottom: 1px solid var(--border); */
+  /* margin-bottom: var(--s-8); */
 }
 .rp-head-row {
   display: flex;
@@ -431,7 +431,8 @@ onUnmounted(stopPolling);
   line-height: 1.1;
 }
 .m-val.m-sm {
-  font-size: var(--fs-caption);
+  /* font-size: var(--fs-caption); */
+  font-size: var(--fs-h3);
   line-height: 1.3;
 }
 .m-lbl {

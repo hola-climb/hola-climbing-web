@@ -4,6 +4,13 @@
   box-sizing: border-box;
 }
 
+/* iOS WebView에서 button/a가 시스템 파란색을 상속하는 현상 방지 */
+button,
+a {
+  color: inherit;
+  font-family: inherit;
+}
+
 body {
   font-family: var(--font-sans);
   background: var(--bg);
