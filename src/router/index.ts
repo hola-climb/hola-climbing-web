@@ -49,6 +49,11 @@ const routes: Array<RouteRecordRaw> = [
     component: () => import('@/pages/records/ClimbingLogPage.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/records/report',
+    component: () => import('@/pages/records/MonthlyReportPage.vue'),
+    meta: { requiresAuth: true },
+  },
 
   // ── Video detail ──────────────────────────────────────────────────────
   {

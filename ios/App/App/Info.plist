@@ -25,13 +25,17 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>가까운 클라이밍 암장을 찾고 위치 기반 기능을 제공하기 위해 사용자의 위치 정보를 사용합니다.</string>
+		<string>가까운 클라이밍 암장을 찾고 위치 기반 기능을 제공하기 위해 사용자의 위치 정보를 사용합니다.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>가까운 클라이밍 암장을 찾고 위치 기반 기능을 제공하기 위해 사용자의 위치 정보를 사용합니다.</string>
+		<string>가까운 클라이밍 암장을 찾고 위치 기반 기능을 제공하기 위해 사용자의 위치 정보를 사용합니다.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>등반 영상을 선택하여 업로드하기 위해 사진 보관함에 접근합니다.</string>
+		<string>등반 영상을 선택하여 업로드하기 위해 사진 보관함에 접근합니다.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>등반 영상을 사진 보관함에 저장하기 위해 접근합니다.</string>
+		<string>등반 영상을 사진 보관함에 저장하기 위해 접근합니다.</string>
+	<key>NSCameraUsageDescription</key>
+		<string>등반 영상을 촬영하여 업로드하기 위해 카메라에 접근합니다.</string>
+	<key>NSMicrophoneUsageDescription</key>
+		<string>등반 영상을 촬영하여 업로드하기 위해 마이크에 접근합니다.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

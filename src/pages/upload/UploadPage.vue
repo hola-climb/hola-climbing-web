@@ -2,8 +2,6 @@
 import { ref, computed } from "vue";
 import { IonPage, IonContent } from "@ionic/vue";
 import { useRouter } from "vue-router";
-import { Capacitor } from "@capacitor/core";
-import { Camera, MediaTypeSelection } from "@capacitor/camera";
 import { useVideoStore } from "@/stores/video";
 import { useUIStore } from "@/stores/ui";
 import { gymService } from "@/services/gym";
@@ -53,39 +51,8 @@ const uploadPct = computed(() => videoStore.uploadProgress);
 
 const canSubmit = computed(() => !videoStore.isUploading && !!selectedFile.value && !!selectedGym.value && selectedGradeId.value != null && !!recordedDate.value);
 
-async function openFilePicker() {
-  if (Capacitor.isNativePlatform()) {
-    await openNativePicker();
-  } else {
-    fileInput.value?.click();
-  }
-}
-
-// 네이티브(iOS/Android): 갤러리에서 영상만 선택.
-// chooseFromGallery는 PHPicker 기반이라 카메라 권한(NSCameraUsageDescription) 불필요.
-// (deprecated getPhoto는 source가 Photos여도 카메라 키 존재를 강제함)
-async function openNativePicker() {
-  try {
-    const { results } = await Camera.chooseFromGallery({
-      mediaType: MediaTypeSelection.Video,
-      allowMultipleSelection: false,
-    });
-    const media = results[0];
-    const webPath = media?.webPath ?? media?.uri;
-    if (!webPath) return;
-    const res = await fetch(webPath);
-    const blob = await res.blob();
-    const ext = webPath.split(".").pop()?.toLowerCase() ?? "mp4";
-    const mime = ext === "mov" ? "video/quicktime" : "video/mp4";
-    const file = new File([blob], `video.${ext}`, { type: mime });
-    receivePicked(file);
-  } catch (err: unknown) {
-    // 사용자가 취소한 경우 조용히 무시
-    const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
-    if (!msg.includes("cancel") && !msg.includes("no image") && !msg.includes("no media")) {
-      uiStore.showToast("영상을 불러오지 못했어요.", "danger");
-    }
-  }
+function openFilePicker() {
+  fileInput.value?.click();
 }
 
 function onFileChange(e: Event) {

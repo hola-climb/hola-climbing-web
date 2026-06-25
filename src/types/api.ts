@@ -475,6 +475,85 @@ export interface RecommendedGym extends Gym {
   rankingDistance: number | null; // pgvector cosine distance, style ranking 불가 시 null
 }
 
+/* ── 월간 리포트 ──────────────────────────────────────
+ * GET /api/stats/me/monthly-reports?month=YYYY-MM[&gymId=]
+ *  · gymId 생략 → 생성 트리거 없이 현재 status 조회(버튼 상태 판별용)
+ *  · gymId 포함 → 생성 요청, status=generating 으로 시작해 ready 까지 polling
+ */
+export type MonthlyReportStatus = "ready" | "insufficientData" | "generating" | "failed";
+
+export interface MonthlyReportMetrics {
+  sessions: number;
+  videos: number;
+  analyzedVideos: number;
+  problemsSolved: number;
+  gymsVisited: number;
+  primaryGymId: number | null;
+  primaryGymName: string | null;
+  dynamicCount: number;
+  staticCount: number;
+  dynamicRatio: number;
+  staticRatio: number;
+  techniqueCounts: Record<string, number>;
+}
+
+export interface MonthlyReportGrade {
+  gymId: number;
+  gymName: string;
+  maxGrade: string;
+  maxGradePrevMonth?: string | null;
+}
+
+export interface MonthlyReportTip {
+  type: string;
+  techniqueKeys: string[];
+  message: string;
+}
+
+export interface MonthlyReportGoal {
+  title: string;
+  metric: string;
+  target: number;
+  techniqueKeys: string[];
+  rationale: string;
+}
+
+export interface MonthlyReportRecommendedGym {
+  gymId: number;
+  name: string;
+  matchedTechniqueKeys: string[];
+  matchingVideoCount: number;
+  reason: string;
+}
+
+export interface MonthlyReportNarrative {
+  headline: string;
+  summary: string;
+  highlights: string[];
+}
+
+export interface MonthlyReport {
+  period: string; // YYYY-MM
+  status: MonthlyReportStatus;
+  source?: string | null;
+  generatedAt: string | null;
+  metrics?: MonthlyReportMetrics | null;
+  grade?: MonthlyReportGrade | null;
+  tip?: MonthlyReportTip | null;
+  nextMonthGoal?: MonthlyReportGoal | null;
+  recommendedGyms?: MonthlyReportRecommendedGym[] | null;
+  narrative?: MonthlyReportNarrative | null;
+  /** insufficientData 시 자격 요건(서버 제공 시) */
+  requirement?: { minVideos: number; minAnalyzedVideos: number } | null;
+}
+
+/** GET /api/stats/me/gyms/rankings?month=YYYY-MM&limit= — 방문수 순 암장 목록(난이도 기준 선택용) */
+export interface GymRanking {
+  gymId: number;
+  gymName: string;
+  visitCount: number;
+}
+
 /** POST /api/reports — 신고 대상 종류 */
 export type ReportTargetType = "video" | "comment" | "user";
 

@@ -15,7 +15,8 @@ import { useAuthStore } from "@/stores/auth";
 import { useUIStore } from "@/stores/ui";
 import { useMediaQuery } from "@/composables/useMediaQuery";
 import { gradeColor, gradeTextColor, gradeDifficulty } from "@/utils/gradeColor";
-import type { FeedVideo, GymGrade } from "@/types/api";
+import { getTagLabel } from "@/utils/tagLabels";
+import type { FeedVideo, GymGrade, UserStats, TechniqueStats, MonthlyReport } from "@/types/api";
 
 // ── Types ──────────────────────────────────────────
 interface GradeRow {
@@ -77,6 +78,149 @@ const recordMap = ref<Map<string, DayCount>>(new Map());
 
 /** selected date for detail view (null = calendar view) */
 const selectedDate = ref<string | null>(null);
+
+// ── 분석 모드 (가로 스크롤/드래그 페이저) ─────────────────
+// 모바일 월 개요에서만 페이저 활성화. 상세/데스크톱은 기존 그대로.
+const pagerActive = computed(() => !isDesktop.value && !selectedDate.value);
+const pagerEl = ref<HTMLElement | null>(null);
+const activeIndex = ref(0); // 0=캘린더, 1=분석
+
+const analysisStats = ref<UserStats | null>(null);
+const techniqueStats = ref<TechniqueStats | null>(null);
+
+// ── 월간 리포트 진입 카드 (분석 탭) — 기본 지난달 ───────
+const reportMonth = (() => {
+  const d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+})();
+const reportMonthLabel = `${Number(reportMonth.split("-")[1])}월`;
+const reportInfo = ref<MonthlyReport | null>(null);
+const reportLoaded = ref(false);
+
+type ReportCardState = "loading" | "exists" | "generatable" | "generating" | "insufficient";
+const reportCardState = computed<ReportCardState>(() => {
+  if (!reportLoaded.value) return "loading";
+  const s = reportInfo.value?.status;
+  if (s === "ready") return "exists";
+  if (s === "insufficientData") return "insufficient";
+  if (s === "generating") return "generating";
+  return "generatable"; // failed · 미생성(404) 포함
+});
+const reportShortfall = computed(() => {
+  const m = reportInfo.value?.metrics;
+  const minA = reportInfo.value?.requirement?.minAnalyzedVideos ?? 3;
+  const minV = reportInfo.value?.requirement?.minVideos ?? 10;
+  if (!m) return null;
+  return { analyzed: Math.max(0, minA - m.analyzedVideos), videos: Math.max(0, minV - m.videos) };
+});
+
+function openReport() {
+  if (reportCardState.value === "loading" || reportCardState.value === "insufficient") return;
+  router.push(`/records/report?month=${reportMonth}`);
+}
+
+const headlineStats = computed(() => {
+  const s = analysisStats.value;
+  const sec = s?.totalClimbingSeconds ?? 0;
+  const climb = sec >= 3600 ? `${(sec / 3600).toFixed(1)}h` : `${Math.floor(sec / 60)}m`;
+  return [
+    { value: s?.isDynamic ? "다이나믹" : "스태틱", label: "STYLE" },
+    { value: climb, label: "CLIMB" },
+    { value: formatLastClimbed(s?.lastClimbedAt), label: "LAST" },
+  ];
+});
+
+const techniques = computed(() => {
+  const counts = techniqueStats.value?.techniqueCounts ?? {};
+  const mostUsed = techniqueStats.value?.mostUsed;
+  const entries = Object.entries(counts)
+    .filter(([, c]) => c > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6);
+  const max = entries.length ? entries[0][1] : 1;
+  return entries.map(([key, count]) => ({
+    key,
+    label: getTagLabel(key),
+    count,
+    pct: (count / max) * 100,
+    color: key === mostUsed ? "var(--hold-lime)" : "var(--hold-pink)",
+  }));
+});
+
+function formatLastClimbed(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  if (days <= 0) return "오늘";
+  if (days === 1) return "어제";
+  if (days < 7) return `${days}일 전`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `${weeks}주 전`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}달 전`;
+  return `${Math.floor(months / 12)}년 전`;
+}
+
+// 네이티브 가로 스크롤-스냅 페이저.
+//  · 모바일: 터치 스와이프(네이티브 스크롤)
+//  · 웹: 트랙패드 가로 스크롤 + 마우스 드래그(아래 포인터 핸들러)
+function onPagerScroll(e: Event) {
+  const el = e.currentTarget as HTMLElement;
+  activeIndex.value = Math.round(el.scrollLeft / (el.clientWidth || 1));
+}
+
+function goToPane(i: number) {
+  const el = pagerEl.value;
+  if (!el) return;
+  el.scrollTo({ left: i * el.clientWidth, behavior: "smooth" });
+}
+
+// 마우스 드래그로도 넘길 수 있게 — 터치는 네이티브 스크롤이 처리하므로 마우스만 가로챈다.
+let isMouseDrag = false;
+let dragStartX = 0;
+let dragStartScroll = 0;
+
+function onPagerPointerDown(e: PointerEvent) {
+  if (!pagerActive.value || e.pointerType !== "mouse") return;
+  isMouseDrag = true;
+  dragStartX = e.clientX;
+  dragStartScroll = (e.currentTarget as HTMLElement).scrollLeft;
+}
+
+function onPagerPointerMove(e: PointerEvent) {
+  if (!isMouseDrag) return;
+  (e.currentTarget as HTMLElement).scrollLeft = dragStartScroll - (e.clientX - dragStartX);
+}
+
+function endMouseDrag(e: PointerEvent) {
+  if (!isMouseDrag) return;
+  isMouseDrag = false;
+  // 드래그를 멈춘 위치에서 가까운 pane으로 스냅(프로그램 스크롤은 자동 스냅이 안 걸린다)
+  const el = e.currentTarget as HTMLElement;
+  const w = el.clientWidth || 1;
+  el.scrollTo({ left: Math.round(el.scrollLeft / w) * w, behavior: "smooth" });
+}
+
+async function loadAnalysis() {
+  try {
+    const [s, t] = await Promise.all([statsService.getStats(), statsService.getTechniques()]);
+    analysisStats.value = s.data;
+    techniqueStats.value = t.data;
+  } catch (err: unknown) {
+    if (import.meta.env.DEV) console.error(err);
+  }
+  // 리포트 상태 — gymId 생략이라 생성은 트리거되지 않는다(상태 조회용).
+  try {
+    const { data } = await statsService.getMonthlyReport(reportMonth);
+    reportInfo.value = data;
+  } catch (err: unknown) {
+    if (import.meta.env.DEV) console.error(err);
+    reportInfo.value = null; // 미생성 → generatable 로 처리
+  } finally {
+    reportLoaded.value = true;
+  }
+}
 const selectedSessions = ref<Session[]>([]);
 
 const gymNameCache = new Map<number, string>();
@@ -378,7 +522,10 @@ function handleScroll(event: CustomEvent<{ scrollTop: number }>) {
   window.dispatchEvent(new CustomEvent("hola:tab-bar-scroll", { detail: { scrolled: event.detail.scrollTop > 12 } }));
 }
 
-onMounted(load);
+onMounted(() => {
+  load();
+  loadAnalysis();
+});
 </script>
 
 <template>
@@ -404,8 +551,26 @@ onMounted(load);
       </IonRefresher>
 
       <div class="records-layout">
-        <!-- ── CALENDAR VIEW ───────────────────────── -->
-        <div v-if="!selectedDate || isDesktop" class="calendar-pane">
+        <!-- 페이저 인디케이터 (캘린더 / 분석) — 탭이 아닌 위치 점 -->
+        <div v-if="pagerActive" class="pager-dots">
+          <button class="dot" :class="{ active: activeIndex === 0 }" aria-label="캘린더 보기" @click="goToPane(0)"></button>
+          <button class="dot" :class="{ active: activeIndex === 1 }" aria-label="분석 보기" @click="goToPane(1)"></button>
+        </div>
+
+        <!-- 캘린더 ↔ 분석 가로 스크롤/드래그 페이저 (비활성 시 display:contents 라 기존 레이아웃 유지) -->
+        <div
+          ref="pagerEl"
+          class="pager"
+          :class="{ 'is-pager': pagerActive }"
+          @scroll.passive="onPagerScroll"
+          @pointerdown="onPagerPointerDown"
+          @pointermove="onPagerPointerMove"
+          @pointerup="endMouseDrag"
+          @pointerleave="endMouseDrag"
+        >
+          <div class="pager-track">
+            <!-- ── CALENDAR VIEW ───────────────────────── -->
+            <div v-if="!selectedDate || isDesktop" class="calendar-pane pager-pane">
           <!-- Hero -->
           <div class="hero page-padding">
             <h1 class="hero-title">이번 달 기록</h1>
@@ -473,6 +638,88 @@ onMounted(load);
                 <span class="day-num">{{ cell.day }}</span>
                 <span v-if="cell.videoCount > 0 && cell.isCurrentMonth" class="record-count" aria-hidden="true">{{ cell.videoCount }}</span>
               </button>
+            </div>
+          </div>
+        </div>
+
+            <!-- ── ANALYSIS VIEW (모바일 페이저 전용) ──────── -->
+            <div v-if="pagerActive" class="analysis-pane pager-pane">
+              <div class="hero page-padding">
+                <h1 class="hero-title">이번 달 분석</h1>
+              </div>
+
+              <div class="page-padding">
+                <!-- 월간 리포트 진입 -->
+                <button
+                  v-if="reportCardState !== 'insufficient'"
+                  class="report-entry"
+                  :class="reportCardState"
+                  :disabled="reportCardState === 'loading'"
+                  @click="openReport"
+                >
+                  <span class="re-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M12 3l1.9 4.6L18.5 9l-3.7 3 1.1 4.8L12 14.6 8.1 16.8 9.2 12 5.5 9l4.6-1.4L12 3z" />
+                    </svg>
+                  </span>
+                  <span class="re-meta">
+                    <span class="re-title">{{ reportCardState === "exists" ? `${reportMonthLabel} 리포트 도착` : reportCardState === "generating" ? `${reportMonthLabel} 리포트 생성 중…` : "리포트 생성하기" }}</span>
+                    <span class="re-sub">AI가 분석한 {{ reportMonthLabel }} 성장 · 다음 목표</span>
+                  </span>
+                  <svg v-if="reportCardState !== 'loading'" class="re-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6" /></svg>
+                </button>
+
+                <!-- 부족: 비활성 안내 -->
+                <div v-else class="report-entry insufficient" aria-disabled="true">
+                  <span class="re-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    </svg>
+                  </span>
+                  <span class="re-meta">
+                    <span class="re-title">{{ reportMonthLabel }} 리포트</span>
+                    <span class="re-sub">
+                      <template v-if="reportShortfall && (reportShortfall.analyzed > 0 || reportShortfall.videos > 0)">분석 영상 {{ reportShortfall.analyzed }}개 · 영상 {{ reportShortfall.videos }}개 더 올리면 생성</template>
+                      <template v-else>지난달 데이터가 더 쌓이면 만들 수 있어요</template>
+                    </span>
+                  </span>
+                </div>
+
+                <div class="stats-card hola-card">
+                  <div class="stats-glow" aria-hidden="true" />
+                  <div v-if="isLoading" class="stats-grid" role="status" aria-label="기록을 불러오는 중">
+                    <div v-for="i in 3" :key="i" class="big-stat">
+                      <div class="stat-sk stat-sk-val" />
+                      <div class="stat-sk stat-sk-lbl" />
+                    </div>
+                  </div>
+                  <div v-else class="stats-grid reveal-on-load">
+                    <div v-for="stat in headlineStats" :key="stat.label" class="big-stat">
+                      <div class="big-val">{{ stat.value }}</div>
+                      <div class="big-lbl">{{ stat.label }}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="pyramid-section">
+                  <div class="section-header">
+                    <div class="an-section-title">기술 사용 빈도</div>
+                  </div>
+                  <div class="pyramid-card hola-card">
+                    <LoadingState v-if="isLoading" variant="list" :count="3" label="기술 분석을 불러오는 중" />
+                    <EmptyState v-else-if="techniques.length === 0" compact hold="cyan" title="아직 분석된 기술이 없어요" description="영상을 업로드하면 AI가 기술을 분석해요." />
+                    <div v-else class="pyramid-rows reveal-on-load">
+                      <div v-for="row in techniques" :key="row.key" class="pyr-row">
+                        <div class="pyr-grade tech-label">{{ row.label }}</div>
+                        <div class="pyr-track">
+                          <div class="pyr-fill" :style="{ width: `${row.pct}%`, background: row.color }" />
+                        </div>
+                        <div class="pyr-count">{{ row.count }}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -939,5 +1186,249 @@ onMounted(load);
   padding: 0;
   cursor: pointer;
   background: var(--surface-soft);
+}
+
+/* ── 페이저 인디케이터 (탭 대체) ───────────────────── */
+.pager-dots {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  padding: 10px 0 6px;
+}
+.dot {
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: var(--border);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease-state),
+    width var(--dur-fast) var(--ease-state);
+}
+.dot.active {
+  width: 18px;
+  background: var(--fg);
+}
+
+/* ── 가로 스크롤-스냅 페이저 ─────────────────────────── */
+/* 비활성(상세/데스크톱) 시 래퍼를 레이아웃에서 제거해 기존 구조 유지 */
+.pager,
+.pager-track {
+  display: contents;
+}
+.pager.is-pager {
+  display: block;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.pager.is-pager::-webkit-scrollbar {
+  display: none;
+}
+.pager.is-pager .pager-track {
+  display: flex;
+  align-items: flex-start;
+  width: 200%;
+}
+.pager.is-pager .pager-pane {
+  flex: 0 0 50%;
+  width: 50%;
+  min-width: 0;
+  scroll-snap-align: start;
+}
+
+/* ── 분석 pane (마이 stats 이식) ───────────────────── */
+.stats-card {
+  position: relative;
+  overflow: hidden;
+  padding: 20px;
+}
+.stats-glow {
+  position: absolute;
+  inset: -50px -50px auto auto;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: var(--hold-cyan);
+  filter: blur(50px);
+  opacity: 0.35;
+  pointer-events: none;
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px 12px;
+  position: relative;
+}
+.big-stat {
+  text-align: left;
+  min-width: 0;
+}
+.big-val {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.big-lbl {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-muted);
+  margin-top: 2px;
+}
+.pyramid-section {
+  margin-top: 16px;
+}
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 12px;
+}
+.an-section-title {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.pyramid-card {
+  padding: 16px;
+}
+.pyramid-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pyr-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.pyr-grade {
+  width: 30px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  flex-shrink: 0;
+}
+.pyr-grade.tech-label {
+  width: 64px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pyr-track {
+  flex: 1;
+  height: 16px;
+  background: var(--surface-soft);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.pyr-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 600ms var(--ease-soft);
+}
+.pyr-count {
+  width: 28px;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+.stat-sk {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-soft);
+  border-radius: var(--r-chip);
+}
+.stat-sk-val {
+  height: 24px;
+  width: 70%;
+}
+.stat-sk-lbl {
+  height: 11px;
+  width: 40%;
+  margin-top: 6px;
+}
+
+/* ── 월간 리포트 진입 카드 ─────────────────────────── */
+.report-entry {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  text-align: left;
+  padding: 14px;
+  margin-bottom: 14px;
+  border-radius: var(--r-card);
+  border: 1px solid var(--hold-cyan, #9fe1cb);
+  background: var(--tint-cyan);
+  cursor: pointer;
+  transition: opacity var(--dur-fast) var(--ease-state);
+}
+.report-entry:active {
+  opacity: 0.85;
+}
+.report-entry.loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+.report-entry.insufficient {
+  border-color: var(--border);
+  background: var(--surface-soft);
+  cursor: default;
+}
+.re-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  flex-shrink: 0;
+  background: var(--hold-cyan, #5dcaa5);
+  color: var(--on-tint-cyan, #04342c);
+}
+.report-entry.insufficient .re-icon {
+  background: var(--surface);
+  color: var(--fg-muted);
+}
+.re-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.re-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--on-tint-cyan, var(--fg));
+}
+.report-entry.insufficient .re-title {
+  color: var(--fg);
+}
+.re-sub {
+  font-size: 12px;
+  color: var(--on-tint-cyan, var(--fg-muted));
+  opacity: 0.85;
+}
+.report-entry.insufficient .re-sub {
+  color: var(--fg-muted);
+  opacity: 1;
+}
+.re-chevron {
+  color: var(--on-tint-cyan, var(--fg-muted));
+  flex-shrink: 0;
 }
 </style>
