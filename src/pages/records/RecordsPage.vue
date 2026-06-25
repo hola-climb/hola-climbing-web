@@ -1447,17 +1447,17 @@ onMounted(() => {
   width: 100%;
   margin-bottom: var(--s-6);
   padding: var(--s-3) var(--s-4);
-  /* border: 1px solid var(--border); */
+  border: none;
   border-radius: var(--r-button);
-  /* background: var(--surface); */
+  background: transparent;
   color: var(--fg);
   font-size: var(--fs-body);
   font-weight: var(--w-semibold);
   cursor: pointer;
-  transition: background var(--dur-fast) var(--ease-state);
+  transition: opacity var(--dur-fast) var(--ease-state);
 }
 .report-past:active:not(:disabled) {
-  background: var(--surface-soft);
+  opacity: 0.6;
 }
 .report-past:disabled {
   opacity: 0.4;
