@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
-import { IonPage, IonContent, IonIcon, IonSpinner, useIonRouter } from "@ionic/vue";
+import { IonPage, IonContent, IonFooter, IonIcon, IonSpinner, useIonRouter } from "@ionic/vue";
 import BaseSheet from "@/components/common/BaseSheet.vue";
 import { heartOutline, heart, shareOutline, chatbubbleOutline, refreshOutline, ellipsisVertical, createOutline, trashOutline, flagOutline } from "ionicons/icons";
 import AppHeader from "@/components/common/AppHeader.vue";
@@ -430,14 +430,16 @@ onMounted(async () => {
       </div>
     </IonContent>
 
-    <!-- 모바일 댓글 입력 (fixed) -->
-    <div v-if="video && !isDesktop" class="comment-bar">
+    <!-- 모바일 댓글 입력 (footer) -->
+    <IonFooter v-if="video && !isDesktop" class="ion-no-border comment-footer">
+    <div class="comment-bar">
       <input v-model="commentInput" class="comment-input" type="text" placeholder="댓글을 입력하세요" :disabled="isPosting" aria-label="댓글 입력" @keydown.enter="postComment($event)" />
       <button class="comment-send" :disabled="!commentInput.trim() || isPosting" aria-label="댓글 등록" @click="postComment">
         <IonSpinner v-if="isPosting" name="crescent" />
         <span v-else>등록</span>
       </button>
     </div>
+    </IonFooter>
 
     <AIFeedbackModal
       v-if="showFeedbackModal && video?.analysis"
@@ -535,6 +537,10 @@ onMounted(async () => {
     display: flex;
     height: 100%;
     overflow: hidden;
+    /* 영상이 화면 왼쪽에 붙지 않도록 영상+사이드바를 한 묶음으로 중앙 정렬 */
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
   }
   .video-pane {
     width: 480px;
@@ -561,7 +567,10 @@ onMounted(async () => {
   .sidebar-scroll .comments-section {
     padding-bottom: 24px;
   }
-  .comment-bar--desktop {
+  /* 베이스 .comment-bar(position:absolute)가 소스 순서상 뒤에 있어 이기므로,
+     특이성을 높여 데스크탑에선 사이드바 하단에 정적으로 배치해 영상 컨트롤바를
+     덮지 않게 한다. */
+  .comment-bar.comment-bar--desktop {
     position: static;
     padding-bottom: 12px;
     flex-shrink: 0;
@@ -825,7 +834,7 @@ onMounted(async () => {
   margin-top: 24px;
   padding-top: 20px;
   border-top: 1px solid var(--border);
-  padding-bottom: 96px;
+  padding-bottom: 24px;
 }
 .comments-title {
   font-size: 16px;
@@ -983,18 +992,16 @@ onMounted(async () => {
 }
 
 /* ── 댓글 입력바 ─────────────────────────────────── */
+.comment-footer {
+  --background: var(--surface);
+  border-top: 1px solid var(--border);
+}
 .comment-bar {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
   display: flex;
   gap: 8px;
   align-items: center;
   padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
   background: var(--surface);
-  border-top: 1px solid var(--border);
-  z-index: 10;
 }
 .comment-input {
   flex: 1;

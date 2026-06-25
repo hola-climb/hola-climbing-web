@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // imports → props/emits → state → computed → methods
-import { ref, computed, watch, onUnmounted } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 
 const props = withDefaults(
   defineProps<{
@@ -33,7 +33,6 @@ const HOLDS = [
   { x: 150, y: 40, rot: -4 },
 ] as const;
 
-// 홀드 페블 원본 좌표계(200×180), 시각 중심 ≈ (108, 92)
 const PEBBLE = "M 38 92 C 22 60, 60 18, 108 22 C 158 26, 188 60, 178 110 C 168 158, 118 168, 78 158 C 44 150, 50 122, 38 92 Z";
 const PEBBLE_S = 0.3;
 
@@ -41,26 +40,11 @@ function holdTransform(h: (typeof HOLDS)[number]): string {
   return `translate(${h.x} ${h.y}) rotate(${h.rot}) scale(${PEBBLE_S}) translate(-108 -92)`;
 }
 
-const LAST = HOLDS.length - 1;
+const N = HOLDS.length;
+const LAST = N - 1;
+const PCTS = [10, 30, 70, 90, 100];
 
-// 2차 베지어 곡선 길이(샘플링) — DOM(getTotalLength) 비의존이라 iOS에서도 안전.
-function bezierLen(ax: number, ay: number, cx: number, cy: number, bx: number, by: number): number {
-  let len = 0;
-  let px = ax;
-  let py = ay;
-  for (let i = 1; i <= 24; i++) {
-    const t = i / 24;
-    const mt = 1 - t;
-    const x = mt * mt * ax + 2 * mt * t * cx + t * t * bx;
-    const y = mt * mt * ay + 2 * mt * t * cy + t * t * by;
-    len += Math.hypot(x - px, y - py);
-    px = x;
-    py = y;
-  }
-  return len;
-}
-
-// 연결선 세그먼트 (홀드 i → i+1, 유기적 2차 베지어). 길이도 함께 계산.
+// 연결선 세그먼트 (홀드 i → i+1, 유기적 2차 베지어). 제어점 보관(빛 위치 평가용).
 const SEGMENTS = HOLDS.slice(0, -1).map((a, i) => {
   const b = HOLDS[i + 1];
   const mx = (a.x + b.x) / 2;
@@ -71,10 +55,73 @@ const SEGMENTS = HOLDS.slice(0, -1).map((a, i) => {
   const off = (i % 2 === 0 ? 1 : -1) * 24;
   const cx = mx + (-dy / len) * off;
   const cy = my + (dx / len) * off;
-  return { id: i, d: `M ${a.x} ${a.y} Q ${cx} ${cy} ${b.x} ${b.y}`, len: bezierLen(a.x, a.y, cx, cy, b.x, b.y) };
+  return { id: i, ax: a.x, ay: a.y, cx, cy, bx: b.x, by: b.y, d: `M ${a.x} ${a.y} Q ${cx} ${cy} ${b.x} ${b.y}` };
 });
 
+function pointAt(seg: number, t: number): { x: number; y: number } {
+  const s = SEGMENTS[Math.max(0, Math.min(SEGMENTS.length - 1, seg))];
+  const mt = 1 - t;
+  return {
+    x: mt * mt * s.ax + 2 * mt * t * s.cx + t * t * s.bx,
+    y: mt * mt * s.ay + 2 * mt * t * s.cy + t * t * s.by,
+  };
+}
+
 const clamped = computed(() => Math.min(100, Math.max(0, props.progress)));
+
+function posFromProgress(p: number): number {
+  if (p <= PCTS[0]) return 0;
+  for (let i = 0; i < PCTS.length - 1; i++) {
+    if (p <= PCTS[i + 1]) return i + (p - PCTS[i]) / (PCTS[i + 1] - PCTS[i]);
+  }
+  return LAST;
+}
+
+// ── 빛 이동(rAF) ───────────────────────────────────
+// displayPos 가 targetBase + anticipation 으로 이징 추적. SSE↑ 시 가속.
+// 분석이 분 단위로 길 수 있으므로 느리게 — 기어가기는 감속하며 끊임없이 접근(하드 정지 없음).
+const ANTIC_MAX = 0.82; // 다음 홀드 직전까지(도달 전) 접근하는 최대 비율
+const ANTIC_TAU = 16000; // 기어가기 감속 시간상수(클수록 더 느리고 오래 이동)
+const TAU = 1100; // 목표 추적 이징(클수록 SSE 점프 시 더 부드럽고 천천히 글라이드)
+const REACH_FRAC = 0.9; // 강조 이동 임계(ANTIC_MAX보다 커야 도달 전 오인 방지)
+
+const displayPos = ref(0);
+const targetBase = ref(0);
+let anticipation = 0;
+let rafId: number | null = null;
+let lastTs: number | null = null;
+
+function recomputeTarget() {
+  const byProgress = posFromProgress(clamped.value);
+  const byStage = STAGES.findIndex((s) => s.key === props.stage);
+  const tb = Math.max(byProgress, byStage);
+  if (tb > targetBase.value) {
+    targetBase.value = tb;
+    anticipation = 0;
+  }
+}
+
+function frame(ts: number) {
+  if (lastTs === null) lastTs = ts;
+  const dt = Math.min(ts - lastTs, 64);
+  lastTs = ts;
+  // 감속 기어가기: 다음 홀드 쪽으로 점점 느려지며 접근(완전히 멈추지 않음)
+  anticipation += (ANTIC_MAX - anticipation) * (1 - Math.exp(-dt / ANTIC_TAU));
+  const goal = Math.min(targetBase.value + anticipation, LAST);
+  const k = 1 - Math.exp(-dt / TAU);
+  let next = displayPos.value + (goal - displayPos.value) * k;
+  if (Math.abs(goal - next) < 0.0008) next = goal;
+  displayPos.value = next;
+  rafId = requestAnimationFrame(frame);
+}
+
+function stopFrame() {
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId);
+    rafId = null;
+  }
+  lastTs = null;
+}
 
 // ── 완료 시퀀스 ───────────────────────────────────
 const phase = ref<"run" | "success">("run");
@@ -84,10 +131,15 @@ let completeTimer: number | null = null;
 function runSuccess() {
   if (outroStarted) return;
   outroStarted = true;
+  stopFrame();
+  displayPos.value = LAST;
   phase.value = "success";
   completeTimer = window.setTimeout(() => emit("complete"), 1050);
 }
 
+watch([clamped, () => props.stage], () => {
+  recomputeTarget();
+});
 watch(
   () => props.finishing,
   (f) => {
@@ -99,13 +151,17 @@ watch(clamped, (v) => {
   if (v >= 100) runSuccess();
 });
 
+onMounted(() => {
+  recomputeTarget();
+  // 동작 줄이기 설정과 무관하게 항상 빛 이동 재생(로딩 인디케이터의 부드러운 빛은 무방).
+  if (phase.value === "run") rafId = requestAnimationFrame(frame);
+});
 onUnmounted(() => {
+  stopFrame();
   if (completeTimer !== null) clearTimeout(completeTimer);
 });
 
-// ── 현재 단계 인덱스 (SSE stage 키 우선, 없으면 진행률 폴백) ──────────
-// 모든 시각 상태가 이 "이산" 값에만 의존 → 변할 때만 class/style 갱신
-// (홀드 색이 정상 동작하는 것과 동일한 메커니즘 = iOS 안전).
+// ── 푸터용 단계 인덱스 (SSE 기준) ──────────
 const reachedIndex = computed(() => {
   if (phase.value === "success") return LAST;
   const byKey = STAGES.findIndex((s) => s.key === props.stage);
@@ -116,28 +172,50 @@ const reachedIndex = computed(() => {
   if (p >= 70) return 2;
   if (p >= 30) return 1;
   if (p >= 10) return 0;
-  return -1; // 대기 중
+  return -1;
 });
 const isWaiting = computed(() => phase.value === "run" && reachedIndex.value < 0);
-const activeHold = computed(() => (reachedIndex.value < 0 ? 0 : reachedIndex.value));
+
+// ── 빛 위치 기반 시각 상태 ──────────────────────────
+const lightSeg = computed(() => Math.max(0, Math.min(SEGMENTS.length - 1, Math.floor(displayPos.value))));
+const lightT = computed(() => {
+  if (displayPos.value >= LAST) return 1;
+  return displayPos.value - Math.floor(displayPos.value);
+});
+const lightPoint = computed(() => pointAt(lightSeg.value, lightT.value));
+const showLight = computed(() => {
+  if (phase.value !== "run") return false;
+  const frac = displayPos.value - Math.floor(displayPos.value);
+  return displayPos.value > 0.04 && displayPos.value < LAST && frac > 0.04;
+});
+
+const highlightIndex = computed(() => {
+  if (phase.value === "success") return LAST;
+  if (isWaiting.value) return 0;
+  const floor = Math.max(0, Math.min(LAST, Math.floor(displayPos.value)));
+  const frac = displayPos.value - floor;
+  return frac >= REACH_FRAC ? Math.min(floor + 1, LAST) : floor;
+});
 
 function holdClass(i: number): string {
   if (phase.value === "success") return i === LAST ? "is-final" : "is-done";
-  if (i === activeHold.value) return isWaiting.value && i === 0 ? "is-active is-waiting" : "is-active";
-  if (i < activeHold.value) return "is-done";
+  const hi = highlightIndex.value;
+  if (i === hi) return isWaiting.value && i === 0 ? "is-active is-waiting" : "is-active";
+  if (i < hi) return "is-done";
   return "is-todo";
 }
 
-// 세그먼트 i(홀드 i→i+1)는 홀드 i+1에 도달하면 채워진다.
-// 채워질 때 dashoffset 이 len→0 으로 CSS transition → 빛나는 선단이 다음 홀드로 이동.
-function segFilled(i: number): boolean {
-  return phase.value === "success" || reachedIndex.value > i;
+// 웹: dash 로 부드럽게 채워지는 양(pathLength=1 정규화, offset 1=숨김 0=채움)
+function segDashoffset(i: number): number {
+  if (phase.value === "success") return 0;
+  if (i < lightSeg.value) return 0;
+  if (i === lightSeg.value) return 1 - lightT.value;
+  return 1;
 }
-function litStyle(seg: (typeof SEGMENTS)[number]) {
-  return {
-    strokeDasharray: `${seg.len}`,
-    strokeDashoffset: segFilled(seg.id) ? "0" : `${seg.len}`,
-  };
+// iOS 안전: dash 가 안 그려지는 WKWebView 대비, 통과 완료된 세그먼트는 solid 로 점등.
+// rAF(displayPos) 와 무관하게 SSE 단계(reachedIndex)에만 의존 → rAF 불안정해도 단계별로 켜짐.
+function segSolidOn(i: number): boolean {
+  return phase.value === "success" || reachedIndex.value > i;
 }
 
 // ── 푸터 정보 ───────────────────────────────────────
@@ -173,17 +251,33 @@ const finalHold = HOLDS[HOLDS.length - 1];
           </radialGradient>
         </defs>
 
-        <!-- 연결선: 베이스(옅음) + 채워지는 점등 선(빛나는 선단이 다음 홀드로 이동) -->
         <g class="lines">
+          <!-- 베이스(옅은 회색) -->
           <path v-for="seg in SEGMENTS" :key="`b${seg.id}`" class="line-base" :d="seg.d" />
+          <!-- iOS 안전: 완료 세그먼트 solid 점등(class/opacity = 홀드 색과 동일 메커니즘) -->
+          <path
+            v-for="seg in SEGMENTS"
+            :key="`s${seg.id}`"
+            class="line-solid"
+            :class="{ on: segSolidOn(seg.id), final: phase === 'success' }"
+            :d="seg.d"
+          />
+          <!-- 웹: dash 로 빛 뒤를 따라 부드럽게 채워짐 -->
           <path
             v-for="seg in SEGMENTS"
             :key="`l${seg.id}`"
             class="line-lit"
-            :class="{ 'is-final': phase === 'success', filled: segFilled(seg.id) }"
+            :class="{ 'is-final': phase === 'success' }"
             :d="seg.d"
-            :style="litStyle(seg)"
+            pathLength="1"
+            :style="{ strokeDashoffset: segDashoffset(seg.id) }"
           />
+        </g>
+
+        <!-- 연결선을 따라 이동하는 빛 -->
+        <g v-if="showLight" class="travel-light">
+          <circle class="travel-glow" :cx="lightPoint.x" :cy="lightPoint.y" r="11" />
+          <circle class="travel-core" :cx="lightPoint.x" :cy="lightPoint.y" r="4.5" />
         </g>
 
         <!-- 완료 시 glow 확산 링 -->
@@ -243,23 +337,46 @@ const finalHold = HOLDS[HOLDS.length - 1];
   stroke-width: 4;
   stroke-linecap: round;
 }
-/* 점등 선: 단계 변화(class/style)로만 갱신 + CSS transition 으로 채워짐.
-   dasharray/offset 은 인라인 style(이산 값) → iOS WKWebView 리페인트 보장. */
+/* iOS 안전 solid 점등 — dash 미사용, class 로 표시(홀드 색과 동일). */
+.line-solid {
+  fill: none;
+  stroke: var(--hold-pink);
+  stroke-width: 4;
+  stroke-linecap: round;
+  opacity: 0;
+  transition: opacity 0.45s var(--ease-soft);
+}
+.line-solid.on {
+  opacity: 1;
+}
+.line-solid.final {
+  stroke: var(--hold-lime-ink);
+}
+/* 웹: dash 로 빛 뒤를 부드럽게 채움(WKWebView에선 안 그려져도 line-solid 가 대체) */
 .line-lit {
   fill: none;
   stroke: var(--hold-pink);
   stroke-width: 4;
   stroke-linecap: round;
-  transition: stroke-dashoffset 0.7s var(--ease-soft);
-}
-/* 채워지는 동안 빛나는 선단 — 이동하는 '빛' 효과 */
-.line-lit.filled {
-  filter: drop-shadow(0 0 5px rgba(255, 77, 148, 0.65));
+  stroke-dasharray: 1;
+  filter: drop-shadow(0 0 4px rgba(255, 77, 148, 0.55));
 }
 .line-lit.is-final {
   stroke: var(--hold-lime-ink);
-  filter: drop-shadow(0 0 6px rgba(200, 255, 0, 0.7));
-  transition: stroke-dashoffset 0.7s var(--ease-soft), stroke 0.4s var(--ease-state);
+}
+
+/* ── 이동하는 빛 ──────────────────────────────── */
+.travel-light {
+  pointer-events: none;
+}
+.travel-glow {
+  fill: var(--hold-pink);
+  opacity: 0.28;
+}
+.travel-core {
+  fill: #fff;
+  stroke: var(--hold-pink);
+  stroke-width: 2.5;
 }
 
 /* ── 홀드 ─────────────────────────────────────── */
@@ -350,28 +467,18 @@ const finalHold = HOLDS[HOLDS.length - 1];
   }
 }
 
-/* 완료 체크 표시 */
+/* 완료 체크 — opacity reveal(dash draw 미사용) */
 .check {
   fill: none;
   stroke: var(--hold-dark);
   stroke-width: 11;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-dasharray: 90;
-  stroke-dashoffset: 90;
   opacity: 0;
+  transition: opacity 0.3s var(--ease-soft) 0.3s;
 }
 .hold.is-final .check {
   opacity: 1;
-  animation: check-draw 0.4s var(--ease-soft) 0.35s forwards;
-}
-@keyframes check-draw {
-  from {
-    stroke-dashoffset: 90;
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
 }
 
 /* ── 하단 정보 카드 ────────────────────────────── */
@@ -434,21 +541,5 @@ const finalHold = HOLDS[HOLDS.length - 1];
   font-size: var(--fs-caption);
   color: var(--fg-muted);
   line-height: 1.45;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .line-lit,
-  .hold.is-active,
-  .hold.is-final,
-  .glow-ring,
-  .check,
-  .dot-led {
-    animation: none;
-    transition: none;
-  }
-  .check {
-    opacity: 1;
-    stroke-dashoffset: 0;
-  }
 }
 </style>

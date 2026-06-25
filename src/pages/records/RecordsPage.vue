@@ -755,7 +755,7 @@ watch(pagerActive, (active) => {
         </div>
 
         <!-- ── DETAIL VIEW ─────────────────────────── -->
-        <div v-if="selectedDate || isDesktop" class="detail-pane desktop-wide">
+        <div v-if="selectedDate || isDesktop" class="detail-pane">
           <!-- Desktop placeholder (no date selected) -->
           <EmptyState v-if="!selectedDate" compact hold="cyan" title="날짜를 선택하세요" description="달력에서 기록이 있는 날짜를 누르면 상세를 볼 수 있어요." />
 

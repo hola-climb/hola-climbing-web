@@ -98,13 +98,6 @@ body {
     margin-left: auto;
     margin-right: auto;
   }
-  /* 2-pane 데스크탑 레이아웃 내부에서는 중앙 컬럼 캡을 해제 */
-  .desktop-wide .page-padding,
-  .page-padding.desktop-wide {
-    max-width: none;
-    margin-left: 0;
-    margin-right: 0;
-  }
 
   /* 시트형 폼 화면(클라이밍 기록·업로드)도 중앙 컬럼으로 */
   .sheet-bg {

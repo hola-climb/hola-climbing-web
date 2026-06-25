@@ -161,7 +161,7 @@ watch(
               </div>
               <span class="card-nickname">{{ video.user.nickname }}</span>
             </div>
-            <div v-if="video.title" class="card-title">{{ video.title }}</div>
+            <div class="card-title">{{ video.title || "제목 없는 영상" }}</div>
             <div class="card-stats">
               <span class="stat">
                 <AppIcon name="heart" :size="13" />
