@@ -5,6 +5,7 @@ import { parseTechniqueTags } from '@/types/api'
 import { videoService } from '@/services/video'
 import { useUIStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
+import router from '@/router'
 
 interface AnalysisProgress {
   progress: number
@@ -197,7 +198,10 @@ export const useVideoStore = defineStore('video', () => {
             currentVideo.value.progress = 100
           }
         }
-        ui.showToast('AI 분석이 완료됐어요!')
+        ui.showToast('AI 분석이 완료됐어요!', 'success', {
+          text: '결과 보기',
+          handler: () => router.push(`/my/videos/${videoId}`),
+        })
       } else if (finalStatus === 'failed') {
         if (currentVideo.value?.id === videoId) currentVideo.value.status = 'failed'
         ui.showToast('AI 분석에 실패했어요.', 'danger')
