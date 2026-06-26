@@ -182,7 +182,7 @@ async function handleSubmit() {
             </button>
           </div>
           <h1 class="drop-title">Drop a clip.</h1>
-          <p class="drop-sub">AI가 베타를 찾고 그레이드를 제안해드려요.</p>
+          <p class="drop-sub">AI가 문제 스타일과 기술을 찾아드려요.</p>
 
           <!-- Upload picker zone -->
           <div class="picker-zone" @click="openFilePicker" role="button" tabindex="0" aria-label="영상 파일 선택" @keydown.enter="openFilePicker">

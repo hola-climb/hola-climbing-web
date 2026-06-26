@@ -472,12 +472,7 @@ function openVideo(id: string) {
         <div class="video-row">
           <template v-for="(v, idx) in videos" :key="v.id">
             <!-- 5번째 영상 (index 4): 더보기 오버레이 -->
-            <button
-              v-if="idx === 4 && totalVideos >= 5"
-              class="video-thumb video-thumb--more"
-              aria-label="영상 전체 보기"
-              @click="router.push(`/gyms/${gymId}/videos`)"
-            >
+            <button v-if="idx === 4 && totalVideos >= 5" class="video-thumb video-thumb--more" aria-label="영상 전체 보기" @click="router.push(`/gyms/${gymId}/videos`)">
               <VideoThumbnail :title="v.title" :thumbnail-url="v.thumbnailUrl" :grade="v.grade" :alt="''" />
               <div class="video-more-overlay" aria-hidden="true">
                 <span class="video-more-label">더보기</span>
@@ -620,7 +615,7 @@ function openVideo(id: string) {
               <div class="cb-head">
                 <span class="cb-name">{{ m.user.nickname }}</span>
                 <span v-if="m.verifiedAtGym" class="cb-verified">
-                  <AppIcon name="pin" :size="11" />
+                  <AppIcon name="check" :size="11" />
                   암장
                 </span>
               </div>
@@ -1161,9 +1156,15 @@ function openVideo(id: string) {
 .cb-verified {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  font-size: 10px;
-  color: var(--fg-muted);
+  gap: 3px;
+  height: 18px;
+  padding: 0 8px 0 6px;
+  border-radius: var(--r-chip);
+  background: var(--hold-orange);
+  color: #fff;
+  font-size: 9px;
+  font-weight: var(--w-bold);
+  letter-spacing: 0.02em;
 }
 .cb-text {
   font-size: var(--fs-body);

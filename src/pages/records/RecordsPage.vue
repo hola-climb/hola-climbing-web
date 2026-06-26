@@ -756,8 +756,66 @@ watch(pagerActive, (active) => {
 
         <!-- ── DETAIL VIEW ─────────────────────────── -->
         <div v-if="selectedDate || isDesktop" class="detail-pane">
-          <!-- Desktop placeholder (no date selected) -->
-          <EmptyState v-if="!selectedDate" compact hold="cyan" title="날짜를 선택하세요" description="달력에서 기록이 있는 날짜를 누르면 상세를 볼 수 있어요." />
+          <!-- 데스크탑: 날짜 미선택 = 분석 뷰 -->
+          <div v-if="!selectedDate" class="analysis-desktop page-padding">
+            <button class="report-entry hola-card" @click="openThisMonthReport">
+              <div class="report-icon">
+                <HoldPebble color="cyan" :size="32" />
+              </div>
+              <div class="report-content">
+                <div class="report-title">지난 달 리포트</div>
+                <div class="report-sub">한 달을 돌아보고 다음 목표를 세워요</div>
+              </div>
+              <svg class="report-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m9 18 6-6-6-6" />
+              </svg>
+            </button>
+
+            <button class="report-past" :disabled="!pastPeriods.length" @click="pickerOpen = true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 3v5h5" />
+                <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" />
+                <path d="M12 7v5l3 2" />
+              </svg>
+              <span>지난 리포트 보기</span>
+              <span v-if="pastPeriods.length" class="rp-count">{{ pastPeriods.length }}</span>
+            </button>
+
+            <div class="stats-card hola-card">
+              <div class="stats-glow" aria-hidden="true" />
+              <div v-if="isLoading" class="stats-grid" role="status" aria-label="기록을 불러오는 중">
+                <div v-for="i in 3" :key="i" class="big-stat">
+                  <div class="stat-sk stat-sk-val" />
+                  <div class="stat-sk stat-sk-lbl" />
+                </div>
+              </div>
+              <div v-else class="stats-grid reveal-on-load">
+                <div v-for="stat in headlineStats" :key="stat.label" class="big-stat">
+                  <div class="big-val">{{ stat.value }}</div>
+                  <div class="big-lbl">{{ stat.label }}</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="pyramid-section">
+              <div class="section-header">
+                <div class="an-section-title">기술 사용 빈도</div>
+              </div>
+              <div class="pyramid-card hola-card">
+                <LoadingState v-if="isLoading" variant="list" :count="3" label="기술 분석을 불러오는 중" />
+                <EmptyState v-else-if="techniques.length === 0" compact hold="cyan" title="아직 분석된 기술이 없어요" description="영상을 업로드하면 AI가 기술을 분석해요." />
+                <div v-else class="pyramid-rows reveal-on-load">
+                  <div v-for="row in techniques" :key="row.key" class="pyr-row">
+                    <div class="pyr-grade tech-label">{{ row.label }}</div>
+                    <div class="pyr-track">
+                      <div class="pyr-fill" :style="{ width: `${row.pct}%`, background: row.color }" />
+                    </div>
+                    <div class="pyr-count">{{ row.count }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
 
           <!-- Loading -->
           <div v-else-if="isDetailLoading" class="detail-skeleton page-padding">
