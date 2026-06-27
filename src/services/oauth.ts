@@ -14,6 +14,7 @@ const PROVIDER_SLUG: Record<OAuthProvider, string> = {
   [OAuthProvider.GOOGLE]: "google",
   [OAuthProvider.KAKAO]: "kakao",
   [OAuthProvider.NAVER]: "naver",
+  [OAuthProvider.APPLE]: "apple",
 };
 
 // 네이티브 커스텀 스킴. 백엔드가 콜백을 이 주소로 리다이렉트하면 OS 가 앱을 깨운다.

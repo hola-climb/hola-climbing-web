@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { IonPage, IonContent, IonIcon, IonInput, useIonRouter } from "@ionic/vue";
-import { eyeOutline, eyeOffOutline } from "ionicons/icons";
+import { eyeOutline, eyeOffOutline, logoApple } from "ionicons/icons";
 import BaseButton from "@/components/common/BaseButton.vue";
 import { useRouter, useRoute } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
@@ -140,6 +140,10 @@ async function handleLogin() {
           <div class="divider"><span>또는</span></div>
 
           <div class="social-btns">
+            <button class="social-btn apple" aria-label="Apple로 로그인" @click="startSocialLogin(OAuthProvider.APPLE)">
+              <IonIcon :icon="logoApple" class="social-icon" aria-hidden="true" />
+              <span>Apple로 시작하기</span>
+            </button>
             <button class="social-btn kakao" aria-label="카카오로 로그인" @click="startSocialLogin(OAuthProvider.KAKAO)">카카오로 시작하기</button>
             <button class="social-btn google" aria-label="구글로 로그인" @click="startSocialLogin(OAuthProvider.GOOGLE)">Google로 시작하기</button>
             <button class="social-btn naver" aria-label="네이버로 로그인" @click="startSocialLogin(OAuthProvider.NAVER)">네이버로 시작하기</button>
@@ -347,6 +351,18 @@ async function handleLogin() {
 }
 .social-btn:active {
   opacity: 0.7;
+}
+.social-btn.apple {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--brand-apple);
+  border-color: var(--brand-apple);
+  color: var(--brand-apple-fg);
+}
+.social-icon {
+  font-size: 18px;
 }
 .social-btn.kakao {
   background: var(--brand-kakao);

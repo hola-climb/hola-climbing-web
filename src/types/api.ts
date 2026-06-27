@@ -81,6 +81,7 @@ export enum OAuthProvider {
   GOOGLE = "GOOGLE",
   KAKAO = "KAKAO",
   NAVER = "NAVER",
+  APPLE = "APPLE",
 }
 
 /** 로그인 / 소셜가입 공통 토큰 응답 모양. */

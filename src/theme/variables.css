@@ -51,6 +51,8 @@
   --brand-kakao-fg: #3a1d1d;
   --brand-naver: #03c75a;
   --brand-naver-fg: #ffffff;
+  --brand-apple: #000000;
+  --brand-apple-fg: #ffffff;
 
   /* ── Semantic ─────────────────────────────────── */
   --success: var(--hold-lime);
