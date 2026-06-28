@@ -112,7 +112,15 @@ async function handleLogin() {
           <div class="field">
             <label class="field-label" for="login-pw">비밀번호</label>
             <div class="pw-wrap">
-              <IonInput id="login-pw" v-model="password" :type="showPw ? 'text' : 'password'" placeholder="비밀번호를 입력하세요" class="hola-input" autocomplete="current-password" @keydown.enter="handleLogin" />
+              <IonInput
+                id="login-pw"
+                v-model="password"
+                :type="showPw ? 'text' : 'password'"
+                placeholder="비밀번호를 입력하세요"
+                class="hola-input"
+                autocomplete="current-password"
+                @keydown.enter="handleLogin"
+              />
               <button class="pw-toggle" @click="showPw = !showPw" :aria-label="showPw ? '비밀번호 숨기기' : '비밀번호 보기'">
                 <IonIcon :icon="showPw ? eyeOffOutline : eyeOutline" />
               </button>
@@ -144,9 +152,18 @@ async function handleLogin() {
               <IonIcon :icon="logoApple" class="social-icon" aria-hidden="true" />
               <span>Apple로 시작하기</span>
             </button>
-            <button class="social-btn kakao" aria-label="카카오로 로그인" @click="startSocialLogin(OAuthProvider.KAKAO)">카카오로 시작하기</button>
-            <button class="social-btn google" aria-label="구글로 로그인" @click="startSocialLogin(OAuthProvider.GOOGLE)">Google로 시작하기</button>
-            <button class="social-btn naver" aria-label="네이버로 로그인" @click="startSocialLogin(OAuthProvider.NAVER)">네이버로 시작하기</button>
+            <button class="social-btn kakao" aria-label="카카오로 로그인" @click="startSocialLogin(OAuthProvider.KAKAO)">
+              <img src="@/assets/icons/kakao-logo.svg" class="social-icon" />
+              <span>카카오로 시작하기</span>
+            </button>
+            <button class="social-btn google" aria-label="구글로 로그인" @click="startSocialLogin(OAuthProvider.GOOGLE)">
+              <img src="@/assets/icons/google-logo.png" class="social-icon" />
+              <span>Google로 시작하기</span>
+            </button>
+            <button class="social-btn naver" aria-label="네이버로 로그인" @click="startSocialLogin(OAuthProvider.KAKAO)">
+              <img src="@/assets/icons/naver-logo.png" class="social-icon" />
+              <span>네이버로 시작하기</span>
+            </button>
           </div>
         </div>
 
@@ -348,22 +365,26 @@ async function handleLogin() {
   font-weight: var(--w-semibold);
   cursor: pointer;
   transition: opacity var(--dur-fast) var(--ease-state);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 .social-btn:active {
   opacity: 0.7;
 }
 .social-btn.apple {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
   background: var(--brand-apple);
   border-color: var(--brand-apple);
   color: var(--brand-apple-fg);
 }
 .social-icon {
   font-size: 18px;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
 }
+
 .social-btn.kakao {
   background: var(--brand-kakao);
   border-color: var(--brand-kakao);
