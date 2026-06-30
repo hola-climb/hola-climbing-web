@@ -1,5 +1,6 @@
 import { ref, type Ref } from "vue";
 import { Geolocation } from "@capacitor/geolocation";
+import { Capacitor } from "@capacitor/core";
 
 export type GeolocationError = "denied" | "unavailable" | "failed";
 
@@ -27,13 +28,17 @@ export function useGeolocation(): {
     isLocating.value = true;
     error.value = null;
     try {
-      // 권한 확인 후 필요 시 요청 (웹에서는 getCurrentPosition 호출 시 프롬프트)
-      const status = await Geolocation.checkPermissions();
-      if (status.location === "denied") {
-        const req = await Geolocation.requestPermissions();
-        if (req.location === "denied") {
-          error.value = "denied";
-          return null;
+      // checkPermissions/requestPermissions는 웹에서 "Not implemented" 예외를
+      // 던진다 — 웹은 getCurrentPosition 호출 시 브라우저가 자체 권한 프롬프트를
+      // 띄우므로 네이티브(iOS/Android)에서만 사전 권한 확인을 수행한다.
+      if (Capacitor.getPlatform() !== "web") {
+        const status = await Geolocation.checkPermissions();
+        if (status.location === "denied") {
+          const req = await Geolocation.requestPermissions();
+          if (req.location === "denied") {
+            error.value = "denied";
+            return null;
+          }
         }
       }
 

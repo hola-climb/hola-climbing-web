@@ -77,7 +77,10 @@ function sortFavoritesFirst<T extends { isFavorited: boolean }>(list: T[]): T[] 
 }
 
 const displayGyms = computed(() => sortFavoritesFirst(nearbyGyms.value.length ? nearbyGyms.value : gymStore.gyms));
-const isNearbyMode = computed(() => nearbyGyms.value.length > 0);
+// 위치 모드 활성 여부 — nearbyGyms.length로 유추하면 "위치는 잡혔지만 3km 내 암장이
+// 0개"인 경우 모드가 꺼진 것처럼 보여 핀·타이틀이 그대로 남는 버그가 생긴다.
+// fetchNearby 성공 시점에 명시적으로 true로 둔다.
+const isNearbyMode = ref(false);
 // 추천 섹션은 위치를 한 번이라도 획득(근처 모드)했을 때만 노출
 const showRecoSection = computed(() => isNearbyMode.value);
 // 이름 검색 중에는 지도(위치 기반 탐색용)를 숨겨 검색 결과를 바로 노출한다
@@ -119,6 +122,7 @@ const mapCenter = computed(() => {
 
 /** 근처/추천 상태 초기화 — 검색·새로고침·전체보기 시 호출 */
 function resetLocation() {
+  isNearbyMode.value = false;
   nearbyGyms.value = [];
   nearestGym.value = null;
   recommendedGyms.value = [];
@@ -139,6 +143,9 @@ async function fetchNearby(coords: { lat: number; lng: number }): Promise<void> 
   nearestGym.value = data[0] ?? null;
   carouselActiveId.value = data[0]?.id ?? null;
   searchQuery.value = "";
+  // 결과가 0개여도 위치 자체는 성공했으므로 모드는 켠다 — 그래야 핀이 lime으로
+  // 바뀌고 "3km 내 암장 없음" 안내가 뜬다.
+  isNearbyMode.value = true;
   if (authStore.isAuthenticated) {
     try {
       const { data: reco } = await gymService.getRecommendations({ lat: coords.lat, lng: coords.lng, radius: 5, size: 20 });
@@ -400,6 +407,13 @@ async function handleLocate() {
                       <path d="m9 5 7 7-7 7" />
                     </svg>
                   </button>
+                </div>
+              </div>
+              <!-- 위치 모드 켜짐 + 3km 내 암장 0개 -->
+              <div v-else-if="isNearbyMode" class="map-pill map-pill-hint" aria-label="주변 암장 없음">
+                <div>
+                  <div class="micro-label">내 주변</div>
+                  <div class="map-gym-name">3km 내에 암장이 없어요</div>
                 </div>
               </div>
               <!-- Hint pill (위치 미설정) -->
