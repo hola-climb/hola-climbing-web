@@ -76,11 +76,13 @@ function sortFavoritesFirst<T extends { isFavorited: boolean }>(list: T[]): T[] 
   return [...list].sort((a, b) => (b.isFavorited ? 1 : 0) - (a.isFavorited ? 1 : 0));
 }
 
-const displayGyms = computed(() => sortFavoritesFirst(nearbyGyms.value.length ? nearbyGyms.value : gymStore.gyms));
 // 위치 모드 활성 여부 — nearbyGyms.length로 유추하면 "위치는 잡혔지만 3km 내 암장이
 // 0개"인 경우 모드가 꺼진 것처럼 보여 핀·타이틀이 그대로 남는 버그가 생긴다.
 // fetchNearby 성공 시점에 명시적으로 true로 둔다.
 const isNearbyMode = ref(false);
+// 근처 모드에서 결과가 0개면 전체 목록으로 폴백하지 않는다 — "주변 암장"
+// 타이틀 아래 전체 목록이 섞여 보이는 걸 막고 빈 상태를 명확히 보여준다.
+const displayGyms = computed(() => sortFavoritesFirst(isNearbyMode.value ? nearbyGyms.value : gymStore.gyms));
 // 추천 섹션은 위치를 한 번이라도 획득(근처 모드)했을 때만 노출
 const showRecoSection = computed(() => isNearbyMode.value);
 // 이름 검색 중에는 지도(위치 기반 탐색용)를 숨겨 검색 결과를 바로 노출한다
@@ -487,7 +489,21 @@ async function handleLocate() {
               <GymCard v-for="gym in displayGyms" :key="gym.id" :gym="gym" :selectable="isDesktop" :class="{ 'is-selected': isDesktop && selectedGymId === gym.id }" @select="openGym" />
             </div>
 
-            <EmptyState v-if="!gymStore.isLoading && !gymStore.gyms.length" compact hold="orange" title="검색 결과가 없어요" description="다른 이름으로 검색하거나 위치로 찾아보세요." />
+            <!-- 근처 모드인데 3km 내 암장이 0개 -->
+            <EmptyState
+              v-else-if="!gymStore.isLoading && isNearbyMode"
+              compact
+              hold="orange"
+              title="3km 내에 암장이 없어요"
+              description="전체 암장 목록에서 다른 암장을 찾아보세요."
+              action-label="전체 암장 보기"
+              @action="
+                resetLocation();
+                loadGyms(true);
+              "
+            />
+
+            <EmptyState v-else-if="!gymStore.isLoading && !gymStore.gyms.length" compact hold="orange" title="검색 결과가 없어요" description="다른 이름으로 검색하거나 위치로 찾아보세요." />
           </div>
 
           <IonInfiniteScroll :disabled="gymStore.isLoading" @ion-infinite="handleInfinite">
