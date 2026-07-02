@@ -24,14 +24,18 @@ export async function authGuard(to: RouteLocationNormalized, from: RouteLocation
   const publicPaths = ["/feed", "/explore", "/verify-email", "/videos", "/users", "/gyms", "/oauth/callback", "/auth/social-signup"];
   const isPublicPath = publicPaths.some((path) => to.path.startsWith(path));
 
+  // 관리자는 접근 제한이 없다(모든 화면 사용 가능). 다만 로그인/기본 진입 화면은 어드민 콘솔로 보낸다.
+  const isAdmin = authStore.isAuthenticated && authStore.user?.role === "ADMIN";
+
   // 백엔드 인증 메일 링크가 /feed?token=... 형태로 오는 경우 → /verify-email로 리다이렉트
   if (to.path === "/feed" && to.query.token) {
     return next({ path: "/verify-email", query: { token: to.query.token } });
   }
 
-  // Already authenticated → keep auth pages out of reach, send to feed
+  // Already authenticated → keep auth pages out of reach
+  // (관리자는 어드민 콘솔, 일반 사용자는 피드로)
   if (isAuthPath && authStore.isAuthenticated) {
-    return next("/feed");
+    return next(isAdmin ? "/admin" : "/feed");
   }
 
   // Admin-only routes require ADMIN role

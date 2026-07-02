@@ -667,6 +667,209 @@ export interface PageResponse<T> {
   nextCursor?: string | null;
 }
 
+// ── Admin ─────────────────────────────────────────────────────────────────────
+// 어드민 대시보드 전용 타입. 백엔드 /api/admin/** (ROLE_ADMIN) 응답/요청 형태.
+
+export type UserRole = "USER" | "ADMIN";
+export type AdminUserStatus = "ACTIVE" | "SUSPENDED" | "DELETED";
+export type AdminGymStatus = "pending" | "active" | "closed";
+export type AdminReportStatus = "reviewed" | "resolved" | "rejected";
+export type AdminReportTargetType = "user" | "video" | "comment";
+/** 신고 카테고리 (프론트 정의) */
+export type AdminReportCategory = "obscene" | "copyright" | "abuse" | "spam" | "irrelevant" | "etc";
+export type ReportResolutionAction = "none" | "delete_video" | "delete_comment" | "suspend_user";
+export type AuditTargetType = "user" | "gym" | "report" | "video" | "comment";
+
+/** GET /api/admin/dashboard */
+export interface AdminDashboardResponse {
+  pendingGymCount: number;
+  pendingReportCount: number;
+  failedAnalysisVideoCount: number;
+  newUserCountToday: number;
+}
+
+/** GET /api/admin/users → content[] */
+export interface AdminUserSearchResponse {
+  id: number;
+  email: string;
+  nickname: string;
+  role: UserRole;
+  status: AdminUserStatus;
+  emailVerified: boolean;
+  lastLoginAt: string | null;
+  createdAt: string;
+}
+
+/** GET /api/admin/users/{userId} */
+export interface AdminUserDetailResponse {
+  id: number;
+  email: string;
+  nickname: string;
+  profileImage: string | null;
+  bio: string | null;
+  role: UserRole;
+  status: AdminUserStatus;
+  emailVerified: boolean;
+  lastLoginAt: string | null;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+/** GET /api/admin/reports → content[] */
+export interface AdminReportResponse {
+  id: number;
+  reporterId: number;
+  targetType: AdminReportTargetType;
+  targetId: number;
+  category: string;
+  reason: string | null;
+  status: AdminReportStatus;
+  reviewedBy: number | null;
+  reviewedAt: string | null;
+  createdAt: string;
+}
+
+/** GET /api/admin/gyms/{gymId} — GymDetailResponse (raw 백엔드 형태, lat/lng·요일키 businessHours) */
+export interface AdminGymDetail {
+  id: number;
+  name: string;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+  description: string | null;
+  phone: string | null;
+  website: string | null;
+  thumbnailUrl: string | null;
+  businessHours: Record<string, { open: string; close: string } | null> | null;
+  regionCode: string | null;
+  ratingAvg: number | null;
+  ratingCount: number;
+  status: AdminGymStatus;
+}
+
+/** GET /api/admin/gyms → content[] */
+export interface AdminGymSearchResponse {
+  id: number;
+  name: string;
+  address: string | null;
+  regionCode: string | null;
+  status: AdminGymStatus;
+  createdBy: number | null;
+  ratingAvg: number | null;
+  ratingCount: number;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+/** GET /api/admin/audit-logs → content[] */
+export interface AdminAuditLogResponse {
+  id: number;
+  adminId: number;
+  action: string;
+  targetType: string;
+  targetId: number;
+  reason: string | null;
+  beforeJson: string | null;
+  afterJson: string | null;
+  createdAt: string;
+}
+
+/** GET /api/admin/analysis/models/{modelVersion}/metrics → perTechnique[key] */
+export interface PerTechniqueMetric {
+  truePositive: number;
+  falsePositive: number;
+  falseNegative: number;
+  trueNegative: number;
+  accuracy: number;
+  precision: number;
+  recall: number;
+  f1: number;
+}
+
+export interface AdminModelMetricsResponse {
+  modelVersion: string;
+  feedbackCount: number;
+  dynamicEvaluatedCount: number;
+  dynamicAccuracy: number;
+  techniqueExactMatchAccuracy: number;
+  perTechnique: Record<string, PerTechniqueMetric>;
+}
+
+/** POST /api/admin/gyms/import/preview → invalidRows[] */
+export interface AdminGymImportInvalidRow {
+  rowIndex: number;
+  externalKey: string;
+  errors: string[];
+}
+
+export interface AdminGymImportPreviewResponse {
+  totalCount: number;
+  validCount: number;
+  invalidCount: number;
+  invalidRows: AdminGymImportInvalidRow[];
+}
+
+/** POST /api/admin/gyms/import */
+export interface AdminGymImportApplyResponse {
+  importedCount: number;
+}
+
+// ── Admin request DTOs ──────────────────────────────────────────────────────────
+
+/** 요일별 운영시간. 요일 키는 백엔드가 MONDAY..SUNDAY 대문자를 받는다. 휴무는 null. */
+export type AdminBusinessHours = Record<string, { open: string; close: string } | null>;
+
+export interface AdminUserStatusRequest {
+  status: AdminUserStatus;
+  reason?: string;
+}
+
+export interface AdminUserRoleRequest {
+  role: UserRole;
+  reason: string;
+}
+
+export interface AdminReasonRequest {
+  reason?: string;
+}
+
+export interface AdminReportStatusRequest {
+  status: AdminReportStatus;
+  resolutionAction: ReportResolutionAction;
+  reason?: string;
+}
+
+export interface AdminGymUpsertRequest {
+  name: string;
+  address?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  phone?: string | null;
+  website?: string | null;
+  description?: string | null;
+  businessHours?: AdminBusinessHours | null;
+  regionCode?: string | null;
+}
+
+export interface AdminGymGradeInput {
+  label: string;
+  difficultyOrder: number;
+}
+
+export interface AdminGymGradeReplaceRequest {
+  grades: AdminGymGradeInput[];
+  reason?: string;
+}
+
+export interface AdminGymImportRow extends AdminGymUpsertRequest {
+  externalKey: string;
+  grades: AdminGymGradeInput[];
+}
+
+export interface AdminGymImportRequest {
+  rows: AdminGymImportRow[];
+}
+
 // ── API error ─────────────────────────────────────────────────────────────────
 
 export interface ApiError {

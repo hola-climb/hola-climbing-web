@@ -168,11 +168,22 @@ const routes: Array<RouteRecordRaw> = [
     component: () => import('@/pages/my/UserProfilePage.vue'),
   },
 
-  // ── Admin ─────────────────────────────────────────────────────────────
+  // ── Admin (데스크톱 전용 어드민 쉘) ───────────────────────────────────────
+  // 부모 meta.requiresAdmin 은 to.meta 에 병합되어 모든 하위 라우트를 보호한다.
   {
     path: '/admin',
-    component: () => import('@/pages/admin/AdminPage.vue'),
+    component: () => import('@/layouts/AdminLayout.vue'),
     meta: { requiresAdmin: true },
+    children: [
+      { path: '', component: () => import('@/pages/admin/AdminDashboardPage.vue') },
+      { path: 'users', component: () => import('@/pages/admin/AdminUsersPage.vue') },
+      { path: 'users/:id', component: () => import('@/pages/admin/AdminUserDetailPage.vue') },
+      { path: 'reports', component: () => import('@/pages/admin/AdminReportsPage.vue') },
+      { path: 'gyms', component: () => import('@/pages/admin/AdminGymsPage.vue') },
+      { path: 'gyms/:id', component: () => import('@/pages/admin/AdminGymDetailPage.vue') },
+      { path: 'audit-logs', component: () => import('@/pages/admin/AdminAuditLogsPage.vue') },
+      { path: 'analysis/models', component: () => import('@/pages/admin/AdminModelMetricsPage.vue') },
+    ],
   },
 
   // ── Fallback ──────────────────────────────────────────────────────────

@@ -72,7 +72,8 @@ async function handleLogin() {
     } else {
       localStorage.removeItem(REMEMBER_KEY);
     }
-    const redirect = (route.query.redirect as string) || "/feed";
+    // 관리자는 어드민 콘솔로만 진입한다 (일반 사용자 화면 사용 불가).
+    const redirect = authStore.user?.role === "ADMIN" ? "/admin" : (route.query.redirect as string) || "/feed";
     // 탭 레이아웃(AppLayout)으로 돌아갈 때는 Ionic 라우터로 스택을 'root'로 리셋한다.
     // 평범한 router.replace 는 Ionic 에 방향을 알리지 못해 캐시된 ion-tabs 가
     // 망가지고(탭 클릭이 먹지 않음) 페이지 전환이 안 되는 문제를 유발한다.

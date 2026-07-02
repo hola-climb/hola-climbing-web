@@ -73,6 +73,19 @@ body {
   color: var(--fg-muted);
 }
 
+/* Screen-reader-only text (visually hidden, still announced) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* Canonical top-level section heading (e.g. "주변 암장", "기술 사용 빈도") */
 .section-title {
   font-size: var(--fs-h2);
@@ -250,6 +263,128 @@ ion-modal {
   cursor: pointer;
   color: var(--fg-muted);
   font-size: 18px;
+}
+
+/* ── Admin form controls ────────────────────────────
+   어드민 대시보드 전용 폼 컨트롤 (필터바·다이얼로그·폼 공용). */
+.admin-input,
+.admin-select,
+.admin-textarea {
+  width: 100%;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 0 12px;
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  font-weight: var(--w-medium);
+  color: var(--fg);
+  outline: none;
+  transition: border-color var(--dur-fast) var(--ease-state);
+}
+.admin-textarea {
+  height: auto;
+  min-height: 80px;
+  padding: 10px 12px;
+  line-height: 1.5;
+  resize: vertical;
+}
+.admin-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23697690' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 32px;
+  cursor: pointer;
+}
+.admin-input:focus,
+.admin-select:focus,
+.admin-textarea:focus {
+  border-color: var(--fg);
+}
+.admin-input::placeholder,
+.admin-textarea::placeholder {
+  color: var(--fg-muted);
+}
+.admin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.admin-field-label {
+  font-size: var(--fs-caption);
+  font-weight: var(--w-semibold);
+  color: var(--fg);
+}
+
+/* ── Admin page scaffolding ─────────────────────────
+   어드민 페이지 공통 구조 (제목/카드/툴바). */
+.admin-page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.admin-page-title {
+  font-size: var(--fs-h1);
+  font-weight: var(--w-extrabold);
+  letter-spacing: -0.015em;
+  line-height: 1.1;
+  margin: 0;
+}
+.admin-page-sub {
+  font-size: var(--fs-caption);
+  font-weight: var(--w-medium);
+  color: var(--fg-muted);
+  margin: 4px 0 0;
+}
+.admin-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+  padding: 20px 22px;
+}
+.admin-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: var(--fs-caption);
+  font-weight: var(--w-semibold);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-state);
+}
+.admin-btn:hover {
+  background: var(--surface-soft);
+}
+.admin-btn--primary {
+  background: var(--hold-dark);
+  color: #fff;
+  border-color: var(--hold-dark);
+}
+.admin-btn--primary:hover {
+  background: #2a2a2a;
+}
+.admin-btn--danger {
+  color: var(--hold-pink);
+  border-color: var(--tint-pink);
+}
+.admin-btn--danger:hover {
+  background: var(--tint-pink);
+}
+.admin-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* ── Scroll resets ──────────────────────────────── */

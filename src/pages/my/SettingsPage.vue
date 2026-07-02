@@ -147,6 +147,20 @@ async function handleDelete(password: string) {
           </div>
         </section>
 
+        <!-- Admin section (ADMIN 역할만) -->
+        <section v-if="authStore.user?.role === 'ADMIN'" class="settings-section">
+          <h2 class="section-title">관리자</h2>
+
+          <div class="hola-card action-card">
+            <button class="action-row" aria-label="관리자 대시보드" @click="router.push('/admin')">
+              <span class="action-label">관리자 대시보드</span>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m9 5 7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        </section>
+
         <!-- Account section -->
         <section class="settings-section">
           <h2 class="section-title">계정</h2>
